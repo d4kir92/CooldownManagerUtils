@@ -398,18 +398,19 @@ local function SavePosition(frame)
 end
 
 local function CreateReminderIcon(parent, index)
-	local icon = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	local icon = CreateFrame("Frame", nil, parent)
 	icon:SetSize(ICON_SIZE, ICON_SIZE)
 	icon:EnableMouse(true)
-	icon:SetBackdrop({
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		edgeSize = 1
-	})
-
-	icon:SetBackdropBorderColor(0, 0, 0, 1)
 	icon.Texture = icon:CreateTexture(nil, "ARTWORK")
-	icon.Texture:SetPoint("TOPLEFT", 1, -1)
-	icon.Texture:SetPoint("BOTTOMRIGHT", -1, 1)
+	icon.Texture:SetAllPoints()
+	icon.Mask = icon:CreateMaskTexture()
+	icon.Mask:SetAtlas("UI-HUD-CoolDownManager-Mask")
+	icon.Mask:SetAllPoints()
+	icon.Texture:AddMaskTexture(icon.Mask)
+	icon.Overlay = icon:CreateTexture(nil, "OVERLAY")
+	icon.Overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
+	icon.Overlay:SetPoint("TOPLEFT", -8, 7)
+	icon.Overlay:SetPoint("BOTTOMRIGHT", 8, -7)
 	icon:SetScript("OnEnter", function(self)
 		if not self.spellID then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
