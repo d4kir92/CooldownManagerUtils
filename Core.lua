@@ -1,17 +1,9 @@
 local _, CooldownManagerUtils = ...
-
-CooldownManagerUtils:SetAddonOutput("CooldownManagerUtils", 134148)
-
+CooldownManagerUtils:SetAddonOutput("CooldownManagerUtils", 134376)
 local ICON_SIZE = 40
 local ICON_SPACING = 4
 local FRAME_PADDING = 6
-local SOURCE_CATEGORIES = {
-	"TrackedBuff",
-	"TrackedBar",
-	"EquipSlotTracked",
-	"SpecAgnosticTracked",
-	"HiddenPassive"
-}
+local SOURCE_CATEGORIES = {"TrackedBuff", "TrackedBar", "EquipSlotTracked", "SpecAgnosticTracked", "HiddenPassive"}
 local REMINDER_CATEGORY_ORDER = {
 	trackedBuff = 1,
 	hidden = 2
@@ -22,7 +14,6 @@ local reminderFrame
 local editModeActive = false
 local updatePending = false
 local presenceCache = {}
-
 local function IsSupportedClient()
 	return CooldownManagerUtils:GetWoWBuildNr() >= 120000 or CooldownManagerUtils:IsForever()
 end
@@ -34,7 +25,12 @@ end
 local function GetReminderSpellInfo(spellID)
 	if C_Spell and C_Spell.GetSpellInfo then return C_Spell.GetSpellInfo(spellID) end
 	local name, _, iconID = _G.GetSpellInfo(spellID)
-	if name then return {name = name, iconID = iconID} end
+	if name then
+		return {
+			name = name,
+			iconID = iconID
+		}
+	end
 end
 
 local function GetSpecKey()
@@ -64,18 +60,27 @@ local function AddAvailableCooldown(cooldownViewer, cooldownID, availableBuffs, 
 	AddCandidate(candidates, seenCandidates, info.overrideSpellID)
 	AddCandidate(candidates, seenCandidates, info.spellID)
 	if type(info.linkedSpellIDs) == "table" then
-		for _, linkedSpellID in ipairs(info.linkedSpellIDs) do AddCandidate(candidates, seenCandidates, linkedSpellID) end
+		for _, linkedSpellID in ipairs(info.linkedSpellIDs) do
+			AddCandidate(candidates, seenCandidates, linkedSpellID)
+		end
 	end
+
 	local displaySpellID = info.overrideTooltipSpellID or info.overrideSpellID or info.spellID or candidates[1]
 	if not displaySpellID then return end
 	AddCandidate(candidates, seenCandidates, displaySpellID)
 	local existing = availableBuffsBySpellID[displaySpellID]
 	if existing then
 		local existingCandidates = {}
-		for _, spellID in ipairs(existing.candidates) do existingCandidates[spellID] = true end
-		for _, spellID in ipairs(candidates) do AddCandidate(existing.candidates, existingCandidates, spellID) end
+		for _, spellID in ipairs(existing.candidates) do
+			existingCandidates[spellID] = true
+		end
+
+		for _, spellID in ipairs(candidates) do
+			AddCandidate(existing.candidates, existingCandidates, spellID)
+		end
 		return
 	end
+
 	local spellInfo = displaySpellID and GetReminderSpellInfo(displaySpellID)
 	if not spellInfo or not spellInfo.name then return end
 	local entry = {
@@ -85,6 +90,7 @@ local function AddAvailableCooldown(cooldownViewer, cooldownID, availableBuffs, 
 		defaultCategory = "hidden",
 		candidates = candidates
 	}
+
 	availableBuffsBySpellID[displaySpellID] = entry
 	table.insert(availableBuffs, entry)
 end
@@ -93,13 +99,17 @@ function CooldownManagerUtils:GetProfile()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	CooldownManagerUtilsDB.profiles = CooldownManagerUtilsDB.profiles or {}
 	local specKey = GetSpecKey()
-	CooldownManagerUtilsDB.profiles[specKey] = CooldownManagerUtilsDB.profiles[specKey] or {selected = {}}
+	CooldownManagerUtilsDB.profiles[specKey] = CooldownManagerUtilsDB.profiles[specKey] or {
+		selected = {}
+	}
+
 	local profile = CooldownManagerUtilsDB.profiles[specKey]
 	if profile.layoutVersion ~= 3 then
 		profile.selected = {}
 		profile.layout = {}
 		profile.layoutVersion = 3
 	end
+
 	profile.selected = profile.selected or {}
 	profile.layout = profile.layout or {}
 	return profile
@@ -114,10 +124,15 @@ function CooldownManagerUtils:SaveReminderLayout(categories)
 	local selected = {}
 	for _, category in ipairs(categories) do
 		for order, entry in ipairs(category.entries) do
-			layout[entry.spellID] = {category = category.key, order = order}
+			layout[entry.spellID] = {
+				category = category.key,
+				order = order
+			}
+
 			if category.key ~= "hidden" then selected[entry.spellID] = true end
 		end
 	end
+
 	local profile = self:GetProfile()
 	profile.layout = layout
 	profile.selected = selected
@@ -136,6 +151,7 @@ function CooldownManagerUtils:SetReminderSelected(spellID, selected)
 		profile.selected[spellID] = nil
 		presenceCache[spellID] = nil
 	end
+
 	self:UpdateReminderBar()
 end
 
@@ -197,14 +213,23 @@ end
 local function SavePosition(frame)
 	local point, _, relativePoint, x, y = frame:GetPoint(1)
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
-	CooldownManagerUtilsDB.position = {point = point, relativePoint = relativePoint, x = x, y = y}
+	CooldownManagerUtilsDB.position = {
+		point = point,
+		relativePoint = relativePoint,
+		x = x,
+		y = y
+	}
 end
 
 local function CreateReminderIcon(parent, index)
 	local icon = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	icon:SetSize(ICON_SIZE, ICON_SIZE)
 	icon:EnableMouse(true)
-	icon:SetBackdrop({edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
+	icon:SetBackdrop({
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1
+	})
+
 	icon:SetBackdropBorderColor(0, 0, 0, 1)
 	icon.Texture = icon:CreateTexture(nil, "ARTWORK")
 	icon.Texture:SetPoint("TOPLEFT", 1, -1)
@@ -215,6 +240,7 @@ local function CreateReminderIcon(parent, index)
 		GameTooltip:SetSpellByID(self.spellID)
 		GameTooltip:Show()
 	end)
+
 	icon:SetScript("OnLeave", GameTooltip_Hide)
 	parent.icons[index] = icon
 	return icon
@@ -227,7 +253,12 @@ function CooldownManagerUtils:CreateReminderBar()
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:RegisterForDrag("LeftButton")
-	frame:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 2})
+	frame:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 2
+	})
+
 	frame:SetBackdropColor(0, 0, 0, 0)
 	frame:SetBackdropBorderColor(0.2, 0.6, 1, 0)
 	frame.icons = {}
@@ -235,13 +266,12 @@ function CooldownManagerUtils:CreateReminderBar()
 	frame.Label:SetPoint("CENTER")
 	frame.Label:SetText(self:Trans("LID_BUFFREMINDERS_EDITMODE"))
 	frame.Label:Hide()
-	frame:SetScript("OnDragStart", function(mover)
-		if editModeActive then mover:StartMoving() end
-	end)
+	frame:SetScript("OnDragStart", function(mover) if editModeActive then mover:StartMoving() end end)
 	frame:SetScript("OnDragStop", function(mover)
 		mover:StopMovingOrSizing()
 		SavePosition(mover)
 	end)
+
 	RestorePosition(frame)
 	reminderFrame = frame
 	return frame
@@ -252,7 +282,12 @@ local function GetSavedEntry(spellID)
 	if entry then return entry end
 	local spellInfo = GetReminderSpellInfo(spellID)
 	if not spellInfo or not spellInfo.name then return end
-	return {spellID = spellID, name = spellInfo.name, iconID = spellInfo.iconID, candidates = {spellID}}
+	return {
+		spellID = spellID,
+		name = spellInfo.name,
+		iconID = spellInfo.iconID,
+		candidates = {spellID}
+	}
 end
 
 local function GetAuraState(entry)
@@ -266,6 +301,7 @@ local function GetAuraState(entry)
 			return true
 		end
 	end
+
 	if unknown then return nil end
 	return false
 end
@@ -282,6 +318,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 			if editModeActive or presenceCache[spellID] == false then table.insert(entries, entry) end
 		end
 	end
+
 	local profile = self:GetProfile()
 	table.sort(entries, function(left, right)
 		local leftLayout = profile.layout[left.spellID]
@@ -307,7 +344,10 @@ function CooldownManagerUtils:UpdateReminderBar()
 		icon.spellID = entry.spellID
 		icon:Show()
 	end
-	for index = #entries + 1, #frame.icons do frame.icons[index]:Hide() end
+
+	for index = #entries + 1, #frame.icons do
+		frame.icons[index]:Hide()
+	end
 
 	local width = #entries > 0 and FRAME_PADDING * 2 + #entries * ICON_SIZE + (#entries - 1) * ICON_SPACING or 180
 	frame:SetSize(width, ICON_SIZE + FRAME_PADDING * 2)
@@ -340,6 +380,7 @@ function CooldownManagerUtils:Initialize()
 		EventRegistry:RegisterCallback("EditMode.Enter", function() SetEditModeActive(true) end, self)
 		EventRegistry:RegisterCallback("EditMode.Exit", function() SetEditModeActive(false) end, self)
 	end
+
 	if EditModeManagerFrame and EditModeManagerFrame.IsEditModeActive then editModeActive = EditModeManagerFrame:IsEditModeActive() == true end
 	self:InitializeReminderSettings()
 	self:RefreshAvailableBuffs()
@@ -357,6 +398,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
 end
+
 eventFrame:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_LOGIN" then
 		CooldownManagerUtils:Initialize()

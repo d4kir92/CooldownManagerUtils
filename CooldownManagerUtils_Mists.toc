@@ -1,6 +1,6 @@
 ## Interface: 50504
 ## Version: 0.1.0
-## Title: Cooldown Manager Utils |T134148:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
+## Title: Cooldown Manager Utils |T134376:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
 ## Notes: 
 ## Notes-deDE: 
 ## Notes-esES: 
@@ -29,7 +29,7 @@
 ## SavedVariablesPerCharacter: CooldownManagerUtilsDB
 ## X-Curse-Project-ID: 1709871
 ## X-Wago-ID: YK9xEe6L
-## IconTexture: 134148
+## IconTexture: 134376
 
 libs\D4Lib\D4Lib.xml
 

@@ -8,7 +8,7 @@
 ## Interface: 120100
 
 ## Version: 0.1.0
-## Title: Cooldown Manager Utils |T134148:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
+## Title: Cooldown Manager Utils |T134376:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
 ## Notes: Adds configurable missing-buff reminders to Blizzard's Cooldown Manager.
 ## Notes-deDE: 
 ## Notes-esES: 
@@ -38,7 +38,7 @@
 ## OptionalDeps: Blizzard_CooldownViewer, Blizzard_EditMode
 ## X-Curse-Project-ID: 1709871
 ## X-Wago-ID: YK9xEe6L
-## IconTexture: 134148
+## IconTexture: 134376
 
 libs\D4Lib\D4Lib.xml
 
