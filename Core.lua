@@ -72,7 +72,7 @@ local function AddAuraMappingSpell(mapping, spellID)
 end
 
 local function AddCooldownAuraMapping(knownAuraSpells, info)
-	if type(info) ~= "table" or info.hasAura ~= true then return end
+	if type(info) ~= "table" or info.hasAura ~= true or info.selfAura ~= true then return end
 	local mapping = {
 		candidates = {},
 		seen = {}
@@ -98,27 +98,46 @@ local function AddCooldownAuraMapping(knownAuraSpells, info)
 	end
 end
 
+local function AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, seenCooldownIDs)
+	local categoryOK, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, true)
+	if not categoryOK or type(cooldownIDs) ~= "table" then return end
+	for _, cooldownID in ipairs(cooldownIDs) do
+		if not seenCooldownIDs[cooldownID] then
+			seenCooldownIDs[cooldownID] = true
+			local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
+			if infoOK then AddCooldownAuraMapping(knownAuraSpells, info) end
+		end
+	end
+end
+
+local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells)
+	if type(cooldownViewer.GetGroupBuffItems) ~= "function" then return end
+	local itemsOK, items = pcall(cooldownViewer.GetGroupBuffItems)
+	if not itemsOK or type(items) ~= "table" then return end
+	for _, item in ipairs(items) do
+		local spellID = type(item) == "table" and item.spellID
+		if type(spellID) == "number" then
+			knownAuraSpells[spellID] = knownAuraSpells[spellID] or {
+				candidates = {},
+				seen = {}
+			}
+			local mapping = knownAuraSpells[spellID]
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+		end
+	end
+end
+
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local cooldownViewer = C_CooldownViewer
 	local categoryEnum = Enum and Enum.CooldownViewerCategory
 	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells end
 
+	AddGroupBuffMappings(cooldownViewer, knownAuraSpells)
 	local seenCooldownIDs = {}
 	for _, categoryName in ipairs(COOLDOWN_AURA_CATEGORIES) do
 		local category = categoryEnum[categoryName]
-		if category ~= nil then
-			local categoryOK, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, true)
-			if categoryOK and type(cooldownIDs) == "table" then
-				for _, cooldownID in ipairs(cooldownIDs) do
-					if not seenCooldownIDs[cooldownID] then
-						seenCooldownIDs[cooldownID] = true
-						local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
-						if infoOK then AddCooldownAuraMapping(knownAuraSpells, info) end
-					end
-				end
-			end
-		end
+		if category ~= nil then AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, seenCooldownIDs) end
 	end
 
 	return knownAuraSpells
