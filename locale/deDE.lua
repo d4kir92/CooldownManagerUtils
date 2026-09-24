@@ -1,7 +1,7 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS", "Buff-Erinnerungen")
-CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_DESC", "Ziehe Buffs aus „Nicht angezeigt“ nach „Verfolgte Buffs“, um sie als Reminder zu verwenden.")
-CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_EMPTY", "Für diese Spezialisierung sind keine Buffs verfügbar.")
+CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_DESC", "Hier findest du Klassen- und Spezialisierungszauber, die einen Buff auf deinem Charakter auslösen. Ziehe sie nach „Verfolgte Buffs“, um sie als Erinnerung zu verwenden.")
+CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_EMPTY", "Für diese Klasse und Spezialisierung sind keine passenden Buff-Zauber verfügbar.")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_EDITMODE", "Buff-Erinnerung")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_TOOLTIP", "Nach „Verfolgte Buffs“ ziehen, um diesen Buff als Reminder zu verwenden.")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_DRAG", "Nach „Nicht angezeigt“ ziehen, um den Reminder zu entfernen.")

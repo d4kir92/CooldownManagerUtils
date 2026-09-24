@@ -3,10 +3,17 @@ CooldownManagerUtils:SetAddonOutput("CooldownManagerUtils", 134376)
 local ICON_SIZE = 40
 local ICON_SPACING = 4
 local FRAME_PADDING = 6
-local SOURCE_CATEGORIES = {"TrackedBuff", "TrackedBar", "EquipSlotTracked", "SpecAgnosticTracked", "HiddenPassive"}
 local REMINDER_CATEGORY_ORDER = {
 	trackedBuff = 1,
 	hidden = 2
+}
+local COOLDOWN_AURA_CATEGORIES = {
+	"Essential",
+	"Utility",
+	"TrackedBuff",
+	"TrackedBar",
+	"HiddenActive",
+	"HiddenPassive"
 }
 
 local eventFrame = CreateFrame("Frame")
@@ -52,47 +59,153 @@ local function AddCandidate(candidates, seen, spellID)
 	table.insert(candidates, spellID)
 end
 
-local function AddAvailableCooldown(cooldownViewer, cooldownID, availableBuffs, availableBuffsBySpellID)
-	local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
-	if not infoOK or type(info) ~= "table" or info.isKnown == false or info.hasAura == false then return end
-	local candidates = {}
-	local seenCandidates = {}
-	AddCandidate(candidates, seenCandidates, info.overrideSpellID)
-	AddCandidate(candidates, seenCandidates, info.spellID)
+local function GetSpellPredicate(predicate, spellID)
+	if type(predicate) ~= "function" then return false end
+	local ok, result = pcall(predicate, spellID)
+	if not ok or IsSecret(result) then return false end
+	return result == true
+end
+
+local function AddAuraMappingSpell(mapping, spellID)
+	if type(spellID) ~= "number" then return end
+	AddCandidate(mapping.candidates, mapping.seen, spellID)
+end
+
+local function AddCooldownAuraMapping(knownAuraSpells, info)
+	if type(info) ~= "table" or info.hasAura ~= true then return end
+	local mapping = {
+		candidates = {},
+		seen = {}
+	}
+	AddAuraMappingSpell(mapping, info.overrideSpellID)
+	AddAuraMappingSpell(mapping, info.overrideTooltipSpellID)
+	AddAuraMappingSpell(mapping, info.spellID)
 	if type(info.linkedSpellIDs) == "table" then
 		for _, linkedSpellID in ipairs(info.linkedSpellIDs) do
-			AddCandidate(candidates, seenCandidates, linkedSpellID)
+			AddAuraMappingSpell(mapping, linkedSpellID)
 		end
 	end
 
-	local displaySpellID = info.overrideTooltipSpellID or info.overrideSpellID or info.spellID or candidates[1]
-	if not displaySpellID then return end
-	AddCandidate(candidates, seenCandidates, displaySpellID)
-	local existing = availableBuffsBySpellID[displaySpellID]
+	for _, mappedSpellID in ipairs(mapping.candidates) do
+		knownAuraSpells[mappedSpellID] = knownAuraSpells[mappedSpellID] or {
+			candidates = {},
+			seen = {}
+		}
+		local target = knownAuraSpells[mappedSpellID]
+		for _, candidateSpellID in ipairs(mapping.candidates) do
+			AddCandidate(target.candidates, target.seen, candidateSpellID)
+		end
+	end
+end
+
+local function BuildKnownAuraSpellLookup()
+	local knownAuraSpells = {}
+	local cooldownViewer = C_CooldownViewer
+	local categoryEnum = Enum and Enum.CooldownViewerCategory
+	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells end
+
+	local seenCooldownIDs = {}
+	for _, categoryName in ipairs(COOLDOWN_AURA_CATEGORIES) do
+		local category = categoryEnum[categoryName]
+		if category ~= nil then
+			local categoryOK, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, true)
+			if categoryOK and type(cooldownIDs) == "table" then
+				for _, cooldownID in ipairs(cooldownIDs) do
+					if not seenCooldownIDs[cooldownID] then
+						seenCooldownIDs[cooldownID] = true
+						local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
+						if infoOK then AddCooldownAuraMapping(knownAuraSpells, info) end
+					end
+				end
+			end
+		end
+	end
+
+	return knownAuraSpells
+end
+
+local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
+	if not C_Spell or GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
+	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
+	if GetSpellPredicate(C_Spell.IsSelfBuff, spellID) then return true end
+	if not GetSpellPredicate(C_Spell.IsSpellHelpful, spellID) then return false end
+	if type(C_Spell.GetSpellMaxCumulativeAuraApplications) ~= "function" then return false end
+	local ok, applications = pcall(C_Spell.GetSpellMaxCumulativeAuraApplications, spellID)
+	return ok and not IsSecret(applications) and type(applications) == "number" and applications > 0
+end
+
+local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
+	local candidates = {}
+	local seenCandidates = {}
+	AddCandidate(candidates, seenCandidates, spellID)
+	AddCandidate(candidates, seenCandidates, baseSpellID)
+	local auraMapping = knownAuraSpells[spellID] or knownAuraSpells[baseSpellID]
+	if auraMapping then
+		for _, auraSpellID in ipairs(auraMapping.candidates) do
+			AddCandidate(candidates, seenCandidates, auraSpellID)
+		end
+	end
+	if C_Spell.GetBaseSpell then
+		local ok, result = pcall(C_Spell.GetBaseSpell, spellID)
+		if ok and not IsSecret(result) then AddCandidate(candidates, seenCandidates, result) end
+	end
+
+	local existing = availableBuffsBySpellID[spellID]
 	if existing then
 		local existingCandidates = {}
-		for _, spellID in ipairs(existing.candidates) do
-			existingCandidates[spellID] = true
+		for _, candidateSpellID in ipairs(existing.candidates) do
+			existingCandidates[candidateSpellID] = true
 		end
 
-		for _, spellID in ipairs(candidates) do
-			AddCandidate(existing.candidates, existingCandidates, spellID)
+		for _, candidateSpellID in ipairs(candidates) do
+			AddCandidate(existing.candidates, existingCandidates, candidateSpellID)
 		end
 		return
 	end
 
-	local spellInfo = displaySpellID and GetReminderSpellInfo(displaySpellID)
+	local spellInfo = GetReminderSpellInfo(spellID)
 	if not spellInfo or not spellInfo.name then return end
 	local entry = {
-		spellID = displaySpellID,
+		spellID = spellID,
 		name = spellInfo.name,
 		iconID = spellInfo.iconID,
 		defaultCategory = "hidden",
 		candidates = candidates
 	}
 
-	availableBuffsBySpellID[displaySpellID] = entry
+	availableBuffsBySpellID[spellID] = entry
 	table.insert(availableBuffs, entry)
+end
+
+local function AddFlyoutSpells(flyoutID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if type(GetFlyoutInfo) ~= "function" or type(GetFlyoutSlotInfo) ~= "function" then return end
+	local _, _, numSlots, isKnown = GetFlyoutInfo(flyoutID)
+	if not isKnown or type(numSlots) ~= "number" then return end
+	for slotIndex = 1, numSlots do
+		local baseSpellID, overrideSpellID, isKnownSlot = GetFlyoutSlotInfo(flyoutID, slotIndex)
+		if isKnownSlot then AddAvailableSpell(overrideSpellID or baseSpellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
+	end
+end
+
+local function AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local skillLineInfo = C_SpellBook.GetSpellBookSkillLineInfo(skillLineIndex)
+	if not skillLineInfo or skillLineInfo.shouldHide or skillLineInfo.isGuild then return end
+	local playerBank = Enum.SpellBookSpellBank.Player
+	local spellType = Enum.SpellBookItemType.Spell
+	local flyoutType = Enum.SpellBookItemType.Flyout
+	local firstItem = skillLineInfo.itemIndexOffset + 1
+	local lastItem = firstItem + skillLineInfo.numSpellBookItems - 1
+	for itemIndex = firstItem, lastItem do
+		local itemInfo = C_SpellBook.GetSpellBookItemInfo(itemIndex, playerBank)
+		if itemInfo and not itemInfo.isPassive and not itemInfo.isOffSpec then
+			if itemInfo.itemType == spellType and itemInfo.spellID then
+				AddAvailableSpell(itemInfo.spellID, itemInfo.actionID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+			elseif itemInfo.itemType == flyoutType then
+				AddFlyoutSpells(itemInfo.actionID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+			end
+		end
+	end
 end
 
 function CooldownManagerUtils:GetProfile()
@@ -104,10 +217,10 @@ function CooldownManagerUtils:GetProfile()
 	}
 
 	local profile = CooldownManagerUtilsDB.profiles[specKey]
-	if profile.layoutVersion ~= 3 then
+	if profile.layoutVersion ~= 4 then
 		profile.selected = {}
 		profile.layout = {}
-		profile.layoutVersion = 3
+		profile.layoutVersion = 4
 	end
 
 	profile.selected = profile.selected or {}
@@ -161,9 +274,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 		return
 	end
 
-	local cooldownViewer = C_CooldownViewer
-	local categoryEnum = Enum and Enum.CooldownViewerCategory
-	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then
+	if not C_SpellBook or not C_SpellBook.GetSpellBookSkillLineInfo or not C_SpellBook.GetSpellBookItemInfo or not Enum or not Enum.SpellBookSpellBank or not Enum.SpellBookItemType then
 		self.availableBuffs = {}
 		self.availableBuffsBySpellID = {}
 		return
@@ -171,21 +282,12 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 
 	local availableBuffs = {}
 	local availableBuffsBySpellID = {}
-	local seenCooldownIDs = {}
-	for _, categoryName in ipairs(SOURCE_CATEGORIES) do
-		local category = categoryEnum[categoryName]
-		if category ~= nil then
-			local ok, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, false)
-			if ok and type(cooldownIDs) == "table" then
-				for _, cooldownID in ipairs(cooldownIDs) do
-					if not seenCooldownIDs[cooldownID] then
-						seenCooldownIDs[cooldownID] = true
-						AddAvailableCooldown(cooldownViewer, cooldownID, availableBuffs, availableBuffsBySpellID)
-					end
-				end
-			end
-		end
-	end
+	local knownAuraSpells = BuildKnownAuraSpellLookup()
+	local skillLineEnum = Enum.SpellBookSkillLineIndex
+	local classLine = skillLineEnum and skillLineEnum.Class or 2
+	local specLine = skillLineEnum and skillLineEnum.MainSpec or 3
+	AddSpellBookSkillLine(classLine, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	AddSpellBookSkillLine(specLine, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
 	self.availableBuffs = availableBuffs

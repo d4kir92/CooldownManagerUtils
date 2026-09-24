@@ -108,7 +108,11 @@ local function CreateItemButton(parent, index)
 	button.Icon:SetAllPoints()
 	button.Highlight = button:CreateTexture(nil, "HIGHLIGHT")
 	button.Highlight:SetAllPoints(button.Icon)
-	button.Highlight:SetColorTexture(1, 1, 1, 0.18)
+	button.Highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+	button.Highlight:SetBlendMode("ADD")
+	button.Filter = button:CreateTexture(nil, "OVERLAY")
+	button.Filter:SetAllPoints(button.Icon)
+	button.Filter:SetColorTexture(0, 0, 0, 0.72)
 	button:SetScript("OnDragStart", BeginDrag)
 	button:SetScript("OnDragStop", FinishDrag)
 	button:SetScript("OnEnter", function(self)
@@ -130,22 +134,19 @@ end
 local function CreateCategoryFrame(parent, definition, index)
 	local frame = CreateFrame("Frame", nil, parent)
 	frame:SetWidth(CATEGORY_WIDTH)
-	frame.Header = CreateFrame("Button", nil, frame, "BackdropTemplate")
+	frame.Header = CreateFrame("Button", nil, frame, "ListHeaderThreeSliceTemplate")
 	frame.Header:SetPoint("TOPLEFT")
 	frame.Header:SetPoint("TOPRIGHT")
 	frame.Header:SetHeight(22)
-	frame.Header:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1})
-	frame.Header:SetBackdropColor(0.12, 0.12, 0.12, 0.95)
-	frame.Header:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
-	frame.Header.Text = frame.Header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	frame.Header.Text:SetPoint("LEFT", 8, 0)
-	frame.Header.Arrow = frame.Header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	frame.Header.Arrow:SetPoint("RIGHT", -7, 0)
-	frame.Header:SetScript("OnClick", function()
-		collapsed[definition.key] = not collapsed[definition.key]
-		CooldownManagerUtils:RefreshReminderSettings()
+	frame.Header:SetTitleColor(false, NORMAL_FONT_COLOR)
+	frame.Header:SetTitleColor(true, NORMAL_FONT_COLOR)
+	frame.Header:SetClickHandler(function(_, button)
+		if button == "LeftButton" then
+			collapsed[definition.key] = not collapsed[definition.key]
+			CooldownManagerUtils:RefreshReminderSettings()
+		end
 	end)
-	frame.Header:SetScript("OnEnter", function()
+	frame.Header:HookScript("OnEnter", function()
 		if draggedButton then
 			dropCategory = categoryByKey[definition.key]
 			dropEntry = nil
@@ -156,6 +157,19 @@ local function CreateCategoryFrame(parent, definition, index)
 	frame.Container:SetWidth(315)
 	frame.Container:EnableMouse(true)
 	frame.Container.buttons = {}
+	frame.Container.Empty = CreateFrame("Frame", nil, frame.Container)
+	frame.Container.Empty:SetSize(ITEM_SIZE, ITEM_SIZE)
+	frame.Container.Empty:SetPoint("TOPLEFT")
+	frame.Container.Empty:EnableMouse(true)
+	frame.Container.Empty.Icon = frame.Container.Empty:CreateTexture(nil, "ARTWORK")
+	frame.Container.Empty.Icon:SetAllPoints()
+	frame.Container.Empty.Icon:SetAtlas("cdm-empty")
+	frame.Container.Empty:SetScript("OnEnter", function()
+		if draggedButton then
+			dropCategory = categoryByKey[definition.key]
+			dropEntry = nil
+		end
+	end)
 	frame.Container:SetScript("OnEnter", function()
 		if draggedButton then
 			dropCategory = categoryByKey[definition.key]
@@ -200,23 +214,18 @@ function CooldownManagerUtils:RefreshReminderSettings()
 	BuildCategoryModels()
 	local filter = settingsFrame and settingsFrame.filterText or ""
 	local yOffset = 0
-	local visibleTotal = 0
 	for index, definition in ipairs(CATEGORY_DEFINITIONS) do
 		local model = categoryModels[index]
 		local frame = categoryFrames[index]
-		local visibleEntries = {}
-		for _, entry in ipairs(model.entries) do
-			if filter == "" or entry.name:lower():find(filter, 1, true) then table.insert(visibleEntries, entry) end
-		end
-		visibleTotal = visibleTotal + #visibleEntries
 		frame:ClearAllPoints()
 		frame:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
 		local title = _G[definition.titleGlobal] or self:Trans(definition.localeKey)
-		frame.Header.Text:SetText(title .. " (" .. #visibleEntries .. ")")
-		frame.Header.Arrow:SetText(collapsed[definition.key] and "+" or "−")
 		local isCollapsed = collapsed[definition.key] == true
+		frame.Header:SetHeaderText(title)
+		frame.Header:UpdateCollapsedState(isCollapsed)
 		frame.Container:SetShown(not isCollapsed)
-		for itemIndex, entry in ipairs(visibleEntries) do
+		frame.Container.Empty:SetShown(#model.entries == 0)
+		for itemIndex, entry in ipairs(model.entries) do
 			local button = frame.Container.buttons[itemIndex] or CreateItemButton(frame.Container, itemIndex)
 			local column = (itemIndex - 1) % GRID_COLUMNS
 			local row = math.floor((itemIndex - 1) / GRID_COLUMNS)
@@ -225,13 +234,14 @@ function CooldownManagerUtils:RefreshReminderSettings()
 			button.entry = entry
 			button.category = model
 			button.Icon:SetTexture(entry.iconID)
+			button.Filter:SetShown(filter ~= "" and not entry.name:lower():find(filter, 1, true))
 			button:Show()
 		end
-		for itemIndex = #visibleEntries + 1, #frame.Container.buttons do
+		for itemIndex = #model.entries + 1, #frame.Container.buttons do
 			frame.Container.buttons[itemIndex].entry = nil
 			frame.Container.buttons[itemIndex]:Hide()
 		end
-		local rowCount = math.max(1, math.ceil(#visibleEntries / GRID_COLUMNS))
+		local rowCount = math.max(1, math.ceil(#model.entries / GRID_COLUMNS))
 		local containerHeight = rowCount * ITEM_SIZE + math.max(0, rowCount - 1) * ITEM_SPACING
 		frame.Container:SetHeight(containerHeight)
 		local frameHeight = isCollapsed and 22 or 22 + 15 + containerHeight + 10
@@ -240,7 +250,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 		yOffset = yOffset + frameHeight + 18
 	end
 	reminderContent.ScrollChild:SetHeight(math.max(1, yOffset))
-	reminderContent.Empty:SetShown(visibleTotal == 0)
+	reminderContent.Empty:Hide()
 end
 
 local function SetCustomMode(enabled)
