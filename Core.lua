@@ -15,6 +15,27 @@ local COOLDOWN_AURA_CATEGORIES = {
 	"HiddenActive",
 	"HiddenPassive"
 }
+local CLASS_AURA_FALLBACKS = {
+	DRUID = {
+		{spellID = 1126}
+	},
+	EVOKER = {
+		{spellID = 364342}
+	},
+	MAGE = {
+		{spellID = 1459}
+	},
+	PRIEST = {
+		{spellID = 21562}
+	},
+	SHAMAN = {
+		{spellID = 462854}
+	},
+	WARRIOR = {
+		{spellID = 6673},
+		{spellID = 97462, auraSpellID = 97463}
+	}
+}
 
 local eventFrame = CreateFrame("Frame")
 local reminderFrame
@@ -71,7 +92,7 @@ local function AddAuraMappingSpell(mapping, spellID)
 	AddCandidate(mapping.candidates, mapping.seen, spellID)
 end
 
-local function AddCooldownAuraMapping(knownAuraSpells, info)
+local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, info)
 	if type(info) ~= "table" or info.hasAura ~= true or info.selfAura ~= true then return end
 	local mapping = {
 		candidates = {},
@@ -85,6 +106,8 @@ local function AddCooldownAuraMapping(knownAuraSpells, info)
 			AddAuraMappingSpell(mapping, linkedSpellID)
 		end
 	end
+	local sourceSpellID = info.overrideSpellID or info.spellID
+	if type(sourceSpellID) == "number" then knownAuraSources[sourceSpellID] = info.spellID or sourceSpellID end
 
 	for _, mappedSpellID in ipairs(mapping.candidates) do
 		knownAuraSpells[mappedSpellID] = knownAuraSpells[mappedSpellID] or {
@@ -98,25 +121,26 @@ local function AddCooldownAuraMapping(knownAuraSpells, info)
 	end
 end
 
-local function AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, seenCooldownIDs)
+local function AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, seenCooldownIDs)
 	local categoryOK, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, true)
 	if not categoryOK or type(cooldownIDs) ~= "table" then return end
 	for _, cooldownID in ipairs(cooldownIDs) do
 		if not seenCooldownIDs[cooldownID] then
 			seenCooldownIDs[cooldownID] = true
 			local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
-			if infoOK then AddCooldownAuraMapping(knownAuraSpells, info) end
+			if infoOK then AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, info) end
 		end
 	end
 end
 
-local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells)
+local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources)
 	if type(cooldownViewer.GetGroupBuffItems) ~= "function" then return end
 	local itemsOK, items = pcall(cooldownViewer.GetGroupBuffItems)
 	if not itemsOK or type(items) ~= "table" then return end
 	for _, item in ipairs(items) do
 		local spellID = type(item) == "table" and item.spellID
 		if type(spellID) == "number" then
+			knownAuraSources[spellID] = spellID
 			knownAuraSpells[spellID] = knownAuraSpells[spellID] or {
 				candidates = {},
 				seen = {}
@@ -127,20 +151,39 @@ local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells)
 	end
 end
 
+local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
+	local _, class = UnitClass("player")
+	local definitions = CLASS_AURA_FALLBACKS[class]
+	if not definitions then return end
+	for _, definition in ipairs(definitions) do
+		local spellID = definition.spellID
+		local mapping = {
+			candidates = {},
+			seen = {}
+		}
+		AddCandidate(mapping.candidates, mapping.seen, spellID)
+		AddCandidate(mapping.candidates, mapping.seen, definition.auraSpellID)
+		knownAuraSpells[spellID] = mapping
+		knownAuraSources[spellID] = spellID
+	end
+end
+
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
+	local knownAuraSources = {}
+	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	local cooldownViewer = C_CooldownViewer
 	local categoryEnum = Enum and Enum.CooldownViewerCategory
-	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells end
+	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells, knownAuraSources end
 
-	AddGroupBuffMappings(cooldownViewer, knownAuraSpells)
+	AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources)
 	local seenCooldownIDs = {}
 	for _, categoryName in ipairs(COOLDOWN_AURA_CATEGORIES) do
 		local category = categoryEnum[categoryName]
-		if category ~= nil then AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, seenCooldownIDs) end
+		if category ~= nil then AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, seenCooldownIDs) end
 	end
 
-	return knownAuraSpells
+	return knownAuraSpells, knownAuraSources
 end
 
 local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
@@ -227,6 +270,17 @@ local function AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableB
 	end
 end
 
+local function AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if type(C_SpellBook.IsSpellKnownOrInSpellBook) ~= "function" then return end
+	local playerBank = Enum.SpellBookSpellBank.Player
+	for spellID, baseSpellID in pairs(knownAuraSources) do
+		local knownOK, isKnown = pcall(C_SpellBook.IsSpellKnownOrInSpellBook, spellID, playerBank, true)
+		if knownOK and not IsSecret(isKnown) and isKnown == true then
+			AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+		end
+	end
+end
+
 function CooldownManagerUtils:GetProfile()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	CooldownManagerUtilsDB.profiles = CooldownManagerUtilsDB.profiles or {}
@@ -301,12 +355,13 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 
 	local availableBuffs = {}
 	local availableBuffsBySpellID = {}
-	local knownAuraSpells = BuildKnownAuraSpellLookup()
+	local knownAuraSpells, knownAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
 	local classLine = skillLineEnum and skillLineEnum.Class or 2
 	local specLine = skillLineEnum and skillLineEnum.MainSpec or 3
 	AddSpellBookSkillLine(classLine, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddSpellBookSkillLine(specLine, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
 	self.availableBuffs = availableBuffs
