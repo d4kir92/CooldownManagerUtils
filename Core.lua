@@ -3,6 +3,8 @@ CooldownManagerUtils:SetAddonOutput("CooldownManagerUtils", 134376)
 local ICON_SIZE = 40
 local ICON_SPACING = 4
 local FRAME_PADDING = 6
+local DEFAULT_REMINDER_X = 0
+local DEFAULT_REMINDER_Y = -180
 local REMINDER_CATEGORY_ORDER = {
 	trackedBuff = 1,
 	hidden = 2
@@ -42,6 +44,17 @@ local reminderFrame
 local editModeActive = false
 local updatePending = false
 local presenceCache = {}
+local reminderSettingDefaults = {
+	orientation = 0,
+	iconDirection = 1,
+	iconSize = 100,
+	iconPadding = ICON_SPACING,
+	opacity = 100,
+	visibleSetting = 0,
+	hideWhenInactive = 1,
+	showTimer = 1,
+	showTooltips = 1
+}
 local function IsSupportedClient()
 	return CooldownManagerUtils:GetWoWBuildNr() >= 120000 or CooldownManagerUtils:IsForever()
 end
@@ -380,21 +393,212 @@ local function RestorePosition(frame)
 	local position = CooldownManagerUtilsDB.position
 	frame:ClearAllPoints()
 	if position then
-		frame:SetPoint(position.point or "CENTER", UIParent, position.relativePoint or "CENTER", position.x or 0, position.y or -180)
+		local relativeTo = position.relativeTo and _G[position.relativeTo] or UIParent
+		frame:SetPoint(position.point or "CENTER", relativeTo, position.relativePoint or "CENTER", position.x or DEFAULT_REMINDER_X, position.y or DEFAULT_REMINDER_Y)
 	else
-		frame:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
+		frame:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
 	end
 end
 
 local function SavePosition(frame)
-	local point, _, relativePoint, x, y = frame:GetPoint(1)
+	local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
+	local relativeName = relativeTo and relativeTo ~= UIParent and relativeTo:GetName() or nil
+	if relativeTo and relativeTo ~= UIParent and not relativeName then
+		local centerX, centerY = frame:GetCenter()
+		local parentCenterX, parentCenterY = UIParent:GetCenter()
+		point = "CENTER"
+		relativePoint = "CENTER"
+		x = centerX - parentCenterX
+		y = centerY - parentCenterY
+	end
 	CooldownManagerUtilsDB.position = {
 		point = point,
+		relativeTo = relativeName,
 		relativePoint = relativePoint,
 		x = x,
 		y = y
 	}
+end
+
+local function GetReminderSettings()
+	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
+	CooldownManagerUtilsDB.reminderSettings = CooldownManagerUtilsDB.reminderSettings or {}
+	local settings = CooldownManagerUtilsDB.reminderSettings
+	for key, value in pairs(reminderSettingDefaults) do
+		if settings[key] == nil then settings[key] = value end
+	end
+	return settings
+end
+
+local function GetEditModeSettingDefinitions()
+	if not Enum or not Enum.EditModeCooldownViewerSetting then return end
+	local setting = Enum.EditModeCooldownViewerSetting
+	local values = GetReminderSettings()
+	local definitions = {}
+	local function AddDefinition(settingID, value)
+		if settingID ~= nil then table.insert(definitions, {setting = settingID, value = value}) end
+	end
+	AddDefinition(setting.Orientation, values.orientation)
+	AddDefinition(setting.IconDirection, values.iconDirection)
+	AddDefinition(setting.IconSize, values.iconSize)
+	AddDefinition(setting.IconPadding, values.iconPadding)
+	AddDefinition(setting.Opacity, values.opacity)
+	AddDefinition(setting.VisibleSetting, values.visibleSetting)
+	AddDefinition(setting.HideWhenInactive, values.hideWhenInactive)
+	AddDefinition(setting.ShowTimer, values.showTimer)
+	AddDefinition(setting.ShowTooltips, values.showTooltips)
+	return definitions
+end
+
+local function SaveEditModeSettings(frame)
+	if not frame.systemInfo or not frame.systemInfo.settings then return end
+	local setting = Enum.EditModeCooldownViewerSetting
+	local keys = {}
+	local function AddKey(settingID, key)
+		if settingID ~= nil then keys[settingID] = key end
+	end
+	AddKey(setting.Orientation, "orientation")
+	AddKey(setting.IconDirection, "iconDirection")
+	AddKey(setting.IconSize, "iconSize")
+	AddKey(setting.IconPadding, "iconPadding")
+	AddKey(setting.Opacity, "opacity")
+	AddKey(setting.VisibleSetting, "visibleSetting")
+	AddKey(setting.HideWhenInactive, "hideWhenInactive")
+	AddKey(setting.ShowTimer, "showTimer")
+	AddKey(setting.ShowTooltips, "showTooltips")
+	local values = GetReminderSettings()
+	for _, settingInfo in ipairs(frame.systemInfo.settings) do
+		local key = keys[settingInfo.setting]
+		if key then values[key] = settingInfo.value end
+	end
+end
+
+local function IsNativeEditModeAvailable()
+	return EditModeManagerFrame and EditModeManagerFrame.SetSnapPreviewFrame and EditModeManagerFrame.ClearSnapPreviewFrame and EditModeManagerFrame.IsSnapEnabled and EditModeSystemMixin and EditModeCooldownViewerSystemMixin and EditModeSystemSelectionMixin and EditModeSystemSettingsDialog and EditModeSettingDisplayInfoManager and EditModeMagnetismManager and AnchorUtil and Mixin and Enum and Enum.EditModeSystem and Enum.EditModeSystem.CooldownViewer ~= nil and Enum.EditModeCooldownViewerSystemIndices and Enum.EditModeCooldownViewerSystemIndices.BuffIcon ~= nil and Enum.EditModeCooldownViewerSetting
+end
+
+local function ApplyReminderSetting(frame, setting)
+	local enum = Enum.EditModeCooldownViewerSetting
+	if setting == enum.Orientation then
+		frame.orientationSetting = frame:GetSettingValue(setting)
+	elseif setting == enum.IconDirection then
+		frame.iconDirection = frame:GetSettingValue(setting)
+	elseif setting == enum.IconSize then
+		frame.iconScale = frame:GetSettingValue(setting) / 100
+	elseif setting == enum.IconPadding then
+		frame.iconPadding = frame:GetSettingValue(setting)
+	elseif setting == enum.Opacity then
+		frame:SetAlpha(frame:GetSettingValue(setting) / 100)
+	elseif setting == enum.VisibleSetting then
+		frame.visibleSetting = frame:GetSettingValue(setting)
+	elseif setting == enum.HideWhenInactive then
+		frame.hideWhenInactive = frame:GetSettingValue(setting) == 1
+	elseif setting == enum.ShowTimer then
+		frame.showTimer = frame:GetSettingValue(setting) == 1
+	elseif setting == enum.ShowTooltips then
+		frame.showTooltips = frame:GetSettingValue(setting) == 1
+	end
+end
+
+local function SetupNativeEditModeFrame(frame)
+	Mixin(frame, EditModeCooldownViewerSystemMixin)
+	frame.system = Enum.EditModeSystem.CooldownViewer
+	frame.systemIndex = Enum.EditModeCooldownViewerSystemIndices.BuffIcon
+	frame.systemNameString = CooldownManagerUtils:Trans("LID_BUFFREMINDERS_EDITMODE")
+	frame.settingsDialogAnchor = AnchorUtil.CreateAnchor("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -250, 200)
+	frame.settingDisplayInfoMap = EditModeSettingDisplayInfoManager:GetSystemSettingDisplayInfoMap(frame.system)
+	frame.snappedFrames = {}
+	frame.downKeys = {}
+	frame.Selection = CreateFrame("Frame", nil, frame, "EditModeSystemSelectionTemplate")
+	frame.Selection:SetAllPoints()
+	frame.Selection:SetSystem(frame)
+	frame.Selection:Hide()
+	frame.SetIsEditing = function() end
+	frame.SetBarContent = function() end
+	frame.SetBarWidthScale = function() end
+	frame.SetHideWhenInactive = function(self, value) self.hideWhenInactive = value end
+	frame.SetTimerShown = function(self, value) self.showTimer = value end
+	frame.SetTooltipsShown = function(self, value) self.showTooltips = value end
+	frame.UpdateShownState = function() CooldownManagerUtils:UpdateReminderBar() end
+	frame.RefreshLayout = function() CooldownManagerUtils:UpdateReminderBar() end
+	frame.SetHasActiveChanges = function(self, value) self.hasActiveChanges = value == true end
+	frame.HasActiveChanges = function() return false end
+	frame.UpdateMagnetismRegistration = function() end
+	frame.ClearHighlight = function(self)
+		self.Selection:Hide()
+		self.isHighlighted = false
+		self.isSelected = false
+	end
+	frame.HighlightSystem = function(self)
+		self:SetMovable(false)
+		self.Selection:ShowHighlighted()
+		self.isHighlighted = true
+		self.isSelected = false
+	end
+	frame.OnDragStart = function(self)
+		if not self.isSelected then return end
+		self:StartMoving()
+		EditModeManagerFrame:SetSnapPreviewFrame(self)
+		self.isDragging = true
+	end
+	frame.OnDragStop = function(self)
+		if not self.isDragging then return end
+		EditModeManagerFrame:ClearSnapPreviewFrame()
+		self:StopMovingOrSizing()
+		self.isDragging = false
+		if EditModeManagerFrame:IsSnapEnabled() then EditModeMagnetismManager:ApplyMagnetism(self) end
+		self:OnSystemPositionChange()
+	end
+	frame.OnSystemPositionChange = function(self)
+		self.systemInfo.isInDefaultPosition = false
+		SavePosition(self)
+		EditModeSystemSettingsDialog:UpdateDialog(self)
+	end
+	frame.ResetToDefaultPosition = function(self)
+		self:BreakSnappedFrames()
+		self:ClearAllPoints()
+		self:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
+		self.systemInfo.isInDefaultPosition = true
+		CooldownManagerUtilsDB.position = nil
+		EditModeSystemSettingsDialog:UpdateDialog(self)
+	end
+	frame.UpdateSystemSetting = function(self, setting, entireSystemUpdate)
+		if not entireSystemUpdate then self:UpdateSettingMap() end
+		ApplyReminderSetting(self, setting)
+		self:ClearDirtySetting(setting)
+		SaveEditModeSettings(self)
+		CooldownManagerUtils:UpdateReminderBar()
+		if not entireSystemUpdate then EditModeSystemSettingsDialog:UpdateDialog(self) end
+	end
+	frame.Selection:SetScript("OnMouseDown", function(_, button)
+		if button ~= "LeftButton" then return end
+		EditModeManagerFrame:ClearSelectedSystem()
+		frame:SelectSystem()
+	end)
+	hooksecurefunc(EditModeManagerFrame, "SelectSystem", function(_, selectedFrame)
+		if selectedFrame ~= frame and frame.isSelected then frame:HighlightSystem() end
+	end)
+	hooksecurefunc(EditModeManagerFrame, "ClearSelectedSystem", function()
+		if frame.isSelected then frame:HighlightSystem() end
+	end)
+
+	local position = CooldownManagerUtilsDB.position
+	local relativeTo = position and position.relativeTo and _G[position.relativeTo] and position.relativeTo or "UIParent"
+	local systemInfo = {
+		system = Enum.EditModeSystem.CooldownViewer,
+		systemIndex = frame.systemIndex,
+		isInDefaultPosition = position == nil,
+		anchorInfo = {
+			point = position and position.point or "CENTER",
+			relativeTo = relativeTo,
+			relativePoint = position and position.relativePoint or "CENTER",
+			offsetX = position and position.x or DEFAULT_REMINDER_X,
+			offsetY = position and position.y or DEFAULT_REMINDER_Y
+		},
+		settings = GetEditModeSettingDefinitions()
+	}
+	frame:UpdateSystem(systemInfo)
 end
 
 local function CreateReminderIcon(parent, index)
@@ -412,7 +616,7 @@ local function CreateReminderIcon(parent, index)
 	icon.Overlay:SetPoint("TOPLEFT", -8, 7)
 	icon.Overlay:SetPoint("BOTTOMRIGHT", 8, -7)
 	icon:SetScript("OnEnter", function(self)
-		if not self.spellID then return end
+		if not self.spellID or parent.showTooltips == false then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetSpellByID(self.spellID)
 		GameTooltip:Show()
@@ -425,32 +629,36 @@ end
 
 function CooldownManagerUtils:CreateReminderBar()
 	if reminderFrame then return reminderFrame end
-	local frame = CreateFrame("Frame", "CooldownManagerUtilsReminderFrame", UIParent, "BackdropTemplate")
+	local nativeEditMode = IsNativeEditModeAvailable()
+	local template = nativeEditMode and nil or "BackdropTemplate"
+	local frame = CreateFrame("Frame", "CooldownManagerUtilsReminderFrame", UIParent, template)
 	frame:SetFrameStrata("MEDIUM")
 	frame:SetClampedToScreen(true)
-	frame:SetMovable(true)
-	frame:RegisterForDrag("LeftButton")
-	frame:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		edgeSize = 2
-	})
-
-	frame:SetBackdropColor(0, 0, 0, 0)
-	frame:SetBackdropBorderColor(0.2, 0.6, 1, 0)
 	frame.icons = {}
-	frame.Label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	frame.Label:SetPoint("CENTER")
-	frame.Label:SetText(self:Trans("LID_BUFFREMINDERS_EDITMODE"))
-	frame.Label:Hide()
-	frame:SetScript("OnDragStart", function(mover) if editModeActive then mover:StartMoving() end end)
-	frame:SetScript("OnDragStop", function(mover)
-		mover:StopMovingOrSizing()
-		SavePosition(mover)
-	end)
-
-	RestorePosition(frame)
 	reminderFrame = frame
+	if nativeEditMode then
+		SetupNativeEditModeFrame(frame)
+	else
+		frame:SetMovable(true)
+		frame:RegisterForDrag("LeftButton")
+		frame:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8X8",
+			edgeFile = "Interface\\Buttons\\WHITE8X8",
+			edgeSize = 2
+		})
+		frame:SetBackdropColor(0, 0, 0, 0)
+		frame:SetBackdropBorderColor(0.2, 0.6, 1, 0)
+		frame.Label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		frame.Label:SetPoint("CENTER")
+		frame.Label:SetText(self:Trans("LID_BUFFREMINDERS_EDITMODE"))
+		frame.Label:Hide()
+		frame:SetScript("OnDragStart", function(mover) if editModeActive then mover:StartMoving() end end)
+		frame:SetScript("OnDragStop", function(mover)
+			mover:StopMovingOrSizing()
+			SavePosition(mover)
+		end)
+		RestorePosition(frame)
+	end
 	return frame
 end
 
@@ -511,10 +719,25 @@ function CooldownManagerUtils:UpdateReminderBar()
 		return left.name < right.name
 	end)
 
+	local iconSize = ICON_SIZE * (frame.iconScale or 1)
+	local iconPadding = frame.iconPadding or ICON_SPACING
+	local horizontal = not Enum or not Enum.CooldownViewerOrientation or frame.orientationSetting == nil or frame.orientationSetting == Enum.CooldownViewerOrientation.Horizontal
+	local forward
+	if horizontal then
+		forward = not Enum or not Enum.CooldownViewerIconDirection or frame.iconDirection == nil or frame.iconDirection == Enum.CooldownViewerIconDirection.Right
+	else
+		forward = Enum and Enum.CooldownViewerIconDirection and frame.iconDirection == Enum.CooldownViewerIconDirection.Left
+	end
 	for index, entry in ipairs(entries) do
 		local icon = frame.icons[index] or CreateReminderIcon(frame, index)
+		icon:SetSize(iconSize, iconSize)
 		icon:ClearAllPoints()
-		icon:SetPoint("LEFT", frame, "LEFT", FRAME_PADDING + (index - 1) * (ICON_SIZE + ICON_SPACING), 0)
+		local offset = FRAME_PADDING + (index - 1) * (iconSize + iconPadding)
+		if horizontal then
+			icon:SetPoint(forward and "LEFT" or "RIGHT", frame, forward and "LEFT" or "RIGHT", forward and offset or -offset, 0)
+		else
+			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
+		end
 		icon.Texture:SetTexture(entry.iconID)
 		icon.Texture:SetDesaturated(editModeActive and presenceCache[entry.spellID] == true)
 		icon.Texture:SetAlpha(editModeActive and presenceCache[entry.spellID] == true and 0.5 or 1)
@@ -526,13 +749,20 @@ function CooldownManagerUtils:UpdateReminderBar()
 		frame.icons[index]:Hide()
 	end
 
-	local width = #entries > 0 and FRAME_PADDING * 2 + #entries * ICON_SIZE + (#entries - 1) * ICON_SPACING or 180
-	frame:SetSize(width, ICON_SIZE + FRAME_PADDING * 2)
-	frame.Label:SetShown(editModeActive and #entries == 0)
-	frame:SetBackdropColor(0.05, 0.15, 0.25, editModeActive and 0.65 or 0)
-	frame:SetBackdropBorderColor(0.2, 0.65, 1, editModeActive and 1 or 0)
-	frame:EnableMouse(editModeActive)
-	frame:SetShown(editModeActive or #entries > 0)
+	local extent = #entries > 0 and FRAME_PADDING * 2 + #entries * iconSize + (#entries - 1) * iconPadding or 180
+	frame:SetSize(horizontal and extent or iconSize + FRAME_PADDING * 2, horizontal and iconSize + FRAME_PADDING * 2 or extent)
+	if frame.Label then frame.Label:SetShown(editModeActive and #entries == 0) end
+	if frame.SetBackdropColor then frame:SetBackdropColor(0.05, 0.15, 0.25, editModeActive and 0.65 or 0) end
+	if frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(0.2, 0.65, 1, editModeActive and 1 or 0) end
+	if not frame.Selection then frame:EnableMouse(editModeActive) end
+	local visibleSetting = frame.visibleSetting
+	local visible = #entries > 0
+	if Enum and Enum.CooldownViewerVisibleSetting and visibleSetting == Enum.CooldownViewerVisibleSetting.InCombat then
+		visible = visible and InCombatLockdown()
+	elseif Enum and Enum.CooldownViewerVisibleSetting and visibleSetting == Enum.CooldownViewerVisibleSetting.Hidden then
+		visible = false
+	end
+	frame:SetShown(editModeActive or visible)
 end
 
 function CooldownManagerUtils:ScheduleReminderUpdate()
@@ -547,6 +777,15 @@ end
 local function SetEditModeActive(active)
 	editModeActive = active
 	CooldownManagerUtils:UpdateReminderBar()
+	if reminderFrame and reminderFrame.Selection then
+		if active then
+			reminderFrame:HighlightSystem()
+		else
+			reminderFrame:ClearHighlight()
+			reminderFrame:StopMovingOrSizing()
+			if EditModeSystemSettingsDialog.attachedToSystem == reminderFrame then EditModeSystemSettingsDialog:Hide() end
+		end
+	end
 end
 
 function CooldownManagerUtils:Initialize()
@@ -562,6 +801,7 @@ function CooldownManagerUtils:Initialize()
 	self:InitializeReminderSettings()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
+	if editModeActive and reminderFrame.Selection then reminderFrame:HighlightSystem() end
 end
 
 if IsSupportedClient() then
@@ -572,6 +812,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("SPELLS_CHANGED")
 	eventFrame:RegisterEvent("UNIT_AURA")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
 end
@@ -585,7 +826,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
-	elseif event == "PLAYER_ENTERING_WORLD" then
+	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_DISABLED" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()
