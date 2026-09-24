@@ -1,0 +1,58 @@
+## Interface-Classic: 11509
+## Interface-Forever: 16001
+## Interface-BCC: 20506
+## Interface-Wrath: 30403
+## Interface-Titan: 38002
+## Interface-Cata: 40402
+## Interface-Mists: 50504
+## Interface: 120100
+
+## Version: 0.1.0
+## Title: Cooldown Manager Utils |T134148:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
+## Notes: Adds configurable missing-buff reminders to Blizzard's Cooldown Manager.
+## Notes-deDE: 
+## Notes-esES: 
+## Notes-esMX: 
+## Notes-frFR: 
+## Notes-itIT: 
+## Notes-koKR: 
+## Notes-ptBR: 
+## Notes-ruRU: 
+## Notes-zhCN: 
+## Notes-zhTW: 
+## Author: D4KiR
+## Category: Dungeons & Raids
+## Category-deDE: Dungeons & Schlachtzüge
+## Category-esES: Mazmorras y bandas
+## Category-esMX: Calabozos y bandas
+## Category-frFR: Donjons et raids
+## Category-itIT: Spedizioni e incursioni
+## Category-koKR: 던전 및 공격대
+## Category-ptBR: Masmorras e Raides
+## Category-ruRU: Подземелья и рейды
+## Category-zhCN: 地下城和团队副本
+## Category-zhTW: 地城與團隊
+## DefaultState: enabled
+## SavedVariables: CooldownManagerUtilsGlobalDB
+## SavedVariablesPerCharacter: CooldownManagerUtilsDB
+## OptionalDeps: Blizzard_CooldownViewer, Blizzard_EditMode
+## X-Curse-Project-ID: 1707352
+## X-Wago-ID: RNL4apNo
+## IconTexture: 134148
+
+libs\D4Lib\D4Lib.xml
+
+locale\deDE.lua
+locale\enUS.lua
+locale\esES.lua
+locale\esMX.lua
+locale\frFR.lua
+locale\itIT.lua
+locale\koKR.lua
+locale\ptBR.lua
+locale\ruRU.lua
+locale\zhCN.lua
+locale\zhTW.lua
+
+Core.lua
+Settings.lua
