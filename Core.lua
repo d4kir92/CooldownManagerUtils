@@ -45,6 +45,7 @@ local reminderOptionsFrame
 local editModeActive = false
 local updatePending = false
 local presenceCache = {}
+local snapTargets = {}
 local SNAP_DISTANCE = 10
 local reminderSettingDefaults = {
 	orientation = 0,
@@ -481,20 +482,28 @@ local function GetSnapCandidate(frame, target)
 end
 
 local function SnapReminderFrame(frame)
-	if type(EnumerateFrames) ~= "function" then return end
 	local best
-	local target
-	repeat
-		target = EnumerateFrames(target)
-		local forbidden = target and target.IsForbidden and target:IsForbidden()
-		if target and not forbidden and target ~= frame and target.Selection and target:IsVisible() then
+	for _, target in ipairs(snapTargets) do
+		local forbidden = target.IsForbidden and target:IsForbidden()
+		if not forbidden and target ~= frame and target.Selection and target:IsVisible() then
 			local candidate = GetSnapCandidate(frame, target)
 			if candidate and (not best or candidate.distance < best.distance) then best = candidate end
 		end
-	until not target
+	end
 	if not best then return end
 	frame:ClearAllPoints()
 	frame:SetPoint(best.point, best.target, best.relativePoint, best.x, best.y)
+end
+
+local function RefreshSnapTargets()
+	wipe(snapTargets)
+	local children = {UIParent:GetChildren()}
+	for _, target in ipairs(children) do
+		local forbidden = target.IsForbidden and target:IsForbidden()
+		if not forbidden and target ~= reminderFrame and target.Selection then
+			table.insert(snapTargets, target)
+		end
+	end
 end
 
 local function CreateSettingLabel(parent, text)
@@ -926,8 +935,10 @@ local function SetEditModeActive(active)
 	CooldownManagerUtils:UpdateReminderBar()
 	if reminderFrame and reminderFrame.Selection then
 		if active then
+			RefreshSnapTargets()
 			reminderFrame:HighlightSystem()
 		else
+			wipe(snapTargets)
 			if reminderOptionsFrame then reminderOptionsFrame:Hide() end
 			reminderFrame:ClearHighlight()
 			reminderFrame:StopMovingOrSizing()
