@@ -1,17 +1,17 @@
 ## Interface: 50504
 ## Version: 0.1.0
 ## Title: Cooldown Manager Utils |T134376:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
-## Notes: 
-## Notes-deDE: 
-## Notes-esES: 
-## Notes-esMX: 
-## Notes-frFR: 
-## Notes-itIT: 
-## Notes-koKR: 
-## Notes-ptBR: 
-## Notes-ruRU: 
-## Notes-zhCN: 
-## Notes-zhTW: 
+## Notes: Adds a Buff Reminders tab to the Cooldown Manager and shows icons for tracked buffs you are missing.
+## Notes-deDE: Ergänzt den Cooldown-Manager um einen Tab für Buff-Erinnerungen und zeigt Symbole für verfolgte Buffs, die dir fehlen.
+## Notes-esES: Añade una pestaña de recordatorios de beneficios al gestor de tiempos de reutilización y muestra iconos de los beneficios seguidos que te faltan.
+## Notes-esMX: Agrega una pestaña de recordatorios de beneficios al administrador de tiempos de reutilización y muestra íconos de los beneficios seguidos que te faltan.
+## Notes-frFR: Ajoute un onglet de rappels d'améliorations au gestionnaire de temps de recharge et affiche les icônes des améliorations suivies qui vous manquent.
+## Notes-itIT: Aggiunge una scheda di promemoria dei benefici al gestore dei tempi di recupero e mostra le icone dei benefici monitorati che ti mancano.
+## Notes-koKR: 재사용 대기시간 관리자에 버프 알림 탭을 추가하고 추적 중인 버프가 없을 때 아이콘으로 표시합니다.
+## Notes-ptBR: Adiciona uma aba de lembretes de bônus ao gerenciador de recargas e mostra ícones dos bônus rastreados que estão faltando.
+## Notes-ruRU: Добавляет в менеджер восстановления вкладку напоминаний о баффах и показывает значки отслеживаемых баффов, которых у вас нет.
+## Notes-zhCN: 为冷却管理器添加增益提醒标签页，并以图标显示你缺少的已追踪增益。
+## Notes-zhTW: 為冷卻管理器新增增益提醒分頁，並以圖示顯示你缺少的已追蹤增益。
 ## Author: D4KiR
 ## Category: Buffs & Debuffs
 ## Category-deDE: Buffs & Debuffs
