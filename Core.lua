@@ -2,6 +2,9 @@ local _, CooldownManagerUtils = ...
 CooldownManagerUtils:SetAddonOutput("CooldownManagerUtils", 134376)
 local ICON_SIZE = 40
 local ICON_SPACING = 4
+local ICON_SCALE_MIN = 50
+local ICON_SCALE_MAX = 400
+local ICON_COUNTDOWN_FONT = "GameFontHighlightHugeOutline"
 local FRAME_PADDING = 6
 local DEFAULT_REMINDER_X = 0
 local DEFAULT_REMINDER_Y = -180
@@ -66,7 +69,6 @@ local reminderSettingDefaults = {
 	iconPadding = ICON_SPACING,
 	opacity = 100,
 	visibleSetting = 0,
-	hideWhenInactive = 1,
 	showTimer = 1,
 	showTooltips = 1
 }
@@ -453,6 +455,8 @@ local function GetReminderSettings()
 	for key, value in pairs(reminderSettingDefaults) do
 		if settings[key] == nil then settings[key] = value end
 	end
+	settings.hideWhenInactive = nil
+	settings.iconSize = math.min(math.max(settings.iconSize, ICON_SCALE_MIN), ICON_SCALE_MAX)
 	return settings
 end
 
@@ -463,7 +467,6 @@ local function ApplyReminderSettings(frame)
 	frame.iconScale = settings.iconSize / 100
 	frame.iconPadding = settings.iconPadding
 	frame.visibleSetting = settings.visibleSetting
-	frame.hideWhenInactive = settings.hideWhenInactive == 1
 	frame.showTimer = settings.showTimer == 1
 	frame.showTooltips = settings.showTooltips == 1
 	frame:SetAlpha(settings.opacity / 100)
@@ -907,7 +910,7 @@ local function CreateDropdownSetting(parent, layoutIndex, labelText, key, values
 			end, value)
 		end
 	end)
-	row.Refresh = function() end
+	row.Refresh = function(self) self.Dropdown:GenerateMenu() end
 	row:Show()
 	return row
 end
@@ -1027,19 +1030,17 @@ local function CreateReminderOptionsFrame(owner)
 		padding = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_PADDING or "Icon padding",
 		opacity = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_OPACITY or OPACITY or "Opacity",
 		visibility = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_VISIBLE_SETTING or "Visibility",
-		hideInactive = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_HIDE_WHEN_INACTIVE or "Hide when inactive",
 		showTimer = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_SHOW_TIMER or "Show timer",
 		showTooltips = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_SHOW_TOOLTIPS or "Show tooltips"
 	}
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 1, labels.orientation, "orientation", orientationValues, OrientationText))
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 2, labels.direction, "iconDirection", directionValues, DirectionText))
-	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 3, labels.size, "iconSize", 50, 200, 10, "%"))
+	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 3, labels.size, "iconSize", ICON_SCALE_MIN, ICON_SCALE_MAX, 10, "%"))
 	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 4, labels.padding, "iconPadding", 0, 14, 1, ""))
 	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 5, labels.opacity, "opacity", 50, 100, 1, "%"))
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 6, labels.visibility, "visibleSetting", visibilityValues, VisibilityText))
-	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 7, labels.hideInactive, "hideWhenInactive"))
-	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 8, labels.showTimer, "showTimer"))
-	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 9, labels.showTooltips, "showTooltips"))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 7, labels.showTimer, "showTimer"))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 8, labels.showTooltips, "showTooltips"))
 	panel.Buttons = CreateFrame("Frame", nil, panel, "VerticalLayoutFrame")
 	panel.Buttons:SetPoint("TOP", panel.Settings, "BOTTOM", 0, -12)
 	panel.Buttons.spacing = 2
@@ -1137,7 +1138,7 @@ end
 local function CreateReminderIcon(parent, index)
 	local icon = CreateFrame("Frame", nil, parent)
 	icon:SetSize(ICON_SIZE, ICON_SIZE)
-	icon:EnableMouse(true)
+	icon:SetMouseClickEnabled(false)
 	icon.Texture = icon:CreateTexture(nil, "ARTWORK")
 	icon.Texture:SetAllPoints()
 	icon.Mask = icon:CreateMaskTexture()
@@ -1148,6 +1149,15 @@ local function CreateReminderIcon(parent, index)
 	icon.Overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
 	icon.Overlay:SetPoint("TOPLEFT", -8, 7)
 	icon.Overlay:SetPoint("BOTTOMRIGHT", 8, -7)
+	icon.Cooldown = CreateFrame("Cooldown", nil, icon)
+	icon.Cooldown:SetAllPoints()
+	icon.Cooldown:SetSwipeTexture("Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe")
+	icon.Cooldown:SetEdgeTexture("Interface\\Cooldown\\UI-HUD-ActionBar-SecondaryCooldown")
+	icon.Cooldown:SetSwipeColor(0, 0, 0, 0.7)
+	icon.Cooldown:SetDrawSwipe(true)
+	icon.Cooldown:SetDrawEdge(false)
+	if _G[ICON_COUNTDOWN_FONT] and icon.Cooldown.SetCountdownFont then icon.Cooldown:SetCountdownFont(ICON_COUNTDOWN_FONT) end
+	icon.Cooldown:SetScript("OnCooldownDone", function() CooldownManagerUtils:ScheduleReminderUpdate() end)
 	icon:SetScript("OnEnter", function(self)
 		if not self.spellID or parent.showTooltips == false then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1224,6 +1234,42 @@ local function GetAuraState(entry)
 	return false
 end
 
+local function GetSpellCooldownState(spellID)
+	if not C_Spell then return false end
+	if C_Spell.GetSpellCooldownDuration then
+		local ok, duration = pcall(C_Spell.GetSpellCooldownDuration, spellID, true)
+		if ok and duration and duration.IsZero then
+			local zeroOK, isZero = pcall(duration.IsZero, duration)
+			if zeroOK and not IsSecret(isZero) then
+				if isZero then return false end
+				return true, duration
+			end
+		end
+	end
+	if not C_Spell.GetSpellCooldown then return false end
+	local ok, info = pcall(C_Spell.GetSpellCooldown, spellID)
+	if not ok or type(info) ~= "table" or info.isOnGCD == true or info.isEnabled == false then return false end
+	local startTime, duration = info.startTime, info.duration
+	if IsSecret(startTime) or IsSecret(duration) then return info.isActive == true end
+	if type(startTime) ~= "number" or type(duration) ~= "number" or startTime <= 0 or duration <= 1.5 then return false end
+	if startTime + duration <= GetTime() then return false end
+	return true, nil, startTime, duration, not IsSecret(info.modRate) and info.modRate or 1
+end
+
+local function UpdateIconCooldown(icon, spellID, showTimer)
+	local cooldown = icon.Cooldown
+	cooldown:SetHideCountdownNumbers(not showTimer)
+	local onCooldown, durationObject, startTime, duration, modRate = GetSpellCooldownState(spellID)
+	if onCooldown and durationObject and cooldown.SetCooldownFromDurationObject then
+		cooldown:SetCooldownFromDurationObject(durationObject)
+	elseif onCooldown and startTime then
+		cooldown:SetCooldown(startTime, duration, modRate or 1)
+	else
+		cooldown:Clear()
+	end
+	return onCooldown
+end
+
 function CooldownManagerUtils:UpdateReminderBar()
 	local frame = self:CreateReminderBar()
 	local selected = self:GetProfile().selected
@@ -1252,7 +1298,8 @@ function CooldownManagerUtils:UpdateReminderBar()
 		return left.name < right.name
 	end)
 
-	local iconSize = ICON_SIZE * (frame.iconScale or 1)
+	local iconScale = frame.iconScale or 1
+	local iconSize = ICON_SIZE * iconScale
 	local iconPadding = frame.iconPadding or ICON_SPACING
 	local horizontal = not Enum or not Enum.CooldownViewerOrientation or frame.orientationSetting == nil or frame.orientationSetting == Enum.CooldownViewerOrientation.Horizontal
 	local forward
@@ -1263,17 +1310,20 @@ function CooldownManagerUtils:UpdateReminderBar()
 	end
 	for index, entry in ipairs(entries) do
 		local icon = frame.icons[index] or CreateReminderIcon(frame, index)
-		icon:SetSize(iconSize, iconSize)
+		icon:SetScale(iconScale)
 		icon:ClearAllPoints()
-		local offset = FRAME_PADDING + (index - 1) * (iconSize + iconPadding)
+		local offset = (FRAME_PADDING + (index - 1) * (iconSize + iconPadding)) / iconScale
 		if horizontal then
 			icon:SetPoint(forward and "LEFT" or "RIGHT", frame, forward and "LEFT" or "RIGHT", forward and offset or -offset, 0)
 		else
 			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
 		end
+		local previewPresent = editModeActive and presenceCache[entry.spellID] == true
+		local onCooldown = UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
 		icon.Texture:SetTexture(entry.iconID)
-		icon.Texture:SetDesaturated(editModeActive and presenceCache[entry.spellID] == true)
-		icon.Texture:SetAlpha(editModeActive and presenceCache[entry.spellID] == true and 0.5 or 1)
+		icon.Texture:SetDesaturated(previewPresent or onCooldown)
+		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
+		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
 		icon:Show()
 	end
@@ -1350,6 +1400,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("UNIT_AURA")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+	eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
 end
@@ -1363,7 +1414,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
-	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_DISABLED" then
+	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()

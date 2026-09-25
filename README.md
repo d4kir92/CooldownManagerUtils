@@ -8,8 +8,10 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 - Lists active spells from your class and current specialization that apply a buff to your character, independently of Blizzard's Auras tab.
 - Sorts buffs into two groups, **Tracked Buffs** and **Not Displayed**, by drag and drop.
 - Shows a reminder bar with an icon for every tracked buff that is currently missing on your character. The bar is hidden while nothing is missing.
+- Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
 - Shows the spell tooltip when hovering a reminder icon.
-- Makes the reminder bar movable in Edit Mode.
+- Makes the reminder bar movable in Edit Mode and snaps it to other Edit Mode elements, screen edges, and the grid like Blizzard's own frames.
+- Clicking the bar in Edit Mode opens its settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, and tooltips.
 - Keeps a separate reminder selection for each specialization.
 
 ## Supported clients
