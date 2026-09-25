@@ -62,6 +62,7 @@ local WEAPON_ENCHANT_FAMILIES = {
 }
 local WEAPON_ENCHANT_LEARN_WINDOW = 1
 local WEAPON_ENCHANT_REFRESH_MS = 5000
+local AURA_EXPIRY_GRACE = 0.1
 local WEAPON_ENCHANT_INVENTORY_SLOTS = {INVSLOT_MAINHAND or 16, INVSLOT_OFFHAND or 17, INVSLOT_RANGED or 18}
 local WEAPON_ENCHANT_SLOT_NAMES = {"MainHand", "OffHand", "Ranged"}
 local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
@@ -76,6 +77,7 @@ local reminderOptionsFrame
 local editModeActive = false
 local updatePending = false
 local presenceCache = {}
+local auraExpirationCache = {}
 local availableBuffsByName = {}
 local weaponEnchantState = {}
 local recentWeaponEnchantChanges = {}
@@ -170,6 +172,7 @@ local function GetLearnedAuras()
 	end
 	learned.spells = learned.spells or {}
 	learned.names = learned.names or {}
+	learned.durations = learned.durations or {}
 	return learned
 end
 
@@ -1625,7 +1628,22 @@ local function IsAuraSecretNow(spellID)
 	return secret == true
 end
 
-local function GetAuraState(entry)
+local function SetAuraExpiration(entrySpellID, expirationTime)
+	if auraExpirationCache[entrySpellID] == expirationTime then return end
+	auraExpirationCache[entrySpellID] = expirationTime
+	if not expirationTime then return end
+	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+end
+
+local function TrackAuraExpiration(entry, aura)
+	local expirationTime, duration = aura.expirationTime, aura.duration
+	if IsSecret(expirationTime) or IsSecret(duration) then return end
+	if type(duration) == "number" and duration > 0 then GetLearnedAuras().durations[entry.spellID] = duration end
+	if type(expirationTime) ~= "number" or expirationTime <= 0 then expirationTime = nil end
+	SetAuraExpiration(entry.spellID, expirationTime)
+end
+
+local function GetReadableAuraState(entry)
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
 	local unknown = false
@@ -1637,6 +1655,7 @@ local function GetAuraState(entry)
 			if not ok or IsSecret(aura) then
 				unknown = true
 			elseif aura then
+				TrackAuraExpiration(entry, aura)
 				return true
 			end
 		end
@@ -1644,11 +1663,72 @@ local function GetAuraState(entry)
 
 	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
 		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", entry.name, "HELPFUL")
-		if ok and not IsSecret(aura) and aura then return true end
+		if ok and not IsSecret(aura) and aura then
+			TrackAuraExpiration(entry, aura)
+			return true
+		end
 	end
 
 	if unknown then return nil end
+	SetAuraExpiration(entry.spellID, nil)
 	return false
+end
+
+local function GetAuraState(entry)
+	local present = GetReadableAuraState(entry)
+	if present ~= nil or entry.weaponEnchant then return present end
+	local expirationTime = auraExpirationCache[entry.spellID]
+	if not expirationTime or GetTime() < expirationTime then return nil end
+	SetAuraExpiration(entry.spellID, nil)
+	return false
+end
+
+local debugEnabled = false
+local debugSignatures = {}
+
+local function DebugPrint(message)
+	if debugEnabled then print("|cff55d2ffCMU|r " .. message) end
+end
+
+local function DebugFormat(value)
+	if IsSecret(value) then return "secret" end
+	return tostring(value)
+end
+
+local function DebugSecretsCall(functionName)
+	if not C_Secrets or type(C_Secrets[functionName]) ~= "function" then return "noapi" end
+	local ok, value = pcall(C_Secrets[functionName])
+	return ok and DebugFormat(value) or "err"
+end
+
+local function DebugTime(value)
+	if not value then return "nil" end
+	return string.format("%.1f", value - GetTime())
+end
+
+local function DebugEntryState(entry, expirationBefore, present)
+	if not debugEnabled or entry.weaponEnchant or not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return end
+	local parts = {}
+	for _, spellID in ipairs(entry.candidates) do
+		local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+		local result = not ok and "err" or IsSecret(aura) and "secret" or aura and "aura" or "nil"
+		table.insert(parts, spellID .. (IsAuraSecretNow(spellID) and "(s)" or "") .. "=" .. result)
+	end
+	local nameResult = "noapi"
+	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", entry.name, "HELPFUL")
+		nameResult = not ok and "err" or IsSecret(aura) and "secret" or aura and "aura" or "nil"
+	end
+	local expirationAfter = auraExpirationCache[entry.spellID]
+	local signature = string.format("%s combat=%s restr=%s aurasSecret=%s cand[%s] name=%s dur=%s expires=%s state=%s cache=%s",
+		tostring(entry.name), tostring(InCombatLockdown()), DebugSecretsCall("HasSecretRestrictions"), DebugSecretsCall("ShouldAurasBeSecret"),
+		table.concat(parts, ","), nameResult, tostring(GetLearnedAuras().durations[entry.spellID]),
+		expirationBefore == expirationAfter and DebugTime(expirationAfter) or (DebugTime(expirationBefore) .. "->" .. DebugTime(expirationAfter)),
+		tostring(present), tostring(presenceCache[entry.spellID]))
+	local key = table.concat({tostring(entry.name), tostring(InCombatLockdown()), table.concat(parts, ","), nameResult, tostring(expirationAfter), tostring(present), tostring(presenceCache[entry.spellID])}, "|")
+	if debugSignatures[entry.spellID] == key then return end
+	debugSignatures[entry.spellID] = key
+	DebugPrint(signature)
 end
 
 local function EntryMatchesSpell(entry, spellID, spellName)
@@ -1704,8 +1784,10 @@ function CooldownManagerUtils:UpdateReminderBar()
 		local entry = GetSavedEntry(spellID)
 		if entry and not seenEntries[entry] then
 			seenEntries[entry] = true
+			local expirationBefore = auraExpirationCache[entry.spellID]
 			local present = GetAuraState(entry)
 			if present ~= nil then presenceCache[entry.spellID] = present end
+			DebugEntryState(entry, expirationBefore, present)
 			if editModeActive or presenceCache[entry.spellID] == false then table.insert(entries, entry) end
 		end
 	end
@@ -1797,11 +1879,17 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
 	C_Timer.After(0.3, function() CooldownManagerUtils:OnWeaponEnchantUpdate() end)
 	local changed = false
+	local castTime = GetTime()
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
-		if entry and EntryMatchesSpell(entry, spellID, spellName) and GetAuraState(entry) == nil then
+		if entry and EntryMatchesSpell(entry, spellID, spellName) and GetReadableAuraState(entry) == nil then
 			presenceCache[entry.spellID] = true
 			changed = true
+			if not entry.weaponEnchant then
+				local duration = GetLearnedAuras().durations[entry.spellID]
+				SetAuraExpiration(entry.spellID, duration and castTime + duration or nil)
+			end
+			DebugPrint("cast " .. spellID .. " -> " .. tostring(entry.name) .. " inferred present, expires " .. DebugTime(auraExpirationCache[entry.spellID]))
 		end
 	end
 	if changed then self:ScheduleReminderUpdate() end
@@ -1889,6 +1977,13 @@ if IsSupportedClient() then
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "EDIT_MODE_LAYOUTS_UPDATED")
+	SLASH_COOLDOWNMANAGERUTILSDEBUG1 = "/cmudebug"
+	SlashCmdList.COOLDOWNMANAGERUTILSDEBUG = function()
+		debugEnabled = not debugEnabled
+		wipe(debugSignatures)
+		print("|cff55d2ffCMU|r debug " .. (debugEnabled and "on" or "off"))
+		CooldownManagerUtils:ScheduleReminderUpdate()
+	end
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
