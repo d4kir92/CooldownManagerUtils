@@ -42,6 +42,34 @@ local CLASS_AURA_FALLBACKS = {
 	}
 }
 
+local WEAPON_ENCHANT_FAMILIES = {
+	PALADIN = {
+		{spells = {433568}, enchants = {7143}},
+		{spells = {433583}, enchants = {7144}}
+	},
+	SHAMAN = {
+		{spells = {8017, 8018, 8019, 10399, 16314, 16315, 16316, 25479, 25485}, enchants = {29, 6, 1, 503, 1663, 683, 1664}},
+		{spells = {8024, 8027, 8030, 16339, 16341, 16342, 25489, 58785, 58789, 58790}, enchants = {5, 4, 3, 523, 1665, 1666, 2634, 3779, 3780, 3781}},
+		{spells = {8033, 8038, 10456, 16355, 16356, 25500, 58794, 58795, 58796}, enchants = {2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784}},
+		{spells = {8232, 8235, 10486, 16362, 25505, 58801, 58803, 58804}, enchants = {283, 284, 525, 1669, 2636, 3785, 3786, 3787}},
+		{spells = {51730, 51988, 51991, 51992, 51993, 51994}, enchants = {3345, 3346, 3347, 3348, 3349, 3350}},
+		{spells = {318038}},
+		{spells = {33757}},
+		{spells = {382021}},
+		{spells = {457481}},
+		{spells = {462757}}
+	}
+}
+local WEAPON_ENCHANT_LEARN_WINDOW = 1
+local WEAPON_ENCHANT_REFRESH_MS = 5000
+local WEAPON_ENCHANT_INVENTORY_SLOTS = {INVSLOT_MAINHAND or 16, INVSLOT_OFFHAND or 17, INVSLOT_RANGED or 18}
+local WEAPON_ENCHANT_SLOT_NAMES = {"MainHand", "OffHand", "Ranged"}
+local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
+	[INVSLOT_MAINHAND or 16] = "MainHand",
+	[INVSLOT_OFFHAND or 17] = "OffHand",
+	[INVSLOT_RANGED or 18] = "Ranged"
+}
+
 local eventFrame = CreateFrame("Frame")
 local reminderFrame
 local reminderOptionsFrame
@@ -49,6 +77,11 @@ local editModeActive = false
 local updatePending = false
 local presenceCache = {}
 local availableBuffsByName = {}
+local weaponEnchantState = {}
+local recentWeaponEnchantChanges = {}
+local recentPlayerCasts = {}
+local weaponEnchantFallbackNames
+local weaponEnchantFamilyBySpell
 local snapTargets = {}
 local snapTargetLookup = {}
 local snapPreviewFrame
@@ -169,6 +202,231 @@ local function IsLearnedBuffSpell(spellID)
 	return name ~= nil and learned.names[name] ~= nil
 end
 
+local function GetLearnedWeaponEnchants()
+	local learned = GetLearnedAuras()
+	learned.weaponSpells = learned.weaponSpells or {}
+	learned.weaponNames = learned.weaponNames or {}
+	return learned
+end
+
+local function GetWeaponEnchantFamilies()
+	local _, class = UnitClass("player")
+	return WEAPON_ENCHANT_FAMILIES[class] or {}
+end
+
+local function GetWeaponEnchantFamily(spellID)
+	if type(spellID) ~= "number" then return end
+	if not weaponEnchantFamilyBySpell then
+		weaponEnchantFamilyBySpell = {}
+		for _, family in ipairs(GetWeaponEnchantFamilies()) do
+			for _, familySpellID in ipairs(family.spells) do
+				weaponEnchantFamilyBySpell[familySpellID] = family
+			end
+		end
+	end
+	return weaponEnchantFamilyBySpell[spellID]
+end
+
+local function GetWeaponEnchantFallbackIDs()
+	local spellIDs = {}
+	for _, family in ipairs(GetWeaponEnchantFamilies()) do
+		for _, spellID in ipairs(family.spells) do
+			table.insert(spellIDs, spellID)
+		end
+	end
+	return spellIDs
+end
+
+local function GetWeaponEnchantFallbackNames()
+	if weaponEnchantFallbackNames then return weaponEnchantFallbackNames end
+	local names = {}
+	for _, family in ipairs(GetWeaponEnchantFamilies()) do
+		local name = GetSpellNameSafe(family.spells[1])
+		if name then names[name] = true end
+	end
+	weaponEnchantFallbackNames = names
+	return names
+end
+
+local function IsWeaponEnchantSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	if GetWeaponEnchantFamily(spellID) then return true end
+	local learned = GetLearnedWeaponEnchants()
+	if learned.weaponSpells[spellID] then return true end
+	local name = GetSpellNameSafe(spellID)
+	return name ~= nil and (learned.weaponNames[name] ~= nil or GetWeaponEnchantFallbackNames()[name] == true)
+end
+
+local function AddTemporaryWeaponEnchant(enchants, slot, enchantID, remaining)
+	if IsSecret(enchantID) then
+		enchants.hasSecret = true
+		return
+	end
+	if type(enchantID) ~= "number" or enchants.slots[slot] then return end
+	enchants.slots[slot] = true
+	table.insert(enchants, {
+		slot = slot,
+		enchantID = enchantID,
+		remaining = not IsSecret(remaining) and type(remaining) == "number" and remaining or nil
+	})
+end
+
+local function GetTemporaryWeaponEnchants()
+	local enchants = {slots = {}}
+	if C_Item and type(C_Item.GetWeaponEnchantInfo) == "function" and Enum and Enum.WeaponSlot then
+		local permanentType = Enum.ItemEnchantType and Enum.ItemEnchantType.Permanent or 1
+		for _, slotName in ipairs(WEAPON_ENCHANT_SLOT_NAMES) do
+			local slot = Enum.WeaponSlot[slotName]
+			if slot ~= nil then
+				local ok, list = pcall(C_Item.GetWeaponEnchantInfo, slot)
+				if ok and IsSecret(list) then
+					enchants.hasSecret = true
+				elseif ok and type(list) == "table" then
+					for _, info in pairs(list) do
+						if type(info) == "table" and info.hasEnchant == true and info.enchantType ~= permanentType then
+							AddTemporaryWeaponEnchant(enchants, slotName, info.enchantID, info.timeLeft)
+						end
+					end
+				end
+			end
+		end
+	end
+	if C_PaperDollInfo and type(C_PaperDollInfo.GetTemporaryEnchantmentInfo) == "function" then
+		for _, slot in ipairs(WEAPON_ENCHANT_INVENTORY_SLOTS) do
+			local ok, info = pcall(C_PaperDollInfo.GetTemporaryEnchantmentInfo, slot)
+			if ok and IsSecret(info) then
+				enchants.hasSecret = true
+			elseif ok and type(info) == "table" then
+				AddTemporaryWeaponEnchant(enchants, WEAPON_ENCHANT_SLOT_BY_INVENTORY[slot], info.enchantID, info.remainingTimeMs)
+			end
+		end
+	end
+	if #enchants == 0 and type(GetWeaponEnchantInfo) == "function" then
+		local ok, hasMainHand, mainHandRemaining, _, mainHandID, hasOffHand, offHandRemaining, _, offHandID = pcall(GetWeaponEnchantInfo)
+		if ok and hasMainHand then AddTemporaryWeaponEnchant(enchants, "MainHand", mainHandID, mainHandRemaining) end
+		if ok and hasOffHand then AddTemporaryWeaponEnchant(enchants, "OffHand", offHandID, offHandRemaining) end
+	end
+	return enchants
+end
+
+local function RecordWeaponEnchantChanges(silent)
+	local now = GetTime()
+	local current = GetTemporaryWeaponEnchants()
+	if silent then wipe(recentWeaponEnchantChanges) end
+	local seenSlots = {}
+	for _, enchant in ipairs(current) do
+		seenSlots[enchant.slot] = true
+		local previous = weaponEnchantState[enchant.slot]
+		local changed = not previous or previous.enchantID ~= enchant.enchantID
+		if not changed and enchant.remaining and previous.remaining then
+			local expected = previous.remaining - (now - previous.time) * 1000
+			changed = enchant.remaining - expected > WEAPON_ENCHANT_REFRESH_MS
+		end
+		if changed and not silent then
+			table.insert(recentWeaponEnchantChanges, {enchantID = enchant.enchantID, time = now})
+		end
+		weaponEnchantState[enchant.slot] = {enchantID = enchant.enchantID, remaining = enchant.remaining, time = now}
+	end
+	if current.hasSecret then return end
+	for slot in pairs(weaponEnchantState) do
+		if not seenSlots[slot] then weaponEnchantState[slot] = nil end
+	end
+end
+
+local function PruneRecentEvents(list, now)
+	for index = #list, 1, -1 do
+		if now - list[index].time > WEAPON_ENCHANT_LEARN_WINDOW * 2 then table.remove(list, index) end
+	end
+end
+
+local function LearnWeaponEnchant(spellID, spellName, enchantID)
+	local learned = GetLearnedWeaponEnchants()
+	local changed = false
+	learned.weaponSpells[spellID] = learned.weaponSpells[spellID] or {}
+	if not learned.weaponSpells[spellID][enchantID] then
+		learned.weaponSpells[spellID][enchantID] = true
+		changed = true
+	end
+	if spellName then
+		learned.weaponNames[spellName] = learned.weaponNames[spellName] or {}
+		if not learned.weaponNames[spellName][enchantID] then
+			learned.weaponNames[spellName][enchantID] = true
+			changed = true
+		end
+	end
+	return changed
+end
+
+local function MatchWeaponEnchantLearning()
+	local now = GetTime()
+	PruneRecentEvents(recentPlayerCasts, now)
+	PruneRecentEvents(recentWeaponEnchantChanges, now)
+	local learnedNew = false
+	for changeIndex = #recentWeaponEnchantChanges, 1, -1 do
+		local change = recentWeaponEnchantChanges[changeIndex]
+		local bestCast, bestDelta
+		for _, cast in ipairs(recentPlayerCasts) do
+			local delta = change.time - cast.time
+			if delta >= 0 and delta <= WEAPON_ENCHANT_LEARN_WINDOW and (not bestDelta or delta < bestDelta) then bestCast, bestDelta = cast, delta end
+		end
+		if bestCast then
+			if LearnWeaponEnchant(bestCast.spellID, bestCast.name, change.enchantID) then learnedNew = true end
+			table.remove(recentWeaponEnchantChanges, changeIndex)
+		end
+	end
+	return learnedNew
+end
+
+local function GetKnownWeaponEnchantIDs()
+	local knownEnchantIDs = {}
+	for _, family in ipairs(GetWeaponEnchantFamilies()) do
+		for _, enchantID in ipairs(family.enchants or {}) do
+			knownEnchantIDs[enchantID] = true
+		end
+	end
+	for _, enchantIDs in pairs(GetLearnedWeaponEnchants().weaponSpells) do
+		for enchantID in pairs(enchantIDs) do
+			knownEnchantIDs[enchantID] = true
+		end
+	end
+	return knownEnchantIDs
+end
+
+local function GetEntryWeaponEnchantIDs(entry)
+	local learned = GetLearnedWeaponEnchants()
+	local enchantIDs = {}
+	local function AddSpell(spellID)
+		local family = GetWeaponEnchantFamily(spellID)
+		for _, enchantID in ipairs(family and family.enchants or {}) do
+			enchantIDs[enchantID] = true
+		end
+		for enchantID in pairs(learned.weaponSpells[spellID] or {}) do
+			enchantIDs[enchantID] = true
+		end
+	end
+	AddSpell(entry.spellID)
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		AddSpell(candidateSpellID)
+	end
+	for enchantID in pairs(learned.weaponNames[entry.name] or {}) do
+		enchantIDs[enchantID] = true
+	end
+	return enchantIDs
+end
+
+local function GetWeaponEnchantState(entry)
+	local enchantIDs = GetEntryWeaponEnchantIDs(entry)
+	local knownEnchantIDs
+	local current = GetTemporaryWeaponEnchants()
+	for _, enchant in ipairs(current) do
+		if enchantIDs[enchant.enchantID] then return true end
+		knownEnchantIDs = knownEnchantIDs or GetKnownWeaponEnchantIDs()
+		if not knownEnchantIDs[enchant.enchantID] then return true end
+	end
+	if current.hasSecret then return nil end
+	return false
+end
+
 local function AddAuraMappingSpell(mapping, spellID)
 	if type(spellID) ~= "number" then return end
 	AddCandidate(mapping.candidates, mapping.seen, spellID)
@@ -254,6 +512,9 @@ local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local knownAuraSources = {}
 	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
+	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
+		knownAuraSources[spellID] = spellID
+	end
 	local cooldownViewer = C_CooldownViewer
 	local categoryEnum = Enum and Enum.CooldownViewerCategory
 	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells, knownAuraSources end
@@ -272,6 +533,7 @@ local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
 	if not C_Spell or GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
 	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
 	if IsLearnedBuffSpell(spellID) or IsLearnedBuffSpell(baseSpellID) then return true end
+	if IsWeaponEnchantSpell(spellID) or IsWeaponEnchantSpell(baseSpellID) then return true end
 	if GetSpellPredicate(C_Spell.IsSelfBuff, spellID) then return true end
 	if not GetSpellPredicate(C_Spell.IsSpellHelpful, spellID) then return false end
 	if type(C_Spell.GetSpellMaxCumulativeAuraApplications) ~= "function" then return false end
@@ -281,10 +543,17 @@ end
 
 local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
+	local sourceSpellID = spellID
+	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
+	if family then spellID = family.spells[1] end
 	local candidates = {}
 	local seenCandidates = {}
 	AddCandidate(candidates, seenCandidates, spellID)
+	AddCandidate(candidates, seenCandidates, sourceSpellID)
 	AddCandidate(candidates, seenCandidates, baseSpellID)
+	for _, familySpellID in ipairs(family and family.spells or {}) do
+		AddCandidate(candidates, seenCandidates, familySpellID)
+	end
 	local auraMapping = knownAuraSpells[spellID] or knownAuraSpells[baseSpellID]
 	if auraMapping then
 		for _, auraSpellID in ipairs(auraMapping.candidates) do
@@ -298,9 +567,12 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	local spellName = GetSpellNameSafe(spellID)
 	if spellName then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
 
+	local weaponEnchant = family ~= nil or IsWeaponEnchantSpell(sourceSpellID) or IsWeaponEnchantSpell(baseSpellID)
 	local existing = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
 	if existing then
 		availableBuffsBySpellID[spellID] = existing
+		availableBuffsBySpellID[sourceSpellID] = existing
+		existing.weaponEnchant = existing.weaponEnchant or weaponEnchant
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -319,10 +591,12 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		name = spellInfo.name,
 		iconID = spellInfo.iconID,
 		defaultCategory = "hidden",
+		weaponEnchant = weaponEnchant,
 		candidates = candidates
 	}
 
 	availableBuffsBySpellID[spellID] = entry
+	availableBuffsBySpellID[sourceSpellID] = entry
 	availableBuffsByName[entry.name] = entry
 	table.insert(availableBuffs, entry)
 end
@@ -443,6 +717,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	local availableBuffs = {}
 	local availableBuffsBySpellID = {}
 	wipe(availableBuffsByName)
+	weaponEnchantFallbackNames = nil
 	LearnCurrentPlayerAuras()
 	local knownAuraSpells, knownAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
@@ -1274,6 +1549,7 @@ local function GetSavedEntry(spellID)
 		spellID = spellID,
 		name = spellInfo.name,
 		iconID = spellInfo.iconID,
+		weaponEnchant = IsWeaponEnchantSpell(spellID),
 		candidates = {spellID}
 	}
 end
@@ -1287,6 +1563,7 @@ local function IsAuraSecretNow(spellID)
 end
 
 local function GetAuraState(entry)
+	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
 	local unknown = false
 	for _, spellID in ipairs(entry.candidates) do
@@ -1444,9 +1721,18 @@ function CooldownManagerUtils:ScheduleReminderUpdate()
 	end)
 end
 
+function CooldownManagerUtils:OnWeaponEnchantUpdate(silent)
+	RecordWeaponEnchantChanges(silent)
+	if not silent and MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
+	self:ScheduleReminderUpdate()
+end
+
 function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if IsSecret(spellID) or type(spellID) ~= "number" then return end
 	local spellName = GetSpellNameSafe(spellID)
+	table.insert(recentPlayerCasts, {spellID = spellID, name = spellName, time = GetTime()})
+	if MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
+	C_Timer.After(0.3, function() CooldownManagerUtils:OnWeaponEnchantUpdate() end)
 	local changed = false
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
@@ -1520,6 +1806,9 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
 	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+	eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+	eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 end
 
@@ -1532,10 +1821,17 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)
+	elseif event == "WEAPON_ENCHANT_CHANGED" then
+		CooldownManagerUtils:OnWeaponEnchantUpdate()
+	elseif event == "UNIT_INVENTORY_CHANGED" then
+		local unit = ...
+		if unit == "player" then CooldownManagerUtils:OnWeaponEnchantUpdate() end
+	elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
+		CooldownManagerUtils:OnWeaponEnchantUpdate(true)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
-	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
+	elseif event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()

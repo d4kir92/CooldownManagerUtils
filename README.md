@@ -6,6 +6,7 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 
 - Adds a **Buff Reminders** tab to the side tabs of Blizzard's Cooldown Manager settings.
 - Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
+- Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. The reminder shows while the enchant is missing from your weapons.
 - Sorts buffs into two groups, **Tracked Buffs** and **Not Displayed**, by drag and drop.
 - Shows a reminder bar with an icon for every tracked buff that is currently missing on your character. The bar is hidden while nothing is missing.
 - Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
@@ -44,6 +45,7 @@ To move the reminder bar, open Edit Mode. The bar then shows all tracked buffs, 
 - Passive spells and spells without a player buff are excluded. Class and specialization flyouts are included.
 - The game does not tell add-ons directly which buff a spell applies. Spells the game does not flag as buffs (for example Thorns) are learned automatically the first time their buff from you lands on your character; they then appear in the list.
 - A buff also counts as active when an aura with the same name is on you, so other ranks or IDs of the same buff are recognized.
+- Weapon enchant spells learn their exact enchant the first time you cast them. Until then, any temporary weapon enchant counts as active for them.
 - The list of available buff spells is not refreshed during combat; it updates as soon as combat ends. Reminders themselves keep updating in combat.
 - When the game does not reveal whether an aura is active, for example in restricted content, the last known state is kept instead of showing a false reminder.
 - Reminder selections and the bar position are saved per character.
