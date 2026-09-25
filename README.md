@@ -47,7 +47,9 @@ To move the reminder bar, open Edit Mode. The bar then shows all tracked buffs, 
 - A buff also counts as active when an aura with the same name is on you, so other ranks or IDs of the same buff are recognized.
 - Weapon enchant spells learn their exact enchant the first time you cast them. Until then, any temporary weapon enchant counts as active for them.
 - The list of available buff spells is not refreshed during combat; it updates as soon as combat ends. Reminders themselves keep updating in combat.
-- When the game does not reveal whether an aura is active, for example in restricted content, the last known state is kept instead of showing a false reminder.
+- When the game does not reveal whether an aura is active, for example in combat or in restricted content, the last known state is kept instead of showing a false reminder.
+- While an aura is hidden this way, its reminder still appears when the buff runs out: the add-on uses the last known expiration time, or the cast time plus the buff's remembered duration if you cast it during combat. The duration is remembered whenever the game reveals the buff, for example out of combat.
+- A buff that is cancelled or dispelled while it is hidden cannot be detected; its reminder appears once the game reveals the aura again, usually when combat ends.
 - Reminder selections are saved per character and specialization.
 - Bar position and all bar settings are saved per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. Switching the Edit Mode layout switches the bar along with it. A layout the add-on has not seen yet starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
 
