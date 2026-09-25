@@ -5,6 +5,7 @@ local ICON_SPACING = 4
 local ICON_SCALE_MIN = 50
 local ICON_SCALE_MAX = 400
 local ICON_COUNTDOWN_FONT = "GameFontHighlightHugeOutline"
+local GROUP_COUNT_FONT_SIZE = 10
 local FRAME_PADDING = 6
 local DEFAULT_REMINDER_X = 0
 local DEFAULT_REMINDER_Y = -180
@@ -1611,7 +1612,9 @@ local function CreateReminderIcon(parent, index)
 	icon.CountFrame = CreateFrame("Frame", nil, icon)
 	icon.CountFrame:SetAllPoints()
 	icon.CountFrame:SetFrameLevel(icon.Cooldown:GetFrameLevel() + 2)
-	icon.GroupCount = icon.CountFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+	icon.GroupCount = icon.CountFrame:CreateFontString(nil, "OVERLAY", _G[ICON_COUNTDOWN_FONT] and ICON_COUNTDOWN_FONT or "NumberFontNormal")
+	local groupCountFont, _, groupCountFlags = icon.GroupCount:GetFont()
+	if groupCountFont then icon.GroupCount:SetFont(groupCountFont, GROUP_COUNT_FONT_SIZE, groupCountFlags) end
 	icon.GroupCount:SetPoint("BOTTOMRIGHT", -2, 2)
 	icon.GroupCount:Hide()
 	icon:SetScript("OnEnter", function(self)
