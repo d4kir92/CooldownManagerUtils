@@ -42,6 +42,8 @@ To move the reminder bar, open Edit Mode. The bar then shows all tracked buffs, 
 ## Notes
 
 - Passive spells and spells without a player buff are excluded. Class and specialization flyouts are included.
+- The game does not tell add-ons directly which buff a spell applies. Spells the game does not flag as buffs (for example Thorns) are learned automatically the first time their buff from you lands on your character; they then appear in the list.
+- A buff also counts as active when an aura with the same name is on you, so other ranks or IDs of the same buff are recognized.
 - The list of available buff spells is not refreshed during combat; it updates as soon as combat ends. Reminders themselves keep updating in combat.
 - When the game does not reveal whether an aura is active, for example in restricted content, the last known state is kept instead of showing a false reminder.
 - Reminder selections and the bar position are saved per character.

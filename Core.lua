@@ -48,6 +48,7 @@ local reminderOptionsFrame
 local editModeActive = false
 local updatePending = false
 local presenceCache = {}
+local availableBuffsByName = {}
 local snapTargets = {}
 local snapTargetLookup = {}
 local snapPreviewFrame
@@ -115,6 +116,57 @@ local function GetSpellPredicate(predicate, spellID)
 	local ok, result = pcall(predicate, spellID)
 	if not ok or IsSecret(result) then return false end
 	return result == true
+end
+
+local function GetSpellNameSafe(spellID)
+	if type(spellID) ~= "number" then return end
+	local spellInfo = GetReminderSpellInfo(spellID)
+	local name = spellInfo and spellInfo.name
+	if IsSecret(name) or type(name) ~= "string" then return end
+	return name
+end
+
+local function GetLearnedAuras()
+	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
+	local learned = CooldownManagerUtilsDB.learnedAuras
+	if type(learned) ~= "table" then
+		learned = {}
+		CooldownManagerUtilsDB.learnedAuras = learned
+	end
+	learned.spells = learned.spells or {}
+	learned.names = learned.names or {}
+	return learned
+end
+
+local function LearnPlayerAura(aura)
+	if type(aura) ~= "table" or IsSecret(aura) then return false end
+	local spellID, name, sourceUnit, isHelpful = aura.spellId, aura.name, aura.sourceUnit, aura.isHelpful
+	if IsSecret(spellID) or IsSecret(name) or IsSecret(sourceUnit) or IsSecret(isHelpful) then return false end
+	if isHelpful == false or sourceUnit ~= "player" or type(spellID) ~= "number" or type(name) ~= "string" then return false end
+	local learned = GetLearnedAuras()
+	if learned.spells[spellID] and learned.names[name] then return false end
+	learned.spells[spellID] = true
+	learned.names[name] = learned.names[name] or spellID
+	return true
+end
+
+local function LearnCurrentPlayerAuras()
+	if not C_UnitAuras or type(C_UnitAuras.GetAuraDataByIndex) ~= "function" then return false end
+	local changed = false
+	for index = 1, 255 do
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
+		if not ok or not aura then break end
+		if LearnPlayerAura(aura) then changed = true end
+	end
+	return changed
+end
+
+local function IsLearnedBuffSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	local learned = GetLearnedAuras()
+	if learned.spells[spellID] then return true end
+	local name = GetSpellNameSafe(spellID)
+	return name ~= nil and learned.names[name] ~= nil
 end
 
 local function AddAuraMappingSpell(mapping, spellID)
@@ -219,6 +271,7 @@ end
 local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
 	if not C_Spell or GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
 	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
+	if IsLearnedBuffSpell(spellID) or IsLearnedBuffSpell(baseSpellID) then return true end
 	if GetSpellPredicate(C_Spell.IsSelfBuff, spellID) then return true end
 	if not GetSpellPredicate(C_Spell.IsSpellHelpful, spellID) then return false end
 	if type(C_Spell.GetSpellMaxCumulativeAuraApplications) ~= "function" then return false end
@@ -242,9 +295,12 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		local ok, result = pcall(C_Spell.GetBaseSpell, spellID)
 		if ok and not IsSecret(result) then AddCandidate(candidates, seenCandidates, result) end
 	end
+	local spellName = GetSpellNameSafe(spellID)
+	if spellName then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
 
-	local existing = availableBuffsBySpellID[spellID]
+	local existing = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
 	if existing then
+		availableBuffsBySpellID[spellID] = existing
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -267,6 +323,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	}
 
 	availableBuffsBySpellID[spellID] = entry
+	availableBuffsByName[entry.name] = entry
 	table.insert(availableBuffs, entry)
 end
 
@@ -385,6 +442,8 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 
 	local availableBuffs = {}
 	local availableBuffsBySpellID = {}
+	wipe(availableBuffsByName)
+	LearnCurrentPlayerAuras()
 	local knownAuraSpells, knownAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
 	local classLine = skillLineEnum and skillLineEnum.Class or 2
@@ -1218,19 +1277,44 @@ local function GetSavedEntry(spellID)
 	}
 end
 
+local function IsAuraSecretNow(spellID)
+	if not C_Secrets or type(C_Secrets.ShouldSpellAuraBeSecret) ~= "function" then return false end
+	local ok, secret = pcall(C_Secrets.ShouldSpellAuraBeSecret, spellID)
+	if not ok then return false end
+	if IsSecret(secret) then return true end
+	return secret == true
+end
+
 local function GetAuraState(entry)
 	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
 	local unknown = false
 	for _, spellID in ipairs(entry.candidates) do
-		local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
-		if not ok or IsSecret(aura) then
+		if IsAuraSecretNow(spellID) then
 			unknown = true
-		elseif aura then
-			return true
+		else
+			local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+			if not ok or IsSecret(aura) then
+				unknown = true
+			elseif aura then
+				return true
+			end
 		end
 	end
 
+	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", entry.name, "HELPFUL")
+		if ok and aura and not IsSecret(aura) then return true end
+	end
+
 	if unknown then return nil end
+	return false
+end
+
+local function EntryMatchesSpell(entry, spellID, spellName)
+	if entry.spellID == spellID or (spellName and entry.name == spellName) then return true end
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		if candidateSpellID == spellID then return true end
+	end
 	return false
 end
 
@@ -1274,12 +1358,14 @@ function CooldownManagerUtils:UpdateReminderBar()
 	local frame = self:CreateReminderBar()
 	local selected = self:GetProfile().selected
 	local entries = {}
+	local seenEntries = {}
 	for spellID in pairs(selected) do
 		local entry = GetSavedEntry(spellID)
-		if entry then
+		if entry and not seenEntries[entry] then
+			seenEntries[entry] = true
 			local present = GetAuraState(entry)
-			if present ~= nil then presenceCache[spellID] = present end
-			if editModeActive or presenceCache[spellID] == false then table.insert(entries, entry) end
+			if present ~= nil then presenceCache[entry.spellID] = present end
+			if editModeActive or presenceCache[entry.spellID] == false then table.insert(entries, entry) end
 		end
 	end
 
@@ -1357,6 +1443,35 @@ function CooldownManagerUtils:ScheduleReminderUpdate()
 	end)
 end
 
+function CooldownManagerUtils:OnPlayerSpellCast(spellID)
+	if IsSecret(spellID) or type(spellID) ~= "number" then return end
+	local spellName = GetSpellNameSafe(spellID)
+	local changed = false
+	for selectedSpellID in pairs(self:GetProfile().selected) do
+		local entry = GetSavedEntry(selectedSpellID)
+		if entry and EntryMatchesSpell(entry, spellID, spellName) and GetAuraState(entry) == nil then
+			presenceCache[entry.spellID] = true
+			changed = true
+		end
+	end
+	if changed then self:ScheduleReminderUpdate() end
+end
+
+function CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
+	local learnedNew = false
+	if type(updateInfo) == "table" and not IsSecret(updateInfo) then
+		if updateInfo.isFullUpdate then
+			learnedNew = LearnCurrentPlayerAuras()
+		elseif type(updateInfo.addedAuras) == "table" then
+			for _, aura in ipairs(updateInfo.addedAuras) do
+				if LearnPlayerAura(aura) then learnedNew = true end
+			end
+		end
+	end
+	if learnedNew then self:RefreshAvailableBuffs() end
+	self:ScheduleReminderUpdate()
+end
+
 local function SetEditModeActive(active)
 	editModeActive = active
 	CooldownManagerUtils:UpdateReminderBar()
@@ -1403,18 +1518,23 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
+	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_LOGIN" then
 		CooldownManagerUtils:Initialize()
 	elseif event == "UNIT_AURA" then
-		local unit = ...
-		if unit == "player" then CooldownManagerUtils:ScheduleReminderUpdate() end
+		local unit, updateInfo = ...
+		if unit == "player" then CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo) end
+	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+		local _, _, spellID = ...
+		CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
-	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" then
+	elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()
