@@ -46,7 +46,19 @@ local editModeActive = false
 local updatePending = false
 local presenceCache = {}
 local snapTargets = {}
-local SNAP_DISTANCE = 10
+local snapTargetLookup = {}
+local snapPreviewFrame
+local snapScanFrame
+local snapScanCursor
+local SNAP_DISTANCE = 8
+local SNAP_CORNER_DISTANCE_SQ = SNAP_DISTANCE * SNAP_DISTANCE * 2
+local SNAP_SELECTION_PADDING = 2
+local SNAP_LINE_WIDTH = 1.5
+local snapExclusions = {}
+local snapSidesCache = setmetatable({}, {__mode = "k"})
+local topLevelParent = {}
+local SNAP_CORNER_POINTS = {"TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT"}
+local SNAP_DIAGONAL_CORNERS = {TOPLEFT = "BOTTOMRIGHT", TOPRIGHT = "BOTTOMLEFT", BOTTOMLEFT = "TOPRIGHT", BOTTOMRIGHT = "TOPLEFT"}
 local reminderSettingDefaults = {
 	orientation = 0,
 	iconDirection = 1,
@@ -397,6 +409,10 @@ local function RestorePosition(frame)
 	frame:ClearAllPoints()
 	if position then
 		local relativeTo = position.relativeTo and _G[position.relativeTo] or UIParent
+		if position.relativeSelection and relativeTo.Selection then
+			frame.snapTarget = relativeTo
+			relativeTo = relativeTo.Selection
+		end
 		frame:SetPoint(position.point or "CENTER", relativeTo, position.relativePoint or "CENTER", position.x or DEFAULT_REMINDER_X, position.y or DEFAULT_REMINDER_Y)
 	else
 		frame:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
@@ -407,6 +423,11 @@ local function SavePosition(frame)
 	local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	local relativeName = relativeTo and relativeTo ~= UIParent and relativeTo:GetName() or nil
+	local relativeSelection
+	if frame.snapTarget and relativeTo == frame.snapTarget.Selection then
+		relativeName = frame.snapTarget:GetName()
+		relativeSelection = relativeName and true or nil
+	end
 	if relativeTo and relativeTo ~= UIParent and not relativeName then
 		local centerX, centerY = frame:GetCenter()
 		local parentCenterX, parentCenterY = UIParent:GetCenter()
@@ -418,6 +439,7 @@ local function SavePosition(frame)
 	CooldownManagerUtilsDB.position = {
 		point = point,
 		relativeTo = relativeName,
+		relativeSelection = relativeSelection,
 		relativePoint = relativePoint,
 		x = x,
 		y = y
@@ -449,60 +471,410 @@ local function ApplyReminderSettings(frame)
 	if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.Refresh then reminderOptionsFrame:Refresh() end
 end
 
-local function GetFrameRect(frame)
+local function IsSnapEnabled()
+	return not EditModeManagerFrame or EditModeManagerFrame.snapEnabled ~= false
+end
+
+local function GetUIParentScaleFactor(region)
+	return region:GetEffectiveScale() / UIParent:GetEffectiveScale()
+end
+
+local function GetScaledSelectionSides(frame)
 	local selection = frame and frame.Selection
 	if not selection or not selection:IsShown() then return end
-	return selection:GetLeft(), selection:GetRight(), selection:GetBottom(), selection:GetTop()
+	local left, bottom, width, height = selection:GetRect()
+	if not left then return end
+	local factor = GetUIParentScaleFactor(selection)
+	local sides = snapSidesCache[frame]
+	if not sides then
+		sides = {}
+		snapSidesCache[frame] = sides
+	end
+	sides.left = left * factor
+	sides.right = (left + width) * factor
+	sides.bottom = bottom * factor
+	sides.top = (bottom + height) * factor
+	sides.centerX = (sides.left + sides.right) / 2
+	sides.centerY = (sides.bottom + sides.top) / 2
+	return sides
 end
 
-local function GetSnapCandidate(frame, target)
-	local left, right, bottom, top = GetFrameRect(frame)
-	local targetLeft, targetRight, targetBottom, targetTop = GetFrameRect(target)
-	if not left or not targetLeft then return end
-	local centerX = (left + right) / 2
-	local centerY = (bottom + top) / 2
-	local targetCenterX = (targetLeft + targetRight) / 2
-	local targetCenterY = (targetBottom + targetTop) / 2
-	local best
-	local function SetSnapCandidate(distance, point, relativePoint, x, y)
-		local absoluteDistance = math.abs(distance)
-		if absoluteDistance <= SNAP_DISTANCE and (not best or absoluteDistance < best.distance) then
-			best = {distance = absoluteDistance, point = point, relativePoint = relativePoint, x = x, y = y, target = target}
+local function UpdateTopLevelParent()
+	local left, bottom, width, height = UIParent:GetRect()
+	topLevelParent.left = left
+	topLevelParent.bottom = bottom
+	topLevelParent.width = width
+	topLevelParent.height = height
+	topLevelParent.right = left + width
+	topLevelParent.top = bottom + height
+	topLevelParent.centerX, topLevelParent.centerY = UIParent:GetCenter()
+end
+
+local function IsRegionAnchoredTo(region, anchor, depth)
+	if depth > 20 then return false end
+	for index = 1, region:GetNumPoints() do
+		local _, relativeTo = region:GetPoint(index)
+		if not relativeTo then return false end
+		if relativeTo == anchor then return true end
+		local forbidden = relativeTo.IsForbidden and relativeTo:IsForbidden()
+		if not forbidden and IsRegionAnchoredTo(relativeTo, anchor, depth + 1) then return true end
+	end
+	return false
+end
+
+local function IsMagneticTarget(frame, target)
+	if target == frame then return false end
+	local forbidden = target.IsForbidden and target:IsForbidden()
+	if forbidden or not target:IsVisible() then return false end
+	local excluded = snapExclusions[target]
+	if excluded == nil then
+		excluded = IsRegionAnchoredTo(target, frame, 0)
+		snapExclusions[target] = excluded
+	end
+	return not excluded
+end
+
+local function GetGridLines(verticalLines)
+	local gridLines = EditModeMagnetismManager and EditModeMagnetismManager.magneticGridLines
+	if type(gridLines) ~= "table" then return end
+	return verticalLines and gridLines.vertical or gridLines.horizontal
+end
+
+local function FindClosestGridLine(sides, verticalLines)
+	local parent = topLevelParent
+	local checkPoints
+	if verticalLines then
+		checkPoints = {
+			{"LEFT", "LEFT", sides.left, parent.left},
+			{"RIGHT", "RIGHT", sides.right, parent.right},
+			{"CENTER", "CENTER", sides.centerX, parent.centerX},
+			{"LEFT", "CENTER", sides.left, parent.centerX},
+			{"RIGHT", "CENTER", sides.right, parent.centerX}
+		}
+	else
+		checkPoints = {
+			{"TOP", "TOP", sides.top, parent.top},
+			{"BOTTOM", "BOTTOM", sides.bottom, parent.bottom},
+			{"CENTER", "CENTER", sides.centerY, parent.centerY},
+			{"TOP", "CENTER", sides.top, parent.centerY},
+			{"BOTTOM", "CENTER", sides.bottom, parent.centerY}
+		}
+	end
+	local closestDistance, closestPoint, closestRelativePoint
+	local closestOffset = 0
+	for _, checkPoint in ipairs(checkPoints) do
+		local distance = math.abs(checkPoint[4] - checkPoint[3])
+		if not closestDistance or distance < closestDistance then
+			closestDistance, closestPoint, closestRelativePoint = distance, checkPoint[1], checkPoint[2]
 		end
 	end
-	if top >= targetBottom and bottom <= targetTop then
-		SetSnapCandidate(left - targetRight, "LEFT", "RIGHT", 0, centerY - targetCenterY)
-		SetSnapCandidate(right - targetLeft, "RIGHT", "LEFT", 0, centerY - targetCenterY)
+	local gridLines = GetGridLines(verticalLines)
+	if gridLines then
+		for _, gridLineOffset in pairs(gridLines) do
+			if type(gridLineOffset) == "number" then
+				for index = 1, 3 do
+					local checkPoint = checkPoints[index]
+					local distance = math.abs(gridLineOffset - checkPoint[3])
+					if distance < closestDistance then
+						closestDistance, closestPoint, closestRelativePoint = distance, checkPoint[1], checkPoint[1]
+						if closestPoint == "TOP" then
+							closestOffset = gridLineOffset - parent.top
+						elseif closestPoint == "RIGHT" then
+							closestOffset = gridLineOffset - parent.right
+						elseif closestPoint == "CENTER" then
+							closestOffset = gridLineOffset - (verticalLines and parent.centerX or parent.centerY)
+						else
+							closestOffset = gridLineOffset
+						end
+					end
+				end
+			end
+		end
 	end
-	if right >= targetLeft and left <= targetRight then
-		SetSnapCandidate(top - targetBottom, "TOP", "BOTTOM", centerX - targetCenterX, 0)
-		SetSnapCandidate(bottom - targetTop, "BOTTOM", "TOP", centerX - targetCenterX, 0)
-	end
-	return best
+	return closestDistance, closestPoint, closestRelativePoint, closestOffset
 end
 
-local function SnapReminderFrame(frame)
-	local best
+local function CheckReplaceMagneticFrameInfo(current, target, sides, point, relativePoint, distance, offset, isHorizontal)
+	local scaledDistance = distance * UIParent:GetEffectiveScale()
+	if scaledDistance > SNAP_DISTANCE then return current end
+	if not current or scaledDistance < current.distance then
+		return {target = target, sides = sides, point = point, relativePoint = relativePoint, distance = scaledDistance, offset = offset, isHorizontal = isHorizontal}
+	end
+	return current
+end
+
+local function GetCornerPosition(sides, corner)
+	local x = corner:find("LEFT") and sides.left or sides.right
+	local y = corner:find("TOP") and sides.top or sides.bottom
+	return x, y
+end
+
+local function GetCornerMagneticFrameInfo(sides, relativeInfo)
+	if not relativeInfo then return end
+	local relativeSides = relativeInfo.sides
+	local closestPoint, closestRelativePoint, closestSqrDistance
+	for _, point in ipairs(SNAP_CORNER_POINTS) do
+		local x, y = GetCornerPosition(sides, point)
+		for _, relativePoint in ipairs(SNAP_CORNER_POINTS) do
+			if SNAP_DIAGONAL_CORNERS[point] ~= relativePoint then
+				local relativeX, relativeY = GetCornerPosition(relativeSides, relativePoint)
+				local sqrDistance = (x - relativeX) * (x - relativeX) + (y - relativeY) * (y - relativeY)
+				if sqrDistance <= SNAP_CORNER_DISTANCE_SQ and (not closestSqrDistance or sqrDistance < closestSqrDistance) then
+					closestPoint, closestRelativePoint, closestSqrDistance = point, relativePoint, sqrDistance
+				end
+			end
+		end
+	end
+	if not closestSqrDistance then return end
+	return {target = relativeInfo.target, sides = relativeSides, point = closestPoint, relativePoint = closestRelativePoint, distance = math.sqrt(closestSqrDistance), offset = 0, isHorizontal = relativeInfo.isHorizontal, isCornerSnap = true}
+end
+
+local function GetMagneticFrameInfos(frame)
+	local sides = GetScaledSelectionSides(frame)
+	if not sides then return end
+	UpdateTopLevelParent()
+	local distance, point, relativePoint, offset = FindClosestGridLine(sides, true)
+	local horizontalInfo = CheckReplaceMagneticFrameInfo(nil, UIParent, nil, point, relativePoint, distance, offset, true)
+	distance, point, relativePoint, offset = FindClosestGridLine(sides, false)
+	local verticalInfo = CheckReplaceMagneticFrameInfo(nil, UIParent, nil, point, relativePoint, distance, offset, false)
+	local horizontalCornerInfo, verticalCornerInfo
 	for _, target in ipairs(snapTargets) do
-		local forbidden = target.IsForbidden and target:IsForbidden()
-		if not forbidden and target ~= frame and target.Selection and target:IsVisible() then
-			local candidate = GetSnapCandidate(frame, target)
-			if candidate and (not best or candidate.distance < best.distance) then best = candidate end
+		if IsMagneticTarget(frame, target) then
+			local targetSides = GetScaledSelectionSides(target)
+			if targetSides then
+				local verticallyAligned = sides.top >= targetSides.bottom and sides.bottom <= targetSides.top
+				local horizontallyAligned = sides.right >= targetSides.left and sides.left <= targetSides.right
+				if verticallyAligned and (sides.right < targetSides.left or sides.left > targetSides.right) then
+					if targetSides.right < sides.left then
+						distance, point, relativePoint = sides.left - targetSides.right, "LEFT", "RIGHT"
+					else
+						distance, point, relativePoint = targetSides.left - sides.right, "RIGHT", "LEFT"
+					end
+					horizontalInfo = CheckReplaceMagneticFrameInfo(horizontalInfo, target, targetSides, point, relativePoint, distance, 0, true)
+					horizontalCornerInfo = CheckReplaceMagneticFrameInfo(horizontalCornerInfo, target, targetSides, point, relativePoint, distance, 0, true)
+				end
+				if horizontallyAligned and (sides.bottom > targetSides.top or sides.top < targetSides.bottom) then
+					if targetSides.bottom > sides.top then
+						distance, point, relativePoint = targetSides.bottom - sides.top, "TOP", "BOTTOM"
+					else
+						distance, point, relativePoint = sides.bottom - targetSides.top, "BOTTOM", "TOP"
+					end
+					verticalInfo = CheckReplaceMagneticFrameInfo(verticalInfo, target, targetSides, point, relativePoint, distance, 0, false)
+					verticalCornerInfo = CheckReplaceMagneticFrameInfo(verticalCornerInfo, target, targetSides, point, relativePoint, distance, 0, false)
+				end
+			end
 		end
 	end
-	if not best then return end
+	local horizontalCorner = GetCornerMagneticFrameInfo(sides, horizontalCornerInfo)
+	local verticalCorner = GetCornerMagneticFrameInfo(sides, verticalCornerInfo)
+	if horizontalCorner and (not verticalCorner or horizontalCorner.distance < verticalCorner.distance) then
+		return {horizontalCorner}
+	elseif verticalCorner then
+		return {verticalCorner}
+	elseif horizontalInfo and horizontalInfo.target == UIParent and verticalInfo and verticalInfo.target == UIParent then
+		return {horizontalInfo, verticalInfo}
+	elseif horizontalInfo and (not verticalInfo or horizontalInfo.distance < verticalInfo.distance) then
+		return {horizontalInfo}
+	elseif verticalInfo then
+		return {verticalInfo}
+	end
+end
+
+local function GetPreviewLineAnchors(info)
+	local relativePoint = info.relativePoint
+	if relativePoint:find("CENTER") then
+		return {info.isHorizontal and "CenterVertical" or "CenterHorizontal"}
+	end
+	local anchors = {}
+	if relativePoint:find("TOP") then table.insert(anchors, "Top") end
+	if relativePoint:find("BOTTOM") then table.insert(anchors, "Bottom") end
+	if relativePoint:find("LEFT") then table.insert(anchors, "Left") end
+	if relativePoint:find("RIGHT") then table.insert(anchors, "Right") end
+	return anchors
+end
+
+local function SetupPreviewLine(line, info, lineAnchor)
+	local parent = topLevelParent
+	local offsetX, offsetY = 0, 0
+	if info.target == UIParent then
+		if lineAnchor == "CenterHorizontal" then
+			offsetY = info.offset
+		elseif lineAnchor == "CenterVertical" then
+			offsetX = info.offset
+		elseif lineAnchor == "Top" then
+			offsetY = parent.height + info.offset - parent.centerY
+		elseif lineAnchor == "Bottom" then
+			offsetY = info.offset - parent.centerY
+		elseif lineAnchor == "Right" then
+			offsetX = parent.width + info.offset - parent.centerX
+		else
+			offsetX = info.offset - parent.centerX
+		end
+	else
+		local sides = info.sides
+		if lineAnchor == "Top" then
+			offsetY = sides.top - parent.centerY
+		elseif lineAnchor == "Bottom" then
+			offsetY = sides.bottom - parent.centerY
+		elseif lineAnchor == "CenterHorizontal" then
+			offsetY = sides.centerY - parent.centerY
+		elseif lineAnchor == "Left" then
+			offsetX = sides.left - parent.centerX
+		elseif lineAnchor == "Right" then
+			offsetX = sides.right - parent.centerX
+		else
+			offsetX = sides.centerX - parent.centerX
+		end
+	end
+	line:ClearAllPoints()
+	if lineAnchor == "Top" or lineAnchor == "Bottom" or lineAnchor == "CenterHorizontal" then
+		line:SetStartPoint("LEFT", UIParent, offsetX, offsetY)
+		line:SetEndPoint("RIGHT", UIParent, offsetX, offsetY)
+	else
+		line:SetStartPoint("TOP", UIParent, offsetX, offsetY)
+		line:SetEndPoint("BOTTOM", UIParent, offsetX, offsetY)
+	end
+	line:SetThickness(PixelUtil.GetNearestPixelSize(SNAP_LINE_WIDTH, line:GetEffectiveScale(), SNAP_LINE_WIDTH))
+	line:Show()
+end
+
+local function GetSnapPreviewFrame()
+	if snapPreviewFrame then return snapPreviewFrame end
+	local preview = CreateFrame("Frame", nil, UIParent)
+	preview:SetPoint("TOPLEFT", UIParent)
+	preview:SetPoint("BOTTOMRIGHT", UIParent)
+	preview:SetFrameStrata("HIGH")
+	preview:EnableMouse(false)
+	preview.Lines = {}
+	preview:Hide()
+	snapPreviewFrame = preview
+	return preview
+end
+
+local function UpdateSnapPreview(frame)
+	local preview = GetSnapPreviewFrame()
+	local infos = IsSnapEnabled() and GetMagneticFrameInfos(frame)
+	local count = 0
+	if infos then
+		for _, info in ipairs(infos) do
+			for _, lineAnchor in ipairs(GetPreviewLineAnchors(info)) do
+				count = count + 1
+				local line = preview.Lines[count]
+				if not line then
+					line = preview:CreateLine()
+					line:SetColorTexture(1, 0, 0, 1)
+					preview.Lines[count] = line
+				end
+				SetupPreviewLine(line, info, lineAnchor)
+			end
+		end
+	end
+	for index = count + 1, #preview.Lines do
+		preview.Lines[index]:Hide()
+	end
+	preview:SetShown(count > 0)
+end
+
+local function HideSnapPreview()
+	if snapPreviewFrame then snapPreviewFrame:Hide() end
+end
+
+local function GetSelectionPadding(point, forYOffset, factor)
+	if forYOffset then
+		if point:find("TOP") then return SNAP_SELECTION_PADDING * factor end
+		if point:find("BOTTOM") then return -SNAP_SELECTION_PADDING * factor end
+	else
+		if point:find("LEFT") then return -SNAP_SELECTION_PADDING * factor end
+		if point:find("RIGHT") then return SNAP_SELECTION_PADDING * factor end
+	end
+	return 0
+end
+
+local function GetCombinedSelectionOffset(frame, info, forYOffset)
+	local factor = GetUIParentScaleFactor(frame)
+	local offset = info.offset - GetSelectionPadding(info.point, forYOffset, factor)
+	if info.target ~= UIParent then
+		offset = offset + GetSelectionPadding(info.relativePoint, forYOffset, GetUIParentScaleFactor(info.target.Selection))
+	end
+	return offset / factor
+end
+
+local function GetCombinedCenterOffset(frame, relativeRegion)
+	local factor = GetUIParentScaleFactor(frame)
+	local relativeFactor = GetUIParentScaleFactor(relativeRegion)
+	local centerX, centerY = frame:GetCenter()
+	local relativeX, relativeY = relativeRegion:GetCenter()
+	return (centerX * factor - relativeX * relativeFactor) / factor, (centerY * factor - relativeY * relativeFactor) / factor
+end
+
+local function SnapToMagneticFrame(frame, info)
+	local relativeRegion = info.target == UIParent and UIParent or info.target.Selection
+	local offsetX, offsetY
+	if info.isCornerSnap then
+		offsetX = GetCombinedSelectionOffset(frame, info, false)
+		offsetY = GetCombinedSelectionOffset(frame, info, true)
+	else
+		offsetX, offsetY = GetCombinedCenterOffset(frame, relativeRegion)
+		if info.isHorizontal then
+			offsetX = GetCombinedSelectionOffset(frame, info, false)
+		else
+			offsetY = GetCombinedSelectionOffset(frame, info, true)
+		end
+	end
 	frame:ClearAllPoints()
-	frame:SetPoint(best.point, best.target, best.relativePoint, best.x, best.y)
+	frame:SetPoint(info.point, relativeRegion, info.relativePoint, offsetX, offsetY)
+	frame.snapTarget = info.target ~= UIParent and info.target or nil
+end
+
+local function ApplyMagnetism(frame)
+	if not IsSnapEnabled() then return end
+	local infos = GetMagneticFrameInfos(frame)
+	if not infos then return end
+	for _, info in ipairs(infos) do
+		SnapToMagneticFrame(frame, info)
+	end
+end
+
+local function AddSnapTarget(target)
+	if not target or target == reminderFrame or snapTargetLookup[target] then return end
+	local forbidden = target.IsForbidden and target:IsForbidden()
+	if forbidden or type(target.Selection) ~= "table" or not target.Selection.ShowHighlighted then return end
+	snapTargetLookup[target] = true
+	table.insert(snapTargets, target)
+end
+
+local function StopSnapTargetScan()
+	if snapScanFrame then snapScanFrame:SetScript("OnUpdate", nil) end
+	snapScanCursor = nil
 end
 
 local function RefreshSnapTargets()
+	StopSnapTargetScan()
 	wipe(snapTargets)
+	wipe(snapTargetLookup)
 	local children = {UIParent:GetChildren()}
-	for _, target in ipairs(children) do
-		local forbidden = target.IsForbidden and target:IsForbidden()
-		if not forbidden and target ~= reminderFrame and target.Selection then
-			table.insert(snapTargets, target)
+	for _, target in ipairs(children) do AddSnapTarget(target) end
+	if type(EnumerateFrames) ~= "function" then return end
+	if not snapScanFrame then snapScanFrame = CreateFrame("Frame") end
+	snapScanCursor = nil
+	snapScanFrame:SetScript("OnUpdate", function(self)
+		local started = debugprofilestop()
+		repeat
+			snapScanCursor = EnumerateFrames(snapScanCursor)
+			if not snapScanCursor then
+				self:SetScript("OnUpdate", nil)
+				return
+			end
+			AddSnapTarget(snapScanCursor)
+		until debugprofilestop() - started >= 1.5
+	end)
+	for _ = 1, 50 do
+		snapScanCursor = EnumerateFrames(snapScanCursor)
+		if not snapScanCursor then
+			StopSnapTargetScan()
+			break
 		end
+		AddSnapTarget(snapScanCursor)
 	end
 end
 
@@ -740,14 +1112,19 @@ local function SetupAddonEditModeFrame(frame)
 	end
 	frame.OnDragStart = function(self)
 		if not self.isSelected then return end
+		self.snapTarget = nil
+		wipe(snapExclusions)
 		self:StartMoving()
 		self.isDragging = true
+		self:SetScript("OnUpdate", UpdateSnapPreview)
 	end
 	frame.OnDragStop = function(self)
 		if not self.isDragging then return end
+		self:SetScript("OnUpdate", nil)
+		HideSnapPreview()
 		self:StopMovingOrSizing()
 		self.isDragging = false
-		SnapReminderFrame(self)
+		ApplyMagnetism(self)
 		SavePosition(self)
 	end
 	frame.Selection:SetScript("OnMouseDown", function(_, button)
@@ -938,9 +1315,13 @@ local function SetEditModeActive(active)
 			RefreshSnapTargets()
 			reminderFrame:HighlightSystem()
 		else
+			StopSnapTargetScan()
 			wipe(snapTargets)
+			wipe(snapTargetLookup)
+			HideSnapPreview()
 			if reminderOptionsFrame then reminderOptionsFrame:Hide() end
 			reminderFrame:ClearHighlight()
+			reminderFrame:SetScript("OnUpdate", nil)
 			reminderFrame:StopMovingOrSizing()
 		end
 	end
