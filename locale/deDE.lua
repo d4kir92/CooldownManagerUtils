@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_TOOLTIP", "Nach „Verf
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_DRAG", "Nach „Nicht angezeigt“ ziehen, um den Reminder zu entfernen.")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Verfolgte Buffs")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Nicht angezeigt")
+CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_SHOW_GLOW", "Glow anzeigen")

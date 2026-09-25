@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_TOOLTIP", "Перета
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_DRAG", "Перетащите в «Не отображается», чтобы удалить напоминание.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Отслеживаемые эффекты")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Не отображается")
+CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_SHOW_GLOW", "Показывать свечение")

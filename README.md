@@ -12,7 +12,7 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 - Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
 - Shows the spell tooltip when hovering a reminder icon.
 - Makes the reminder bar movable in Edit Mode and snaps it to other Edit Mode elements, screen edges, and the grid like Blizzard's own frames.
-- Clicking the bar in Edit Mode opens its settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, and tooltips.
+- Clicking the bar in Edit Mode opens its settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the Cooldown Manager on the Buff Reminders tab.
 - Keeps a separate reminder selection for each specialization.
 
 ## Supported clients

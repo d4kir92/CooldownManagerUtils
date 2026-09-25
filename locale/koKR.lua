@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_TOOLTIP", "'추적 중�
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_DRAG", "'표시 안 함'으로 끌어다 놓으면 알림이 제거됩니다.")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "추적 중인 강화 효과")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "표시 안 함")
+CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_SHOW_GLOW", "반짝임 표시")

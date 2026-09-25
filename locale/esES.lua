@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_TOOLTIP", "Arrastra a �
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_DRAG", "Arrastra a «No mostrado» para quitar el recordatorio.")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Beneficios rastreados")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "No mostrado")
+CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar resplandor")

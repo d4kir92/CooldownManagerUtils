@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_TOOLTIP", "Arraste para
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_DRAG", "Arraste para \"Não exibido\" para remover o lembrete.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Bônus rastreados")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Não exibido")
+CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar brilho")

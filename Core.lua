@@ -112,7 +112,8 @@ local reminderSettingDefaults = {
 	opacity = 100,
 	visibleSetting = 0,
 	showTimer = 1,
-	showTooltips = 1
+	showTooltips = 1,
+	showGlow = 1
 }
 local function IsSupportedClient()
 	return CooldownManagerUtils:GetWoWBuildNr() >= 120000 or CooldownManagerUtils:IsForever()
@@ -878,6 +879,7 @@ local function ApplyReminderSettings(frame)
 	frame.visibleSetting = settings.visibleSetting
 	frame.showTimer = settings.showTimer == 1
 	frame.showTooltips = settings.showTooltips == 1
+	frame.showGlow = settings.showGlow == 1
 	frame:SetAlpha(settings.opacity / 100)
 	CooldownManagerUtils:UpdateReminderBar()
 	if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.Refresh then reminderOptionsFrame:Refresh() end
@@ -1450,6 +1452,7 @@ local function CreateReminderOptionsFrame(owner)
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 6, labels.visibility, "visibleSetting", visibilityValues, VisibilityText))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 7, labels.showTimer, "showTimer"))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 8, labels.showTooltips, "showTooltips"))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 9, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_SHOW_GLOW"), "showGlow"))
 	panel.Buttons = CreateFrame("Frame", nil, panel, "VerticalLayoutFrame")
 	panel.Buttons:SetPoint("TOP", panel.Settings, "BOTTOM", 0, -12)
 	panel.Buttons.spacing = 2
@@ -1476,6 +1479,26 @@ local function CreateReminderOptionsFrame(owner)
 		owner:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
 		owner.snapTarget = nil
 		GetActiveLayoutData().position = nil
+	end)
+	panel.EditModeClose = CreateFrame("Button", "CooldownManagerUtilsEditModeClose", UIParent, "InsecureActionButtonTemplate")
+	panel.EditModeClose:Hide()
+	panel.EditModeClose:SetAttribute("useOnKeyDown", false)
+	panel.EditModeClose:SetAttribute("type", "click")
+	panel.EditModeClose:SetAttribute("clickbutton", EditModeManagerFrame and EditModeManagerFrame.CloseButton)
+	panel.CooldownSettings = CreateFrame("Button", nil, panel.Buttons, "EditModeSystemSettingsDialogExtraButtonTemplate, InsecureActionButtonTemplate")
+	panel.CooldownSettings.layoutIndex = 4
+	panel.CooldownSettings:SetText(_G.HUD_EDIT_MODE_COOLDOWN_VIEWER_SETTINGS or "Cooldown Settings")
+	panel.CooldownSettings:RegisterForClicks("LeftButtonUp")
+	panel.CooldownSettings:SetAttribute("useOnKeyDown", false)
+	panel.CooldownSettings:SetAttribute("type", "macro")
+	if _G.SLASH_COOLDOWNMANAGER1 then
+		panel.CooldownSettings:SetAttribute("macrotext", (_G.SLASH_CLICK1 or "/click") .. " CooldownManagerUtilsEditModeClose\n" .. _G.SLASH_COOLDOWNMANAGER1)
+	else
+		panel.CooldownSettings:SetEnabled(false)
+	end
+	panel.CooldownSettings:SetScript("PostClick", function()
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		CooldownManagerUtils:ShowReminderSettingsTab()
 	end)
 	panel.Refresh = function(self)
 		for _, control in ipairs(self.controls) do control:Refresh() end
@@ -1833,6 +1856,39 @@ local function UpdateIconCooldown(icon, spellID, showTimer)
 	return onCooldown
 end
 
+local function UpdateIconGlow(icon, show, birth)
+	local alert = icon.SpellAlert
+	if not show then
+		if alert then
+			alert.ProcStartAnim:Stop()
+			alert.ProcLoop:Stop()
+			alert:Hide()
+		end
+		return
+	end
+	if not alert then
+		alert = CreateFrame("Frame", nil, icon, "ActionButtonSpellAlertTemplate")
+		alert:SetSize(ICON_SIZE * 1.4, ICON_SIZE * 1.4)
+		alert:SetPoint("CENTER")
+		alert:SetFrameLevel(icon.Cooldown:GetFrameLevel() + 1)
+		alert:HookScript("OnShow", function(self)
+			if not self.ProcStartAnim:IsPlaying() and not self.ProcLoop:IsPlaying() then self.ProcLoop:Play() end
+		end)
+		icon.SpellAlert = alert
+		birth = true
+	end
+	if not alert:IsShown() then
+		alert:Show()
+		birth = true
+	end
+	if birth then
+		alert.ProcLoop:Stop()
+		alert.ProcStartAnim:Play()
+	elseif not alert.ProcStartAnim:IsPlaying() and not alert.ProcLoop:IsPlaying() then
+		alert.ProcLoop:Play()
+	end
+end
+
 function CooldownManagerUtils:UpdateReminderBar()
 	local frame = self:CreateReminderBar()
 	local selected = self:GetProfile().selected
@@ -1875,6 +1931,8 @@ function CooldownManagerUtils:UpdateReminderBar()
 	else
 		forward = Enum and Enum.CooldownViewerIconDirection and frame.iconDirection == Enum.CooldownViewerIconDirection.Left
 	end
+	local glowingSpells = {}
+	local previousGlowingSpells = frame.glowingSpells or {}
 	for index, entry in ipairs(entries) do
 		local icon = frame.icons[index] or CreateReminderIcon(frame, index)
 		icon:SetScale(iconScale)
@@ -1893,9 +1951,14 @@ function CooldownManagerUtils:UpdateReminderBar()
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
 		icon:Show()
+		local glow = frame.showGlow and not previewPresent
+		if glow then glowingSpells[entry.spellID] = true end
+		UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end
+	frame.glowingSpells = glowingSpells
 
 	for index = #entries + 1, #frame.icons do
+		UpdateIconGlow(frame.icons[index], false)
 		frame.icons[index]:Hide()
 	end
 

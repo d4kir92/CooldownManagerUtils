@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_TOOLTIP", "Faites gliss
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_DRAG", "Faites glisser vers « Non affiché » pour supprimer le rappel.")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Améliorations suivies")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Non affiché")
+CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_SHOW_GLOW", "Afficher la lueur")

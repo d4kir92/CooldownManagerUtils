@@ -7,3 +7,4 @@ CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_TOOLTIP", "拖到“追
 CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_DRAG", "拖到“不显示”中以移除提醒。")
 CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "追踪的增益")
 CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "不显示")
+CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_SHOW_GLOW", "显示发光")

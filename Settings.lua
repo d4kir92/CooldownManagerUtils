@@ -325,3 +325,7 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	end)
 	self:RefreshReminderSettings()
 end
+
+function CooldownManagerUtils:ShowReminderSettingsTab()
+	if settingsFrame and settingsFrame:IsShown() then SetCustomMode(true) end
+end
