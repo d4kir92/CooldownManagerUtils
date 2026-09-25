@@ -82,6 +82,8 @@ local recentWeaponEnchantChanges = {}
 local recentPlayerCasts = {}
 local weaponEnchantFallbackNames
 local weaponEnchantFamilyBySpell
+local activeLayoutKey
+local activeLayoutData
 local snapTargets = {}
 local snapTargetLookup = {}
 local snapPreviewFrame
@@ -172,7 +174,7 @@ local function GetLearnedAuras()
 end
 
 local function LearnPlayerAura(aura)
-	if type(aura) ~= "table" or IsSecret(aura) then return false end
+	if IsSecret(aura) or type(aura) ~= "table" then return false end
 	local spellID, name, sourceUnit, isHelpful = aura.spellId, aura.name, aura.sourceUnit, aura.isHelpful
 	if IsSecret(spellID) or IsSecret(name) or IsSecret(sourceUnit) or IsSecret(isHelpful) then return false end
 	if isHelpful == false or sourceUnit ~= "player" or type(spellID) ~= "number" or type(name) ~= "string" then return false end
@@ -188,7 +190,7 @@ local function LearnCurrentPlayerAuras()
 	local changed = false
 	for index = 1, 255 do
 		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
-		if not ok or not aura then break end
+		if not ok or (not IsSecret(aura) and aura == nil) then break end
 		if LearnPlayerAura(aura) then changed = true end
 	end
 	return changed
@@ -303,8 +305,12 @@ local function GetTemporaryWeaponEnchants()
 	end
 	if #enchants == 0 and type(GetWeaponEnchantInfo) == "function" then
 		local ok, hasMainHand, mainHandRemaining, _, mainHandID, hasOffHand, offHandRemaining, _, offHandID = pcall(GetWeaponEnchantInfo)
-		if ok and hasMainHand then AddTemporaryWeaponEnchant(enchants, "MainHand", mainHandID, mainHandRemaining) end
-		if ok and hasOffHand then AddTemporaryWeaponEnchant(enchants, "OffHand", offHandID, offHandRemaining) end
+		if ok and (IsSecret(hasMainHand) or IsSecret(hasOffHand)) then
+			enchants.hasSecret = true
+		else
+			if ok and hasMainHand then AddTemporaryWeaponEnchant(enchants, "MainHand", mainHandID, mainHandRemaining) end
+			if ok and hasOffHand then AddTemporaryWeaponEnchant(enchants, "OffHand", offHandID, offHandRemaining) end
+		end
 	end
 	return enchants
 end
@@ -740,9 +746,68 @@ function CooldownManagerUtils:GetAvailableBuffs()
 	return self.availableBuffs or {}
 end
 
-local function RestorePosition(frame)
+local function GetActiveEditModeLayout()
+	if not C_EditMode or type(C_EditMode.GetLayouts) ~= "function" then return end
+	local ok, layouts = pcall(C_EditMode.GetLayouts)
+	if not ok or type(layouts) ~= "table" or type(layouts.activeLayout) ~= "number" then return end
+	local presets = EditModePresetLayoutManager and EditModePresetLayoutManager.presetLayoutInfo
+	local presetCount = type(presets) == "table" and #presets or (Enum.EditModePresetLayoutsMeta and Enum.EditModePresetLayoutsMeta.NumValues) or 2
+	local presetType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Preset or 0
+	if layouts.activeLayout <= presetCount then return "preset:" .. layouts.activeLayout, presetType end
+	local layoutInfo = type(layouts.layouts) == "table" and layouts.layouts[layouts.activeLayout - presetCount]
+	if type(layoutInfo) ~= "table" or type(layoutInfo.layoutName) ~= "string" then return end
+	return tostring(layoutInfo.layoutType) .. ":" .. layoutInfo.layoutName, layoutInfo.layoutType
+end
+
+local function GetLayoutStore(layoutType)
+	local characterType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Character or 2
+	local root
+	if layoutType == characterType then
+		CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
+		root = CooldownManagerUtilsDB
+	else
+		CooldownManagerUtilsGlobalDB = CooldownManagerUtilsGlobalDB or {}
+		root = CooldownManagerUtilsGlobalDB
+	end
+	root.editModeLayouts = root.editModeLayouts or {}
+	return root.editModeLayouts
+end
+
+local function ResolveActiveLayoutData()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
-	local position = CooldownManagerUtilsDB.position
+	local key, layoutType = GetActiveEditModeLayout()
+	if not key then
+		key = "default"
+		layoutType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Character or 2
+	end
+	local store = GetLayoutStore(layoutType)
+	local data = store[key]
+	if type(data) ~= "table" then
+		local template = activeLayoutData
+		if not template and (CooldownManagerUtilsDB.position or CooldownManagerUtilsDB.reminderSettings) then
+			template = {position = CooldownManagerUtilsDB.position, settings = CooldownManagerUtilsDB.reminderSettings}
+		end
+		data = {
+			position = template and template.position and CopyTable(template.position) or nil,
+			settings = template and template.settings and CopyTable(template.settings) or {}
+		}
+		store[key] = data
+		CooldownManagerUtilsDB.position = nil
+		CooldownManagerUtilsDB.reminderSettings = nil
+	end
+	data.settings = type(data.settings) == "table" and data.settings or {}
+	local changed = key ~= activeLayoutKey or data ~= activeLayoutData
+	activeLayoutKey = key
+	activeLayoutData = data
+	return data, changed
+end
+
+local function GetActiveLayoutData()
+	return activeLayoutData or ResolveActiveLayoutData()
+end
+
+local function RestorePosition(frame)
+	local position = GetActiveLayoutData().position
 	frame:ClearAllPoints()
 	if position then
 		local relativeTo = position.relativeTo and _G[position.relativeTo] or UIParent
@@ -758,7 +823,6 @@ end
 
 local function SavePosition(frame)
 	local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
-	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	local relativeName = relativeTo and relativeTo ~= UIParent and relativeTo:GetName() or nil
 	local relativeSelection
 	if frame.snapTarget and relativeTo == frame.snapTarget.Selection then
@@ -773,7 +837,7 @@ local function SavePosition(frame)
 		x = centerX - parentCenterX
 		y = centerY - parentCenterY
 	end
-	CooldownManagerUtilsDB.position = {
+	GetActiveLayoutData().position = {
 		point = point,
 		relativeTo = relativeName,
 		relativeSelection = relativeSelection,
@@ -784,9 +848,7 @@ local function SavePosition(frame)
 end
 
 local function GetReminderSettings()
-	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
-	CooldownManagerUtilsDB.reminderSettings = CooldownManagerUtilsDB.reminderSettings or {}
-	local settings = CooldownManagerUtilsDB.reminderSettings
+	local settings = GetActiveLayoutData().settings
 	for key, value in pairs(reminderSettingDefaults) do
 		if settings[key] == nil then settings[key] = value end
 	end
@@ -1400,7 +1462,8 @@ local function CreateReminderOptionsFrame(owner)
 	panel.Reset:SetScript("OnClick", function()
 		owner:ClearAllPoints()
 		owner:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
-		CooldownManagerUtilsDB.position = nil
+		owner.snapTarget = nil
+		GetActiveLayoutData().position = nil
 	end)
 	panel.Refresh = function(self)
 		for _, control in ipairs(self.controls) do control:Refresh() end
@@ -1581,7 +1644,7 @@ local function GetAuraState(entry)
 
 	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
 		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", entry.name, "HELPFUL")
-		if ok and aura and not IsSecret(aura) then return true end
+		if ok and not IsSecret(aura) and aura then return true end
 	end
 
 	if unknown then return nil end
@@ -1746,11 +1809,13 @@ end
 
 function CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
 	local learnedNew = false
-	if type(updateInfo) == "table" and not IsSecret(updateInfo) then
-		if updateInfo.isFullUpdate then
+	if not IsSecret(updateInfo) and type(updateInfo) == "table" then
+		local isFullUpdate = updateInfo.isFullUpdate
+		local addedAuras = updateInfo.addedAuras
+		if not IsSecret(isFullUpdate) and isFullUpdate == true then
 			learnedNew = LearnCurrentPlayerAuras()
-		elseif type(updateInfo.addedAuras) == "table" then
-			for _, aura in ipairs(updateInfo.addedAuras) do
+		elseif not IsSecret(addedAuras) and type(addedAuras) == "table" then
+			for _, aura in ipairs(addedAuras) do
 				if LearnPlayerAura(aura) then learnedNew = true end
 			end
 		end
@@ -1777,6 +1842,19 @@ local function SetEditModeActive(active)
 			reminderFrame:StopMovingOrSizing()
 		end
 	end
+end
+
+function CooldownManagerUtils:OnEditModeLayoutChanged()
+	local _, changed = ResolveActiveLayoutData()
+	if not changed or not reminderFrame then return end
+	if reminderOptionsFrame and reminderOptionsFrame:IsShown() then reminderOptionsFrame:Hide() end
+	reminderFrame.snapTarget = nil
+	RestorePosition(reminderFrame)
+	ApplyReminderSettings(reminderFrame)
+end
+
+function CooldownManagerUtils:ScheduleEditModeLayoutCheck()
+	C_Timer.After(0, function() CooldownManagerUtils:OnEditModeLayoutChanged() end)
 end
 
 function CooldownManagerUtils:Initialize()
@@ -1810,6 +1888,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
+	pcall(eventFrame.RegisterEvent, eventFrame, "EDIT_MODE_LAYOUTS_UPDATED")
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
@@ -1826,8 +1905,16 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "UNIT_INVENTORY_CHANGED" then
 		local unit = ...
 		if unit == "player" then CooldownManagerUtils:OnWeaponEnchantUpdate() end
-	elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
+	elseif event == "EDIT_MODE_LAYOUTS_UPDATED" then
+		CooldownManagerUtils:ScheduleEditModeLayoutCheck()
+	elseif event == "PLAYER_EQUIPMENT_CHANGED" then
 		CooldownManagerUtils:OnWeaponEnchantUpdate(true)
+	elseif event == "PLAYER_ENTERING_WORLD" then
+		CooldownManagerUtils:OnWeaponEnchantUpdate(true)
+		CooldownManagerUtils:ScheduleEditModeLayoutCheck()
+	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
+		CooldownManagerUtils:RefreshAvailableBuffs()
+		CooldownManagerUtils:ScheduleEditModeLayoutCheck()
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
