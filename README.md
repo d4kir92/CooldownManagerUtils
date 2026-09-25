@@ -5,7 +5,7 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 ## Features
 
 - Adds a **Buff Reminders** tab to the side tabs of Blizzard's Cooldown Manager settings.
-- Lists active spells from your class and current specialization that apply a buff to your character, independently of Blizzard's Auras tab.
+- Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
 - Sorts buffs into two groups, **Tracked Buffs** and **Not Displayed**, by drag and drop.
 - Shows a reminder bar with an icon for every tracked buff that is currently missing on your character. The bar is hidden while nothing is missing.
 - Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.

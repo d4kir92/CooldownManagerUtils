@@ -347,10 +347,10 @@ local function AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableB
 	local lastItem = firstItem + skillLineInfo.numSpellBookItems - 1
 	for itemIndex = firstItem, lastItem do
 		local itemInfo = C_SpellBook.GetSpellBookItemInfo(itemIndex, playerBank)
-		if itemInfo and not itemInfo.isPassive and not itemInfo.isOffSpec then
-			if itemInfo.itemType == spellType and itemInfo.spellID then
+		if itemInfo and not itemInfo.isPassive then
+			if itemInfo.itemType == spellType and itemInfo.spellID and (not itemInfo.isOffSpec or IsLearnedBuffSpell(itemInfo.spellID) or IsLearnedBuffSpell(itemInfo.actionID)) then
 				AddAvailableSpell(itemInfo.spellID, itemInfo.actionID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-			elseif itemInfo.itemType == flyoutType then
+			elseif itemInfo.itemType == flyoutType and not itemInfo.isOffSpec then
 				AddFlyoutSpells(itemInfo.actionID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 			end
 		end
@@ -446,10 +446,11 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	LearnCurrentPlayerAuras()
 	local knownAuraSpells, knownAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
-	local classLine = skillLineEnum and skillLineEnum.Class or 2
-	local specLine = skillLineEnum and skillLineEnum.MainSpec or 3
-	AddSpellBookSkillLine(classLine, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-	AddSpellBookSkillLine(specLine, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local generalLine = skillLineEnum and skillLineEnum.General or 1
+	local numSkillLines = type(C_SpellBook.GetNumSpellBookSkillLines) == "function" and C_SpellBook.GetNumSpellBookSkillLines() or 3
+	for skillLineIndex = 1, numSkillLines do
+		if skillLineIndex ~= generalLine then AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
+	end
 	AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
