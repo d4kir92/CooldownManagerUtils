@@ -7,4 +7,4 @@ CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_TOOLTIP", "Drag to Trac
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_DRAG", "Drag to Not Displayed to remove the reminder.")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Tracked Buffs")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Not Displayed")
-CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_SHOW_GLOW", "Show glow")
+CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_SHOW_GLOW", "Show Glow")

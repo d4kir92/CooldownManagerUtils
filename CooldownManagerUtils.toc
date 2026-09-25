@@ -7,7 +7,7 @@
 ## Interface-Mists: 50504
 ## Interface: 120100
 
-## Version: 0.1.4
+## Version: 0.1.5
 ## Title: Cooldown Manager Utils |T134376:16:16:0:0|t by |cff55d2ffD4KiR |T132115:16:16:0:0|t
 ## Notes: Adds a Buff Reminders tab to the Cooldown Manager and shows icons for tracked buffs you are missing.
 ## Notes-deDE: Ergänzt den Cooldown-Manager um einen Tab für Buff-Erinnerungen und zeigt Symbole für verfolgte Buffs, die dir fehlen.

@@ -22,22 +22,22 @@ local COOLDOWN_AURA_CATEGORIES = {
 }
 local CLASS_AURA_FALLBACKS = {
 	DRUID = {
-		{spellID = 1126}
+		{spellID = 1126, groupBuff = true}
 	},
 	EVOKER = {
-		{spellID = 364342}
+		{spellID = 364342, groupBuff = true}
 	},
 	MAGE = {
-		{spellID = 1459}
+		{spellID = 1459, groupBuff = true}
 	},
 	PRIEST = {
-		{spellID = 21562}
+		{spellID = 21562, groupBuff = true}
 	},
 	SHAMAN = {
-		{spellID = 462854}
+		{spellID = 462854, groupBuff = true}
 	},
 	WARRIOR = {
-		{spellID = 6673},
+		{spellID = 6673, groupBuff = true},
 		{spellID = 97462, auraSpellID = 97463}
 	}
 }
@@ -63,6 +63,8 @@ local WEAPON_ENCHANT_FAMILIES = {
 local WEAPON_ENCHANT_LEARN_WINDOW = 1
 local WEAPON_ENCHANT_REFRESH_MS = 5000
 local AURA_EXPIRY_GRACE = 0.1
+local GROUP_BUFF_UPDATE_DELAY = 0.5
+local GROUP_BUFF_REFRESH_INTERVAL = 2
 local WEAPON_ENCHANT_INVENTORY_SLOTS = {INVSLOT_MAINHAND or 16, INVSLOT_OFFHAND or 17, INVSLOT_RANGED or 18}
 local WEAPON_ENCHANT_SLOT_NAMES = {"MainHand", "OffHand", "Ranged"}
 local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
@@ -81,6 +83,8 @@ local reminderOptionsFrame
 local editModeActive = false
 local updatePending = false
 local presenceCache = {}
+local groupBuffCache = {}
+local groupUpdatePending = false
 local auraExpirationCache = {}
 local availableBuffsByName = {}
 local weaponEnchantState = {}
@@ -505,6 +509,7 @@ local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSo
 				seen = {}
 			}
 			local mapping = knownAuraSpells[spellID]
+			mapping.groupBuff = true
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 		end
 	end
@@ -518,7 +523,8 @@ local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 		local spellID = definition.spellID
 		local mapping = {
 			candidates = {},
-			seen = {}
+			seen = {},
+			groupBuff = definition.groupBuff
 		}
 		AddCandidate(mapping.candidates, mapping.seen, spellID)
 		AddCandidate(mapping.candidates, mapping.seen, definition.auraSpellID)
@@ -560,9 +566,18 @@ local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
 	return ok and not IsSecret(applications) and type(applications) == "number" and applications > 0
 end
 
+local function IsGroupBuffMapping(knownAuraSpells, ...)
+	for index = 1, select("#", ...) do
+		local mapping = knownAuraSpells[select(index, ...)]
+		if mapping and mapping.groupBuff then return true end
+	end
+	return false
+end
+
 local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
 	local sourceSpellID = spellID
+	local groupBuff = IsGroupBuffMapping(knownAuraSpells, spellID, baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
 	if family then spellID = family.spells[1] end
 	local candidates = {}
@@ -592,6 +607,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		availableBuffsBySpellID[spellID] = existing
 		availableBuffsBySpellID[sourceSpellID] = existing
 		existing.weaponEnchant = existing.weaponEnchant or weaponEnchant
+		existing.groupBuff = existing.groupBuff or groupBuff
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -611,6 +627,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		iconID = spellInfo.iconID,
 		defaultCategory = "hidden",
 		weaponEnchant = weaponEnchant,
+		groupBuff = groupBuff,
 		candidates = candidates
 	}
 
@@ -1591,6 +1608,12 @@ local function CreateReminderIcon(parent, index)
 	icon.Cooldown:SetDrawEdge(false)
 	if _G[ICON_COUNTDOWN_FONT] and icon.Cooldown.SetCountdownFont then icon.Cooldown:SetCountdownFont(ICON_COUNTDOWN_FONT) end
 	icon.Cooldown:SetScript("OnCooldownDone", function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+	icon.CountFrame = CreateFrame("Frame", nil, icon)
+	icon.CountFrame:SetAllPoints()
+	icon.CountFrame:SetFrameLevel(icon.Cooldown:GetFrameLevel() + 2)
+	icon.GroupCount = icon.CountFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+	icon.GroupCount:SetPoint("BOTTOMRIGHT", -2, 2)
+	icon.GroupCount:Hide()
 	icon:SetScript("OnEnter", function(self)
 		if not self.spellID or parent.showTooltips == false then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1764,6 +1787,90 @@ local function GetAuraState(entry)
 	return false
 end
 
+local function GetGroupUnits()
+	if IsInRaid() then
+		local units = {}
+		for index = 1, GetNumGroupMembers() do table.insert(units, "raid" .. index) end
+		return units
+	end
+	if not IsInGroup() then return end
+	local units = {"player"}
+	for index = 1, GetNumSubgroupMembers() do table.insert(units, "party" .. index) end
+	return units
+end
+
+local function IsGroupUnit(unit)
+	return not IsSecret(unit) and type(unit) == "string" and (unit:find("^party%d") ~= nil or unit:find("^raid%d") ~= nil)
+end
+
+local function GetUnitFlag(unitFunction, unit)
+	if type(unitFunction) ~= "function" then return end
+	local ok, value = pcall(unitFunction, unit)
+	if not ok or IsSecret(value) then return end
+	return value and true or false
+end
+
+local function GetUnitBuffState(unit, entry)
+	if GetUnitFlag(UnitIsConnected, unit) == false or GetUnitFlag(UnitIsDeadOrGhost, unit) == true or GetUnitFlag(UnitIsVisible, unit) == false then return "unchecked" end
+	local unknown = false
+	for _, spellID in ipairs(entry.candidates) do
+		if IsAuraSecretNow(spellID) then
+			unknown = true
+		else
+			local ok, aura = pcall(C_UnitAuras.GetUnitAuraBySpellID, unit, spellID)
+			if not ok or IsSecret(aura) then
+				unknown = true
+			elseif aura then
+				return "present"
+			end
+		end
+	end
+
+	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, entry.name, "HELPFUL")
+		if ok and not IsSecret(aura) and aura then return "present" end
+	end
+
+	return unknown and "unknown" or "missing"
+end
+
+local function UpdateGroupBuffState(entry)
+	local units = entry.groupBuff and C_UnitAuras and type(C_UnitAuras.GetUnitAuraBySpellID) == "function" and GetGroupUnits()
+	if not units then
+		groupBuffCache[entry.spellID] = nil
+		return
+	end
+	local total, have, missing, unknown = 0, 0, 0, false
+	for _, unit in ipairs(units) do
+		if GetUnitFlag(UnitExists, unit) then
+			total = total + 1
+			local state = GetUnitBuffState(unit, entry)
+			if state == "present" then
+				have = have + 1
+			elseif state == "missing" then
+				missing = missing + 1
+			elseif state == "unknown" then
+				unknown = true
+			end
+		end
+	end
+
+	local cached = groupBuffCache[entry.spellID]
+	if unknown then
+		if cached then
+			cached.total = total
+			cached.have = math.min(cached.have, total)
+		end
+		return
+	end
+	groupBuffCache[entry.spellID] = {total = total, have = have, missing = missing}
+end
+
+local function IsGroupBuffMissing(entry)
+	local state = groupBuffCache[entry.spellID]
+	return state ~= nil and state.missing > 0
+end
+
 local debugEnabled = false
 local debugSignatures = {}
 
@@ -1902,7 +2009,8 @@ function CooldownManagerUtils:UpdateReminderBar()
 			local present = GetAuraState(entry)
 			if present ~= nil then presenceCache[entry.spellID] = present end
 			DebugEntryState(entry, expirationBefore, present)
-			if editModeActive or presenceCache[entry.spellID] == false then table.insert(entries, entry) end
+			UpdateGroupBuffState(entry)
+			if editModeActive or presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry) then table.insert(entries, entry) end
 		end
 	end
 
@@ -1943,13 +2051,16 @@ function CooldownManagerUtils:UpdateReminderBar()
 		else
 			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
 		end
-		local previewPresent = editModeActive and presenceCache[entry.spellID] == true
+		local previewPresent = editModeActive and presenceCache[entry.spellID] == true and not IsGroupBuffMissing(entry)
 		local onCooldown = UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
 		icon.Texture:SetTexture(entry.iconID)
 		icon.Texture:SetDesaturated(previewPresent or onCooldown)
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
+		local groupState = groupBuffCache[entry.spellID]
+		icon.GroupCount:SetText(groupState and (groupState.have .. "/" .. groupState.total) or "")
+		icon.GroupCount:SetShown(groupState ~= nil)
 		icon:Show()
 		local glow = frame.showGlow and not previewPresent
 		if glow then glowingSpells[entry.spellID] = true end
@@ -1987,6 +2098,15 @@ function CooldownManagerUtils:ScheduleReminderUpdate()
 	end)
 end
 
+function CooldownManagerUtils:ScheduleGroupBuffUpdate()
+	if groupUpdatePending then return end
+	groupUpdatePending = true
+	C_Timer.After(GROUP_BUFF_UPDATE_DELAY, function()
+		groupUpdatePending = false
+		CooldownManagerUtils:ScheduleReminderUpdate()
+	end)
+end
+
 function CooldownManagerUtils:OnWeaponEnchantUpdate(silent)
 	RecordWeaponEnchantChanges(silent)
 	if not silent and MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
@@ -2006,6 +2126,11 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 		if entry and EntryMatchesSpell(entry, spellID, spellName) and GetReadableAuraState(entry) == nil then
 			presenceCache[entry.spellID] = true
 			changed = true
+			local groupState = groupBuffCache[entry.spellID]
+			if groupState then
+				groupState.have = groupState.total
+				groupState.missing = 0
+			end
 			if not entry.weaponEnchant then
 				local duration = GetLearnedAuras().durations[entry.spellID]
 				SetAuraExpiration(entry.spellID, duration and castTime + duration or nil)
@@ -2078,6 +2203,9 @@ function CooldownManagerUtils:Initialize()
 	self:InitializeReminderSettings()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
+	C_Timer.NewTicker(GROUP_BUFF_REFRESH_INTERVAL, function()
+		if IsInGroup() then CooldownManagerUtils:ScheduleGroupBuffUpdate() end
+	end)
 end
 
 if IsSupportedClient() then
@@ -2095,6 +2223,8 @@ if IsSupportedClient() then
 	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 	eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+	eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+	pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_CONNECTION")
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "EDIT_MODE_LAYOUTS_UPDATED")
@@ -2112,7 +2242,13 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		CooldownManagerUtils:Initialize()
 	elseif event == "UNIT_AURA" then
 		local unit, updateInfo = ...
-		if unit == "player" then CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo) end
+		if unit == "player" then
+			CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
+		elseif IsGroupUnit(unit) then
+			CooldownManagerUtils:ScheduleGroupBuffUpdate()
+		end
+	elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_CONNECTION" then
+		CooldownManagerUtils:ScheduleGroupBuffUpdate()
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)
