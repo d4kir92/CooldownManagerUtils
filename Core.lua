@@ -56,8 +56,8 @@ local WEAPON_ENCHANT_FAMILIES = {
 		{spells = {318038}},
 		{spells = {33757}},
 		{spells = {382021}},
-		{spells = {457481}},
-		{spells = {462757}}
+		{spells = {457481}, shield = true},
+		{spells = {462757}, shield = true}
 	}
 }
 local WEAPON_ENCHANT_LEARN_WINDOW = 1
@@ -69,6 +69,10 @@ local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
 	[INVSLOT_MAINHAND or 16] = "MainHand",
 	[INVSLOT_OFFHAND or 17] = "OffHand",
 	[INVSLOT_RANGED or 18] = "Ranged"
+}
+local WEAPON_ENCHANT_REQUIRED_SLOTS = {
+	MainHand = INVSLOT_MAINHAND or 16,
+	OffHand = INVSLOT_OFFHAND or 17
 }
 
 local eventFrame = CreateFrame("Frame")
@@ -423,17 +427,22 @@ local function GetEntryWeaponEnchantIDs(entry)
 	return enchantIDs
 end
 
-local function GetWeaponEnchantState(entry)
-	local enchantIDs = GetEntryWeaponEnchantIDs(entry)
-	local knownEnchantIDs
-	local current = GetTemporaryWeaponEnchants()
-	for _, enchant in ipairs(current) do
-		if enchantIDs[enchant.enchantID] then return true end
-		knownEnchantIDs = knownEnchantIDs or GetKnownWeaponEnchantIDs()
-		if not knownEnchantIDs[enchant.enchantID] then return true end
+local function IsShieldWeaponEnchantEntry(entry)
+	local family = GetWeaponEnchantFamily(entry.spellID)
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		family = family or GetWeaponEnchantFamily(candidateSpellID)
 	end
-	if current.hasSecret then return nil end
-	return false
+	return family ~= nil and family.shield == true
+end
+
+local function GetEquippedWeaponEnchantSlotKind(inventorySlot)
+	local itemID = GetInventoryItemID("player", inventorySlot)
+	if type(itemID) ~= "number" then return end
+	local getItemInfoInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+	if not getItemInfoInstant then return inventorySlot == WEAPON_ENCHANT_REQUIRED_SLOTS.MainHand and "weapon" or nil end
+	local _, _, _, equipLoc, _, classID = getItemInfoInstant(itemID)
+	if equipLoc == "INVTYPE_SHIELD" then return "shield" end
+	if classID == (Enum and Enum.ItemClass and Enum.ItemClass.Weapon or 2) then return "weapon" end
 end
 
 local function AddAuraMappingSpell(mapping, spellID)
@@ -1618,6 +1627,55 @@ local function GetSavedEntry(spellID)
 		weaponEnchant = IsWeaponEnchantSpell(spellID),
 		candidates = {spellID}
 	}
+end
+
+local function GetTrackedWeaponEnchantEntries(entry)
+	local trackedEntries = {[entry.spellID] = entry}
+	for spellID in pairs(CooldownManagerUtils:GetProfile().selected) do
+		local trackedEntry = GetSavedEntry(spellID)
+		if trackedEntry and trackedEntry.weaponEnchant then trackedEntries[trackedEntry.spellID] = trackedEntry end
+	end
+	return trackedEntries
+end
+
+local function GetWeaponEnchantState(entry)
+	local current = GetTemporaryWeaponEnchants()
+	if current.hasSecret then return nil end
+	local trackedEntries = GetTrackedWeaponEnchantEntries(entry)
+	local entryEnchantIDs = {}
+	local entryKinds = {}
+	local tracksShield = false
+	for spellID, trackedEntry in pairs(trackedEntries) do
+		entryEnchantIDs[spellID] = GetEntryWeaponEnchantIDs(trackedEntry)
+		entryKinds[spellID] = IsShieldWeaponEnchantEntry(trackedEntry) and "shield" or "weapon"
+		tracksShield = tracksShield or entryKinds[spellID] == "shield"
+	end
+	local knownEnchantIDs = GetKnownWeaponEnchantIDs()
+	local activeEntries = {}
+	local imbuedSlots = {}
+	for _, enchant in ipairs(current) do
+		local counts = not knownEnchantIDs[enchant.enchantID]
+		for spellID, enchantIDs in pairs(entryEnchantIDs) do
+			if enchantIDs[enchant.enchantID] then
+				activeEntries[spellID] = true
+				counts = true
+			end
+		end
+		if counts then imbuedSlots[enchant.slot] = true end
+	end
+	local missingKinds = {}
+	for slotName, inventorySlot in pairs(WEAPON_ENCHANT_REQUIRED_SLOTS) do
+		local kind = GetEquippedWeaponEnchantSlotKind(inventorySlot)
+		if kind == "shield" and not tracksShield then kind = nil end
+		if kind and not imbuedSlots[slotName] then missingKinds[kind] = true end
+	end
+	local kind = entryKinds[entry.spellID]
+	if not missingKinds[kind] then return true end
+	if not activeEntries[entry.spellID] then return false end
+	for spellID in pairs(trackedEntries) do
+		if not activeEntries[spellID] and entryKinds[spellID] == kind then return true end
+	end
+	return false
 end
 
 local function IsAuraSecretNow(spellID)
