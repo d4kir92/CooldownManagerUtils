@@ -1975,56 +1975,6 @@ local function IsGroupBuffMissing(entry)
 	return state ~= nil and state.missing > 0
 end
 
-local debugEnabled = false
-local debugSignatures = {}
-
-local function DebugPrint(message)
-	if debugEnabled then print("|cff55d2ffCMU|r " .. message) end
-end
-
-local function DebugFormat(value)
-	if IsSecret(value) then return "secret" end
-	return tostring(value)
-end
-
-local function DebugSecretsCall(functionName)
-	if not C_Secrets or type(C_Secrets[functionName]) ~= "function" then return "noapi" end
-	local ok, value = pcall(C_Secrets[functionName])
-	return ok and DebugFormat(value) or "err"
-end
-
-local function DebugTime(value)
-	if not value then return "nil" end
-	return string.format("%.1f", value - GetTime())
-end
-
-local function DebugEntryState(entry, expirationBefore, present)
-	if not debugEnabled or entry.weaponEnchant or not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return end
-	local parts = {}
-	for _, spellID in ipairs(entry.candidates) do
-		local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
-		local result = not ok and "err" or IsSecret(aura) and "secret" or aura and "aura" or "nil"
-		table.insert(parts, spellID .. (IsAuraSecretNow(spellID) and "(s)" or "") .. "=" .. result)
-	end
-	local nameResult = "noapi"
-	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
-		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", entry.name, "HELPFUL")
-		nameResult = not ok and "err" or IsSecret(aura) and "secret" or aura and "aura" or "nil"
-	end
-	local expirationAfter = auraExpirationCache[entry.spellID]
-	local chargeState = auraChargeCache[entry.spellID]
-	local charges = chargeState and tostring(chargeState.charges) or "nil"
-	local signature = string.format("%s combat=%s restr=%s aurasSecret=%s cand[%s] name=%s dur=%s expires=%s charges=%s state=%s cache=%s",
-		tostring(entry.name), tostring(InCombatLockdown()), DebugSecretsCall("HasSecretRestrictions"), DebugSecretsCall("ShouldAurasBeSecret"),
-		table.concat(parts, ","), nameResult, tostring(GetLearnedAuras().durations[entry.spellID]),
-		expirationBefore == expirationAfter and DebugTime(expirationAfter) or (DebugTime(expirationBefore) .. "->" .. DebugTime(expirationAfter)),
-		charges, tostring(present), tostring(presenceCache[entry.spellID]))
-	local key = table.concat({tostring(entry.name), tostring(InCombatLockdown()), table.concat(parts, ","), nameResult, tostring(expirationAfter), charges, tostring(present), tostring(presenceCache[entry.spellID])}, "|")
-	if debugSignatures[entry.spellID] == key then return end
-	debugSignatures[entry.spellID] = key
-	DebugPrint(signature)
-end
-
 local function EntryMatchesSpell(entry, spellID, spellName)
 	if entry.spellID == spellID or (spellName and entry.name == spellName) then return true end
 	for _, candidateSpellID in ipairs(entry.candidates) do
@@ -2111,10 +2061,8 @@ function CooldownManagerUtils:UpdateReminderBar()
 		local entry = GetSavedEntry(spellID)
 		if entry and not seenEntries[entry] then
 			seenEntries[entry] = true
-			local expirationBefore = auraExpirationCache[entry.spellID]
 			local present = GetAuraState(entry)
 			if present ~= nil then presenceCache[entry.spellID] = present end
-			DebugEntryState(entry, expirationBefore, present)
 			UpdateGroupBuffState(entry)
 			if editModeActive or presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry) then table.insert(entries, entry) end
 		end
@@ -2242,7 +2190,6 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 				SetAuraExpiration(entry.spellID, duration and castTime + duration or nil)
 				ResetAuraCharges(entry)
 			end
-			DebugPrint("cast " .. spellID .. " -> " .. tostring(entry.name) .. " inferred present, expires " .. DebugTime(auraExpirationCache[entry.spellID]))
 		end
 	end
 	if changed then self:ScheduleReminderUpdate() end
@@ -2351,13 +2298,6 @@ if IsSupportedClient() then
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "EDIT_MODE_LAYOUTS_UPDATED")
-	SLASH_COOLDOWNMANAGERUTILSDEBUG1 = "/cmudebug"
-	SlashCmdList.COOLDOWNMANAGERUTILSDEBUG = function()
-		debugEnabled = not debugEnabled
-		wipe(debugSignatures)
-		print("|cff55d2ffCMU|r debug " .. (debugEnabled and "on" or "off"))
-		CooldownManagerUtils:ScheduleReminderUpdate()
-	end
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
