@@ -61,7 +61,8 @@ local WEAPON_ENCHANT_FAMILIES = {
 		{spells = {462757}, shield = true}
 	}
 }
-local WEAPON_ENCHANT_LEARN_WINDOW = 1
+local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
+local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
 local WEAPON_ENCHANT_REFRESH_MS = 5000
 local AURA_EXPIRY_GRACE = 0.1
 local GROUP_BUFF_UPDATE_DELAY = 0.5
@@ -423,7 +424,7 @@ local function MatchWeaponEnchantLearning()
 		local bestCast, bestDelta
 		for _, cast in ipairs(recentPlayerCasts) do
 			local delta = change.time - cast.time
-			if delta >= 0 and delta <= WEAPON_ENCHANT_LEARN_WINDOW and (not bestDelta or delta < bestDelta) then bestCast, bestDelta = cast, delta end
+			if delta >= -WEAPON_ENCHANT_LATE_CAST_WINDOW and delta <= WEAPON_ENCHANT_LEARN_WINDOW and (not bestDelta or math.abs(delta) < bestDelta) then bestCast, bestDelta = cast, math.abs(delta) end
 		end
 		if bestCast then
 			if LearnWeaponEnchant(bestCast.spellID, bestCast.name, change.enchantID) then learnedNew = true end
