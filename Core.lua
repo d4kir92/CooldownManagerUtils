@@ -257,19 +257,32 @@ local function GetWeaponEnchantFallbackNames()
 	local names = {}
 	for _, family in ipairs(GetWeaponEnchantFamilies()) do
 		local name = GetSpellNameSafe(family.spells[1])
-		if name then names[name] = true end
+		if name and not names[name] then names[name] = family end
 	end
 	weaponEnchantFallbackNames = names
 	return names
 end
 
+local function GetWeaponEnchantCatalogFamily(spellID, spellName)
+	local family = GetWeaponEnchantFamily(spellID)
+	if family then return family end
+	spellName = spellName or GetSpellNameSafe(spellID)
+	if spellName then return GetWeaponEnchantFallbackNames()[spellName] end
+end
+
 local function IsWeaponEnchantSpell(spellID)
-	if type(spellID) ~= "number" then return false end
-	if GetWeaponEnchantFamily(spellID) then return true end
-	local learned = GetLearnedWeaponEnchants()
-	if learned.weaponSpells[spellID] then return true end
-	local name = GetSpellNameSafe(spellID)
-	return name ~= nil and (learned.weaponNames[name] ~= nil or GetWeaponEnchantFallbackNames()[name] == true)
+	return GetWeaponEnchantCatalogFamily(spellID) ~= nil
+end
+
+local function IsForeignWeaponEnchant(family, enchantID)
+	for _, otherFamily in ipairs(GetWeaponEnchantFamilies()) do
+		if otherFamily ~= family then
+			for _, otherEnchantID in ipairs(otherFamily.enchants or {}) do
+				if otherEnchantID == enchantID then return true end
+			end
+		end
+	end
+	return false
 end
 
 local function AddTemporaryWeaponEnchant(enchants, slot, enchantID, remaining)
@@ -358,7 +371,31 @@ local function PruneRecentEvents(list, now)
 	end
 end
 
+local function PruneLearnedEnchantIDs(list, key, family)
+	local enchantIDs = list[key]
+	if type(enchantIDs) ~= "table" or not family then
+		list[key] = nil
+		return
+	end
+	for enchantID in pairs(enchantIDs) do
+		if IsForeignWeaponEnchant(family, enchantID) then enchantIDs[enchantID] = nil end
+	end
+	if not next(enchantIDs) then list[key] = nil end
+end
+
+local function PruneLearnedWeaponEnchants()
+	local learned = GetLearnedWeaponEnchants()
+	for spellID in pairs(learned.weaponSpells) do
+		PruneLearnedEnchantIDs(learned.weaponSpells, spellID, GetWeaponEnchantCatalogFamily(spellID))
+	end
+	for spellName in pairs(learned.weaponNames) do
+		PruneLearnedEnchantIDs(learned.weaponNames, spellName, GetWeaponEnchantFallbackNames()[spellName])
+	end
+end
+
 local function LearnWeaponEnchant(spellID, spellName, enchantID)
+	local family = GetWeaponEnchantCatalogFamily(spellID, spellName)
+	if not family or IsForeignWeaponEnchant(family, enchantID) then return false end
 	local learned = GetLearnedWeaponEnchants()
 	local changed = false
 	learned.weaponSpells[spellID] = learned.weaponSpells[spellID] or {}
@@ -2119,7 +2156,7 @@ end
 function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if IsSecret(spellID) or type(spellID) ~= "number" then return end
 	local spellName = GetSpellNameSafe(spellID)
-	table.insert(recentPlayerCasts, {spellID = spellID, name = spellName, time = GetTime()})
+	if GetWeaponEnchantCatalogFamily(spellID, spellName) then table.insert(recentPlayerCasts, {spellID = spellID, name = spellName, time = GetTime()}) end
 	if MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
 	C_Timer.After(0.3, function() CooldownManagerUtils:OnWeaponEnchantUpdate() end)
 	local changed = false
@@ -2204,6 +2241,7 @@ function CooldownManagerUtils:Initialize()
 	end
 
 	self:InitializeReminderSettings()
+	PruneLearnedWeaponEnchants()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
 	C_Timer.NewTicker(GROUP_BUFF_REFRESH_INTERVAL, function()
