@@ -61,6 +61,11 @@ local WEAPON_ENCHANT_FAMILIES = {
 		{spells = {462757}, shield = true}
 	}
 }
+local HIT_CHARGE_AURAS = {
+	SHAMAN = {
+		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5}
+	}
+}
 local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
 local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
 local WEAPON_ENCHANT_REFRESH_MS = 5000
@@ -88,6 +93,8 @@ local presenceCache = {}
 local groupBuffCache = {}
 local groupUpdatePending = false
 local auraExpirationCache = {}
+local auraChargeCache = {}
+local hitChargeAuraBySpell
 local availableBuffsByName = {}
 local weaponEnchantState = {}
 local recentWeaponEnchantChanges = {}
@@ -184,6 +191,7 @@ local function GetLearnedAuras()
 	learned.spells = learned.spells or {}
 	learned.names = learned.names or {}
 	learned.durations = learned.durations or {}
+	learned.charges = learned.charges or {}
 	return learned
 end
 
@@ -1780,7 +1788,55 @@ local function SetAuraExpiration(entrySpellID, expirationTime)
 	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
 end
 
+local function GetHitChargeAura(entry)
+	if not hitChargeAuraBySpell then
+		hitChargeAuraBySpell = {}
+		local _, class = UnitClass("player")
+		for _, definition in ipairs(HIT_CHARGE_AURAS[class] or {}) do
+			for _, spellID in ipairs(definition.spells) do
+				hitChargeAuraBySpell[spellID] = definition
+			end
+		end
+	end
+	local definition = hitChargeAuraBySpell[entry.spellID]
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		definition = definition or hitChargeAuraBySpell[candidateSpellID]
+	end
+	return definition
+end
+
+local function GetAuraChargeCount(aura)
+	local count = 0
+	for _, key in ipairs({"charges", "applications"}) do
+		local value = aura[key]
+		if not IsSecret(value) and type(value) == "number" and value > count then count = value end
+	end
+	return count
+end
+
+local function TrackAuraCharges(entry, aura)
+	local definition = GetHitChargeAura(entry)
+	if not definition then return end
+	local charges = GetAuraChargeCount(aura)
+	if charges <= 0 then
+		auraChargeCache[entry.spellID] = nil
+		return
+	end
+	local learnedCharges = GetLearnedAuras().charges
+	learnedCharges[entry.spellID] = math.max(learnedCharges[entry.spellID] or 0, charges)
+	local state = auraChargeCache[entry.spellID] or {lockout = definition.lockout, lockoutUntil = 0}
+	state.charges = charges
+	auraChargeCache[entry.spellID] = state
+end
+
+local function ResetAuraCharges(entry)
+	local definition = GetHitChargeAura(entry)
+	local charges = definition and GetLearnedAuras().charges[entry.spellID]
+	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0} or nil
+end
+
 local function TrackAuraExpiration(entry, aura)
+	TrackAuraCharges(entry, aura)
 	local expirationTime, duration = aura.expirationTime, aura.duration
 	if IsSecret(expirationTime) or IsSecret(duration) then return end
 	if type(duration) == "number" and duration > 0 then GetLearnedAuras().durations[entry.spellID] = duration end
@@ -1816,12 +1872,19 @@ local function GetReadableAuraState(entry)
 
 	if unknown then return nil end
 	SetAuraExpiration(entry.spellID, nil)
+	auraChargeCache[entry.spellID] = nil
 	return false
 end
 
 local function GetAuraState(entry)
 	local present = GetReadableAuraState(entry)
 	if present ~= nil or entry.weaponEnchant then return present end
+	local chargeState = auraChargeCache[entry.spellID]
+	if chargeState and chargeState.charges <= 0 then
+		auraChargeCache[entry.spellID] = nil
+		SetAuraExpiration(entry.spellID, nil)
+		return false
+	end
 	local expirationTime = auraExpirationCache[entry.spellID]
 	if not expirationTime or GetTime() < expirationTime then return nil end
 	SetAuraExpiration(entry.spellID, nil)
@@ -1949,12 +2012,14 @@ local function DebugEntryState(entry, expirationBefore, present)
 		nameResult = not ok and "err" or IsSecret(aura) and "secret" or aura and "aura" or "nil"
 	end
 	local expirationAfter = auraExpirationCache[entry.spellID]
-	local signature = string.format("%s combat=%s restr=%s aurasSecret=%s cand[%s] name=%s dur=%s expires=%s state=%s cache=%s",
+	local chargeState = auraChargeCache[entry.spellID]
+	local charges = chargeState and tostring(chargeState.charges) or "nil"
+	local signature = string.format("%s combat=%s restr=%s aurasSecret=%s cand[%s] name=%s dur=%s expires=%s charges=%s state=%s cache=%s",
 		tostring(entry.name), tostring(InCombatLockdown()), DebugSecretsCall("HasSecretRestrictions"), DebugSecretsCall("ShouldAurasBeSecret"),
 		table.concat(parts, ","), nameResult, tostring(GetLearnedAuras().durations[entry.spellID]),
 		expirationBefore == expirationAfter and DebugTime(expirationAfter) or (DebugTime(expirationBefore) .. "->" .. DebugTime(expirationAfter)),
-		tostring(present), tostring(presenceCache[entry.spellID]))
-	local key = table.concat({tostring(entry.name), tostring(InCombatLockdown()), table.concat(parts, ","), nameResult, tostring(expirationAfter), tostring(present), tostring(presenceCache[entry.spellID])}, "|")
+		charges, tostring(present), tostring(presenceCache[entry.spellID]))
+	local key = table.concat({tostring(entry.name), tostring(InCombatLockdown()), table.concat(parts, ","), nameResult, tostring(expirationAfter), charges, tostring(present), tostring(presenceCache[entry.spellID])}, "|")
 	if debugSignatures[entry.spellID] == key then return end
 	debugSignatures[entry.spellID] = key
 	DebugPrint(signature)
@@ -2175,8 +2240,23 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 			if not entry.weaponEnchant then
 				local duration = GetLearnedAuras().durations[entry.spellID]
 				SetAuraExpiration(entry.spellID, duration and castTime + duration or nil)
+				ResetAuraCharges(entry)
 			end
 			DebugPrint("cast " .. spellID .. " -> " .. tostring(entry.name) .. " inferred present, expires " .. DebugTime(auraExpirationCache[entry.spellID]))
+		end
+	end
+	if changed then self:ScheduleReminderUpdate() end
+end
+
+function CooldownManagerUtils:OnPlayerCombatEvent(action)
+	if IsSecret(action) or action ~= "WOUND" then return end
+	local now = GetTime()
+	local changed = false
+	for _, state in pairs(auraChargeCache) do
+		if state.charges > 0 and now >= state.lockoutUntil then
+			state.charges = state.charges - 1
+			state.lockoutUntil = now + state.lockout
+			changed = true
 		end
 	end
 	if changed then self:ScheduleReminderUpdate() end
@@ -2264,6 +2344,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
 	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+	pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_COMBAT", "player")
 	eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_CONNECTION")
@@ -2294,6 +2375,9 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)
+	elseif event == "UNIT_COMBAT" then
+		local _, action = ...
+		CooldownManagerUtils:OnPlayerCombatEvent(action)
 	elseif event == "WEAPON_ENCHANT_CHANGED" then
 		CooldownManagerUtils:OnWeaponEnchantUpdate()
 	elseif event == "UNIT_INVENTORY_CHANGED" then
