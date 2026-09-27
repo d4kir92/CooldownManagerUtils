@@ -1887,7 +1887,7 @@ local function GetMinimapTrackingState(entry)
 			if info.active == true then return true end
 		end
 	end
-	return found and false or nil
+	if found then return false end
 end
 
 local function GetReadableAuraState(entry)
@@ -1961,8 +1961,26 @@ local function GetUnitFlag(unitFunction, unit)
 	return value and true or false
 end
 
+local function IsUnitInBuffRange(unit, entry)
+	if unit == "player" or not C_Spell or type(C_Spell.IsSpellInRange) ~= "function" then return true end
+	local checked = false
+	local spellIDs = {entry.spellID}
+	for _, spellID in ipairs(entry.candidates) do
+		if spellID ~= entry.spellID then table.insert(spellIDs, spellID) end
+	end
+	for _, spellID in ipairs(spellIDs) do
+		local ok, inRange = pcall(C_Spell.IsSpellInRange, spellID, unit)
+		if ok and not IsSecret(inRange) and type(inRange) == "boolean" then
+			checked = true
+			if inRange then return true end
+		end
+	end
+	return not checked
+end
+
 local function GetUnitBuffState(unit, entry)
 	if GetUnitFlag(UnitIsConnected, unit) == false or GetUnitFlag(UnitIsDeadOrGhost, unit) == true or GetUnitFlag(UnitIsVisible, unit) == false then return "unchecked" end
+	if not IsUnitInBuffRange(unit, entry) then return "unchecked" end
 	local unknown = false
 	for _, spellID in ipairs(entry.candidates) do
 		if IsAuraSecretNow(spellID) then
@@ -1994,8 +2012,8 @@ local function UpdateGroupBuffState(entry)
 	local total, have, missing, unknown = 0, 0, 0, false
 	for _, unit in ipairs(units) do
 		if GetUnitFlag(UnitExists, unit) then
-			total = total + 1
 			local state = GetUnitBuffState(unit, entry)
+			if state ~= "unchecked" then total = total + 1 end
 			if state == "present" then
 				have = have + 1
 			elseif state == "missing" then
@@ -2104,14 +2122,16 @@ function CooldownManagerUtils:UpdateReminderBar()
 	local selected = self:GetProfile().selected
 	local entries = {}
 	local seenEntries = {}
-	for spellID in pairs(selected) do
-		local entry = GetSavedEntry(spellID)
-		if entry and not seenEntries[entry] then
-			seenEntries[entry] = true
-			local present = GetAuraState(entry)
-			if present ~= nil then presenceCache[entry.spellID] = present end
-			UpdateGroupBuffState(entry)
-			if editModeActive or presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry) then table.insert(entries, entry) end
+	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
+		for spellID in pairs(selected) do
+			local entry = GetSavedEntry(spellID)
+			if entry and not seenEntries[entry] then
+				seenEntries[entry] = true
+				local present = GetAuraState(entry)
+				if present ~= nil then presenceCache[entry.spellID] = present end
+				UpdateGroupBuffState(entry)
+				if editModeActive or presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry) then table.insert(entries, entry) end
+			end
 		end
 	end
 
@@ -2333,6 +2353,9 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("UNIT_AURA")
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+	eventFrame:RegisterEvent("PLAYER_DEAD")
+	eventFrame:RegisterEvent("PLAYER_ALIVE")
+	eventFrame:RegisterEvent("PLAYER_UNGHOST")
 	eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
@@ -2361,6 +2384,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_CONNECTION" then
 		CooldownManagerUtils:ScheduleGroupBuffUpdate()
 	elseif event == "MINIMAP_UPDATE_TRACKING" then
+		CooldownManagerUtils:ScheduleReminderUpdate()
+	elseif event == "PLAYER_DEAD" or event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
