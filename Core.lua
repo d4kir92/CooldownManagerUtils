@@ -73,6 +73,32 @@ local PROFESSION_TRACKING_SPELLS = {
 	[8388] = true,
 	[43308] = true
 }
+local PALADIN_BLESSING_FAMILIES = {
+	{spells = {19740, 19834, 19835, 19836, 19837, 19838, 25291, 27140, 48931, 48932}},
+	{spells = {25782, 25916, 27141, 48933, 48934}},
+	{spells = {19742, 19850, 19852, 19853, 19854, 25290, 27142, 48935, 48936}},
+	{spells = {25894, 25918, 27143, 48937, 48938}},
+	{spells = {20217}},
+	{spells = {25898}},
+	{spells = {20911, 20912, 20913, 20914, 27168}},
+	{spells = {25899}},
+	{spells = {1038}},
+	{spells = {25895}},
+	{spells = {19977, 19978, 19979, 27144, 32770}},
+	{spells = {25890}}
+}
+local PALADIN_OTHER_BLESSING_AURA_SPELLS = {
+	1022,
+	1044,
+	5599,
+	6940,
+	10278,
+	20729,
+	27147,
+	27148,
+	48949,
+	48950
+}
 local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
 local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
 local WEAPON_ENCHANT_REFRESH_MS = 5000
@@ -108,6 +134,8 @@ local recentWeaponEnchantChanges = {}
 local recentPlayerCasts = {}
 local weaponEnchantFallbackNames
 local weaponEnchantFamilyBySpell
+local paladinBlessingSpellLookup
+local paladinBlessingAuraSpells
 local activeLayoutKey
 local activeLayoutData
 local snapTargets = {}
@@ -186,6 +214,35 @@ local function GetSpellNameSafe(spellID)
 	local name = spellInfo and spellInfo.name
 	if IsSecret(name) or type(name) ~= "string" then return end
 	return name
+end
+
+local function IsPaladinBlessingSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	if not paladinBlessingSpellLookup then
+		paladinBlessingSpellLookup = {}
+		for _, family in ipairs(PALADIN_BLESSING_FAMILIES) do
+			for _, familySpellID in ipairs(family.spells) do
+				paladinBlessingSpellLookup[familySpellID] = true
+			end
+		end
+	end
+	return paladinBlessingSpellLookup[spellID] == true
+end
+
+local function GetPaladinBlessingAuraSpells()
+	if paladinBlessingAuraSpells then return paladinBlessingAuraSpells end
+	local spells = {}
+	local seen = {}
+	for _, family in ipairs(PALADIN_BLESSING_FAMILIES) do
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(spells, seen, spellID)
+		end
+	end
+	for _, spellID in ipairs(PALADIN_OTHER_BLESSING_AURA_SPELLS) do
+		AddCandidate(spells, seen, spellID)
+	end
+	paladinBlessingAuraSpells = spells
+	return spells
 end
 
 local function GetLearnedAuras()
@@ -587,10 +644,29 @@ local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	end
 end
 
+local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
+	local _, class = UnitClass("player")
+	if class ~= "PALADIN" then return end
+	for _, family in ipairs(PALADIN_BLESSING_FAMILIES) do
+		local mapping = {
+			candidates = {},
+			seen = {},
+			groupBuff = true,
+			paladinBlessing = true
+		}
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			knownAuraSpells[spellID] = mapping
+			knownAuraSources[spellID] = family.spells[1]
+		end
+	end
+end
+
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local knownAuraSources = {}
 	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
+	AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
 	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
 		knownAuraSources[spellID] = spellID
 	end
@@ -630,10 +706,19 @@ local function IsGroupBuffMapping(knownAuraSpells, ...)
 	return false
 end
 
+local function IsPaladinBlessingMapping(knownAuraSpells, ...)
+	for index = 1, select("#", ...) do
+		local mapping = knownAuraSpells[select(index, ...)]
+		if mapping and mapping.paladinBlessing then return true end
+	end
+	return false
+end
+
 local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
 	local sourceSpellID = spellID
 	local groupBuff = IsGroupBuffMapping(knownAuraSpells, spellID, baseSpellID)
+	local paladinBlessing = IsPaladinBlessingMapping(knownAuraSpells, spellID, baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
 	if family then spellID = family.spells[1] end
 	local candidates = {}
@@ -666,6 +751,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.weaponEnchant = existing.weaponEnchant or weaponEnchant
 		existing.minimapTracking = existing.minimapTracking or minimapTracking
 		existing.groupBuff = existing.groupBuff or groupBuff
+		existing.paladinBlessing = existing.paladinBlessing or paladinBlessing
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -687,6 +773,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		weaponEnchant = weaponEnchant,
 		minimapTracking = minimapTracking,
 		groupBuff = groupBuff,
+		paladinBlessing = paladinBlessing,
 		candidates = candidates
 	}
 
@@ -1745,6 +1832,8 @@ local function GetSavedEntry(spellID)
 		iconID = spellInfo.iconID,
 		weaponEnchant = IsWeaponEnchantSpell(spellID),
 		minimapTracking = PROFESSION_TRACKING_SPELLS[spellID] == true,
+		paladinBlessing = IsPaladinBlessingSpell(spellID),
+		groupBuff = IsPaladinBlessingSpell(spellID),
 		candidates = {spellID}
 	}
 end
@@ -1978,9 +2067,32 @@ local function IsUnitInBuffRange(unit, entry)
 	return not checked
 end
 
+local function GetUnitPaladinBlessingState(unit)
+	local unknown = false
+	for _, spellID in ipairs(GetPaladinBlessingAuraSpells()) do
+		if IsAuraSecretNow(spellID) then
+			unknown = true
+		else
+			local ok, aura = pcall(C_UnitAuras.GetUnitAuraBySpellID, unit, spellID)
+			if not ok or IsSecret(aura) then
+				unknown = true
+			elseif aura then
+				local sourceUnit = aura.sourceUnit
+				if IsSecret(sourceUnit) then
+					unknown = true
+				elseif sourceUnit == "player" then
+					return "present"
+				end
+			end
+		end
+	end
+	return unknown and "unknown" or "missing"
+end
+
 local function GetUnitBuffState(unit, entry)
 	if GetUnitFlag(UnitIsConnected, unit) == false or GetUnitFlag(UnitIsDeadOrGhost, unit) == true or GetUnitFlag(UnitIsVisible, unit) == false then return "unchecked" end
 	if not IsUnitInBuffRange(unit, entry) then return "unchecked" end
+	if entry.paladinBlessing then return GetUnitPaladinBlessingState(unit) end
 	local unknown = false
 	for _, spellID in ipairs(entry.candidates) do
 		if IsAuraSecretNow(spellID) then
@@ -2003,10 +2115,18 @@ local function GetUnitBuffState(unit, entry)
 	return unknown and "unknown" or "missing"
 end
 
-local function UpdateGroupBuffState(entry)
+local function UpdateGroupBuffState(entry, sharedPaladinState)
+	if entry.paladinBlessing and sharedPaladinState and sharedPaladinState.resolved then
+		groupBuffCache[entry.spellID] = sharedPaladinState.state
+		return
+	end
 	local units = entry.groupBuff and C_UnitAuras and type(C_UnitAuras.GetUnitAuraBySpellID) == "function" and GetGroupUnits()
 	if not units then
 		groupBuffCache[entry.spellID] = nil
+		if entry.paladinBlessing and sharedPaladinState then
+			sharedPaladinState.resolved = true
+			sharedPaladinState.state = nil
+		end
 		return
 	end
 	local total, have, missing, unknown = 0, 0, 0, false
@@ -2030,9 +2150,18 @@ local function UpdateGroupBuffState(entry)
 			cached.total = total
 			cached.have = math.min(cached.have, total)
 		end
+		if entry.paladinBlessing and sharedPaladinState then
+			sharedPaladinState.resolved = true
+			sharedPaladinState.state = cached
+		end
 		return
 	end
-	groupBuffCache[entry.spellID] = {total = total, have = have, missing = missing}
+	local state = {total = total, have = have, missing = missing}
+	groupBuffCache[entry.spellID] = state
+	if entry.paladinBlessing and sharedPaladinState then
+		sharedPaladinState.resolved = true
+		sharedPaladinState.state = state
+	end
 end
 
 local function IsGroupBuffMissing(entry)
@@ -2122,6 +2251,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 	local selected = self:GetProfile().selected
 	local entries = {}
 	local seenEntries = {}
+	local sharedPaladinState = {}
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
@@ -2129,8 +2259,10 @@ function CooldownManagerUtils:UpdateReminderBar()
 				seenEntries[entry] = true
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end
-				UpdateGroupBuffState(entry)
-				if editModeActive or presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry) then table.insert(entries, entry) end
+				UpdateGroupBuffState(entry, sharedPaladinState)
+				local show = presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry)
+				if entry.paladinBlessing and IsInGroup() then show = IsGroupBuffMissing(entry) end
+				if editModeActive or show then table.insert(entries, entry) end
 			end
 		end
 	end
@@ -2248,7 +2380,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 			presenceCache[entry.spellID] = true
 			changed = true
 			local groupState = groupBuffCache[entry.spellID]
-			if groupState then
+			if groupState and not entry.paladinBlessing then
 				groupState.have = groupState.total
 				groupState.missing = 0
 			end
