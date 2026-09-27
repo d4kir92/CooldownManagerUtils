@@ -66,6 +66,13 @@ local HIT_CHARGE_AURAS = {
 		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5}
 	}
 }
+local PROFESSION_TRACKING_SPELLS = {
+	[2383] = true,
+	[2580] = true,
+	[8387] = true,
+	[8388] = true,
+	[43308] = true
+}
 local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
 local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
 local WEAPON_ENCHANT_REFRESH_MS = 5000
@@ -602,7 +609,9 @@ local function BuildKnownAuraSpellLookup()
 end
 
 local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
-	if not C_Spell or GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
+	if not C_Spell then return false end
+	if PROFESSION_TRACKING_SPELLS[spellID] or PROFESSION_TRACKING_SPELLS[baseSpellID] then return true end
+	if GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
 	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
 	if IsLearnedBuffSpell(spellID) or IsLearnedBuffSpell(baseSpellID) then return true end
 	if IsWeaponEnchantSpell(spellID) or IsWeaponEnchantSpell(baseSpellID) then return true end
@@ -649,11 +658,13 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	if spellName then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
 
 	local weaponEnchant = family ~= nil or IsWeaponEnchantSpell(sourceSpellID) or IsWeaponEnchantSpell(baseSpellID)
+	local minimapTracking = PROFESSION_TRACKING_SPELLS[sourceSpellID] == true or PROFESSION_TRACKING_SPELLS[baseSpellID] == true
 	local existing = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
 	if existing then
 		availableBuffsBySpellID[spellID] = existing
 		availableBuffsBySpellID[sourceSpellID] = existing
 		existing.weaponEnchant = existing.weaponEnchant or weaponEnchant
+		existing.minimapTracking = existing.minimapTracking or minimapTracking
 		existing.groupBuff = existing.groupBuff or groupBuff
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
@@ -674,6 +685,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		iconID = spellInfo.iconID,
 		defaultCategory = "hidden",
 		weaponEnchant = weaponEnchant,
+		minimapTracking = minimapTracking,
 		groupBuff = groupBuff,
 		candidates = candidates
 	}
@@ -711,6 +723,17 @@ local function AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableB
 				AddFlyoutSpells(itemInfo.actionID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 			end
 		end
+	end
+end
+
+local function AddProfessionTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if not C_Minimap or type(C_Minimap.GetNumTrackingTypes) ~= "function" or type(C_Minimap.GetTrackingFilter) ~= "function" then return end
+	local countOK, count = pcall(C_Minimap.GetNumTrackingTypes)
+	if not countOK or IsSecret(count) or type(count) ~= "number" then return end
+	for index = 1, count do
+		local filterOK, filter = pcall(C_Minimap.GetTrackingFilter, index)
+		local spellID = filterOK and not IsSecret(filter) and type(filter) == "table" and filter.spellID
+		if PROFESSION_TRACKING_SPELLS[spellID] then AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 	end
 end
 
@@ -809,6 +832,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	for skillLineIndex = 1, numSkillLines do
 		if skillLineIndex ~= generalLine then AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 	end
+	AddProfessionTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
@@ -1720,6 +1744,7 @@ local function GetSavedEntry(spellID)
 		name = spellInfo.name,
 		iconID = spellInfo.iconID,
 		weaponEnchant = IsWeaponEnchantSpell(spellID),
+		minimapTracking = PROFESSION_TRACKING_SPELLS[spellID] == true,
 		candidates = {spellID}
 	}
 end
@@ -1844,7 +1869,29 @@ local function TrackAuraExpiration(entry, aura)
 	SetAuraExpiration(entry.spellID, expirationTime)
 end
 
+local function GetMinimapTrackingState(entry)
+	if not C_Minimap or type(C_Minimap.GetNumTrackingTypes) ~= "function" or type(C_Minimap.GetTrackingFilter) ~= "function" or type(C_Minimap.GetTrackingInfo) ~= "function" then return nil end
+	local countOK, count = pcall(C_Minimap.GetNumTrackingTypes)
+	if not countOK or IsSecret(count) or type(count) ~= "number" then return nil end
+	local candidateLookup = {}
+	for _, spellID in ipairs(entry.candidates) do
+		candidateLookup[spellID] = true
+	end
+	local found = false
+	for index = 1, count do
+		local filterOK, filter = pcall(C_Minimap.GetTrackingFilter, index)
+		local infoOK, info = pcall(C_Minimap.GetTrackingInfo, index)
+		if filterOK and infoOK and not IsSecret(filter) and not IsSecret(info) and type(filter) == "table" and type(info) == "table" and candidateLookup[filter.spellID or info.spellID] then
+			found = true
+			if IsSecret(info.active) then return nil end
+			if info.active == true then return true end
+		end
+	end
+	return found and false or nil
+end
+
 local function GetReadableAuraState(entry)
+	if entry.minimapTracking then return GetMinimapTrackingState(entry) end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
 	local unknown = false
@@ -2289,6 +2336,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
 	eventFrame:RegisterEvent("COOLDOWN_VIEWER_TABLE_HOTFIXED")
+	eventFrame:RegisterEvent("MINIMAP_UPDATE_TRACKING")
 	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 	pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_COMBAT", "player")
@@ -2312,6 +2360,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		end
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_CONNECTION" then
 		CooldownManagerUtils:ScheduleGroupBuffUpdate()
+	elseif event == "MINIMAP_UPDATE_TRACKING" then
+		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)

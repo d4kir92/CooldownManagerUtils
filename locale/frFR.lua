@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS", "Rappels d'améliorations")
-CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_DESC", "Liste les sorts de classe et de spécialisation qui appliquent une amélioration à votre personnage. Faites-les glisser vers « Améliorations suivies » pour les utiliser comme rappels.")
+CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_DESC", "Liste les améliorations de classe et de spécialisation ainsi que les techniques de pistage des métiers de récolte. Faites-les glisser vers « Améliorations suivies » pour les utiliser comme rappels.")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_EMPTY", "Aucun sort d'amélioration correspondant n'est disponible pour cette classe et cette spécialisation.")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_EDITMODE", "Rappel d'amélioration")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_TOOLTIP", "Faites glisser vers « Améliorations suivies » pour utiliser cette amélioration comme rappel.")

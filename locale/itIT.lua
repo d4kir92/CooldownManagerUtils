@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS", "Promemoria benefici")
-CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_DESC", "Qui trovi gli incantesimi di classe e specializzazione che applicano un beneficio al tuo personaggio. Trascinali in \"Benefici tracciati\" per usarli come promemoria.")
+CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_DESC", "Qui trovi i benefici di classe e specializzazione e le abilità di tracciamento delle professioni di raccolta. Trascinali in \"Benefici tracciati\" per usarli come promemoria.")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_EMPTY", "Nessun incantesimo di beneficio disponibile per questa classe e specializzazione.")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_EDITMODE", "Promemoria beneficio")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_TOOLTIP", "Trascina in \"Benefici tracciati\" per usare questo beneficio come promemoria.")

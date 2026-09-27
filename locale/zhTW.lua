@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS", "增益提醒")
-CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_DESC", "這裡列出了會為你的角色施加增益效果的職業和專精法術。將它們拖到「追蹤的增益」中即可用作提醒。")
+CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_DESC", "這裡列出了職業和專精增益，以及採集專業的追蹤技能。將它們拖到「追蹤的增益」中即可用作提醒。")
 CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_EMPTY", "此職業和專精沒有可用的增益法術。")
 CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_EDITMODE", "增益提醒")
 CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_TOOLTIP", "拖到「追蹤的增益」中以將此增益用作提醒。")

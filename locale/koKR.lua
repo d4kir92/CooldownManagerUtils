@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS", "강화 효과 알림")
-CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_DESC", "캐릭터에게 강화 효과를 부여하는 직업 및 전문화 주문 목록입니다. '추적 중인 강화 효과'로 끌어다 놓으면 알림으로 사용할 수 있습니다.")
+CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_DESC", "직업 및 전문화 강화 효과와 채집 전문 기술의 추적 능력 목록입니다. '추적 중인 강화 효과'로 끌어다 놓으면 알림으로 사용할 수 있습니다.")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_EMPTY", "이 직업과 전문화에 사용할 수 있는 강화 효과 주문이 없습니다.")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_EDITMODE", "강화 효과 알림")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_TOOLTIP", "'추적 중인 강화 효과'로 끌어다 놓으면 이 강화 효과를 알림으로 사용합니다.")

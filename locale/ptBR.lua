@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS", "Lembretes de bônus")
-CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_DESC", "Aqui estão os feitiços de classe e especialização que aplicam um bônus ao seu personagem. Arraste-os para \"Bônus rastreados\" para usá-los como lembretes.")
+CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_DESC", "Aqui estão os bônus de classe e especialização e as habilidades de rastreamento das profissões de coleta. Arraste-os para \"Bônus rastreados\" para usá-los como lembretes.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_EMPTY", "Nenhum feitiço de bônus correspondente está disponível para esta classe e especialização.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_EDITMODE", "Lembrete de bônus")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_TOOLTIP", "Arraste para \"Bônus rastreados\" para usar este bônus como lembrete.")

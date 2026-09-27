@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS", "Напоминания об эффектах")
-CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_DESC", "Здесь перечислены заклинания класса и специализации, накладывающие положительный эффект на вашего персонажа. Перетащите их в «Отслеживаемые эффекты», чтобы использовать как напоминания.")
+CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_DESC", "Здесь перечислены эффекты класса и специализации, а также способности поиска собирательных профессий. Перетащите их в «Отслеживаемые эффекты», чтобы использовать как напоминания.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_EMPTY", "Для этого класса и специализации нет подходящих заклинаний с положительными эффектами.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_EDITMODE", "Напоминание об эффекте")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_TOOLTIP", "Перетащите в «Отслеживаемые эффекты», чтобы использовать этот эффект как напоминание.")

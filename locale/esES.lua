@@ -1,6 +1,6 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS", "Recordatorios de beneficios")
-CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_DESC", "Aquí se muestran los hechizos de clase y especialización que aplican un beneficio a tu personaje. Arrástralos a «Beneficios rastreados» para usarlos como recordatorios.")
+CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_DESC", "Aquí se muestran los beneficios de clase y especialización, así como las facultades de rastreo de las profesiones de recolección. Arrástralos a «Beneficios rastreados» para usarlos como recordatorios.")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_EMPTY", "No hay hechizos de beneficio disponibles para esta clase y especialización.")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_EDITMODE", "Recordatorio de beneficio")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_TOOLTIP", "Arrastra a «Beneficios rastreados» para usar este beneficio como recordatorio.")
