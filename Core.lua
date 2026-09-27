@@ -99,6 +99,15 @@ local PALADIN_OTHER_BLESSING_AURA_SPELLS = {
 	48949,
 	48950
 }
+local PALADIN_SEAL_FAMILIES = {
+	{spells = {21084, 20287, 20288, 20289, 20290, 20291, 20292, 20293}},
+	{spells = {21082, 20162, 20305, 20306, 20307, 20308}},
+	{spells = {20164}},
+	{spells = {20165, 20347, 20348, 20349}},
+	{spells = {20166, 20356, 20357}},
+	{spells = {20375, 20915, 20918, 20919, 20920}},
+	{spells = {1311649, 1311656, 20163, 20419, 20421, 20422, 20423}}
+}
 local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
 local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
 local WEAPON_ENCHANT_REFRESH_MS = 5000
@@ -136,6 +145,11 @@ local weaponEnchantFallbackNames
 local weaponEnchantFamilyBySpell
 local paladinBlessingSpellLookup
 local paladinBlessingAuraSpells
+local paladinSealSpellLookup
+local paladinSealAuraSpells
+local paladinSealPresent
+local paladinSealExpiration
+local paladinSealDuration
 local activeLayoutKey
 local activeLayoutData
 local snapTargets = {}
@@ -242,6 +256,32 @@ local function GetPaladinBlessingAuraSpells()
 		AddCandidate(spells, seen, spellID)
 	end
 	paladinBlessingAuraSpells = spells
+	return spells
+end
+
+local function IsPaladinSealSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	if not paladinSealSpellLookup then
+		paladinSealSpellLookup = {}
+		for _, family in ipairs(PALADIN_SEAL_FAMILIES) do
+			for _, familySpellID in ipairs(family.spells) do
+				paladinSealSpellLookup[familySpellID] = true
+			end
+		end
+	end
+	return paladinSealSpellLookup[spellID] == true
+end
+
+local function GetPaladinSealAuraSpells()
+	if paladinSealAuraSpells then return paladinSealAuraSpells end
+	local spells = {}
+	local seen = {}
+	for _, family in ipairs(PALADIN_SEAL_FAMILIES) do
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(spells, seen, spellID)
+		end
+	end
+	paladinSealAuraSpells = spells
 	return spells
 end
 
@@ -662,11 +702,29 @@ local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
 	end
 end
 
+local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
+	local _, class = UnitClass("player")
+	if class ~= "PALADIN" then return end
+	for _, family in ipairs(PALADIN_SEAL_FAMILIES) do
+		local mapping = {
+			candidates = {},
+			seen = {},
+			paladinSeal = true
+		}
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			knownAuraSpells[spellID] = mapping
+			knownAuraSources[spellID] = family.spells[1]
+		end
+	end
+end
+
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local knownAuraSources = {}
 	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
+	AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
 	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
 		knownAuraSources[spellID] = spellID
 	end
@@ -714,11 +772,20 @@ local function IsPaladinBlessingMapping(knownAuraSpells, ...)
 	return false
 end
 
+local function IsPaladinSealMapping(knownAuraSpells, ...)
+	for index = 1, select("#", ...) do
+		local mapping = knownAuraSpells[select(index, ...)]
+		if mapping and mapping.paladinSeal then return true end
+	end
+	return false
+end
+
 local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
 	local sourceSpellID = spellID
 	local groupBuff = IsGroupBuffMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinBlessing = IsPaladinBlessingMapping(knownAuraSpells, spellID, baseSpellID)
+	local paladinSeal = IsPaladinSealMapping(knownAuraSpells, spellID, baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
 	if family then spellID = family.spells[1] end
 	local candidates = {}
@@ -752,6 +819,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.minimapTracking = existing.minimapTracking or minimapTracking
 		existing.groupBuff = existing.groupBuff or groupBuff
 		existing.paladinBlessing = existing.paladinBlessing or paladinBlessing
+		existing.paladinSeal = existing.paladinSeal or paladinSeal
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -774,6 +842,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		minimapTracking = minimapTracking,
 		groupBuff = groupBuff,
 		paladinBlessing = paladinBlessing,
+		paladinSeal = paladinSeal,
 		candidates = candidates
 	}
 
@@ -1833,6 +1902,7 @@ local function GetSavedEntry(spellID)
 		weaponEnchant = IsWeaponEnchantSpell(spellID),
 		minimapTracking = PROFESSION_TRACKING_SPELLS[spellID] == true,
 		paladinBlessing = IsPaladinBlessingSpell(spellID),
+		paladinSeal = IsPaladinSealSpell(spellID),
 		groupBuff = IsPaladinBlessingSpell(spellID),
 		candidates = {spellID}
 	}
@@ -1893,6 +1963,50 @@ local function IsAuraSecretNow(spellID)
 	if not ok then return false end
 	if IsSecret(secret) then return true end
 	return secret == true
+end
+
+local function SetPaladinSealExpiration(expirationTime)
+	if paladinSealExpiration == expirationTime then return end
+	paladinSealExpiration = expirationTime
+	if not expirationTime then return end
+	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+end
+
+local function TrackPaladinSealAura(aura)
+	local expirationTime, duration = aura.expirationTime, aura.duration
+	if IsSecret(expirationTime) or IsSecret(duration) then return end
+	if type(duration) == "number" and duration > 0 then paladinSealDuration = duration end
+	if type(expirationTime) ~= "number" or expirationTime <= 0 then expirationTime = nil end
+	SetPaladinSealExpiration(expirationTime)
+end
+
+local function GetPaladinSealState()
+	if not C_UnitAuras or type(C_UnitAuras.GetPlayerAuraBySpellID) ~= "function" then return end
+	local unknown = false
+	for _, spellID in ipairs(GetPaladinSealAuraSpells()) do
+		if IsAuraSecretNow(spellID) then
+			unknown = true
+		else
+			local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+			if not ok or IsSecret(aura) then
+				unknown = true
+			elseif aura then
+				TrackPaladinSealAura(aura)
+				paladinSealPresent = true
+				return true
+			end
+		end
+	end
+	if unknown then
+		if paladinSealExpiration and GetTime() >= paladinSealExpiration then
+			paladinSealPresent = false
+			SetPaladinSealExpiration(nil)
+		end
+		return paladinSealPresent
+	end
+	paladinSealPresent = false
+	SetPaladinSealExpiration(nil)
+	return false
 end
 
 local function SetAuraExpiration(entrySpellID, expirationTime)
@@ -2252,6 +2366,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 	local entries = {}
 	local seenEntries = {}
 	local sharedPaladinState = {}
+	local sharedPaladinSealState = {}
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
@@ -2262,6 +2377,13 @@ function CooldownManagerUtils:UpdateReminderBar()
 				UpdateGroupBuffState(entry, sharedPaladinState)
 				local show = presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry)
 				if entry.paladinBlessing and IsInGroup() then show = IsGroupBuffMissing(entry) end
+				if entry.paladinSeal then
+					if not sharedPaladinSealState.resolved then
+						sharedPaladinSealState.present = GetPaladinSealState()
+						sharedPaladinSealState.resolved = true
+					end
+					if sharedPaladinSealState.present ~= nil then show = not sharedPaladinSealState.present end
+				end
 				if editModeActive or show then table.insert(entries, entry) end
 			end
 		end
@@ -2374,6 +2496,11 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	C_Timer.After(0.3, function() CooldownManagerUtils:OnWeaponEnchantUpdate() end)
 	local changed = false
 	local castTime = GetTime()
+	if IsPaladinSealSpell(spellID) then
+		paladinSealPresent = true
+		SetPaladinSealExpiration(paladinSealDuration and castTime + paladinSealDuration or nil)
+		changed = true
+	end
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
 		if entry and EntryMatchesSpell(entry, spellID, spellName) and GetReadableAuraState(entry) == nil then
