@@ -6,12 +6,16 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 
 - Adds a **Buff Reminders** tab to the side tabs of Blizzard's Cooldown Manager settings.
 - Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
+- Includes the gathering tracking abilities **Find Herbs**, **Find Minerals**, and **Find Fish** when they are available to your character. Their reminders disappear while the matching minimap tracking is active.
 - Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. Tracked weapon enchants are checked together against every equipped weapon (main hand and, when dual wielding, off hand; shields only if a shield imbue is tracked): they stay hidden while every weapon carries one of them, otherwise the tracked enchants that are not active on any weapon are shown (or all of them, if each one is already active on another weapon).
 - Sorts buffs into two groups, **Tracked Buffs** and **Not Displayed**, by drag and drop.
 - Shows a reminder bar with an icon for every tracked buff that is currently missing on your character. The bar is hidden while nothing is missing.
-- Group buffs (Blizzard's Group Buffs list, plus Mark of the Wild, Blessing of the Bronze, Arcane Intellect, Power Word: Fortitude, Skyfury, and Battle Shout) are also checked on every party or raid member. Their reminder appears as soon as one member in range is missing the buff, and the icon shows how many members have it, for example `2/5` or `3/40`. Members who are offline, dead, or out of range are included in the total but do not trigger the reminder.
+- Group buffs (Blizzard's Group Buffs list, plus Mark of the Wild, Blessing of the Bronze, Arcane Intellect, Power Word: Fortitude, Skyfury, and Battle Shout) are also checked on every eligible party or raid member. Their reminder appears as soon as one living, connected, visible member in range is missing the buff, and the icon shows how many eligible members have it, for example `2/5` or `3/40`. Offline, dead, invisible, and out-of-range members are excluded from both numbers.
+- Paladin Blessing reminders work as one group: every eligible party or raid member needs any recognized Blessing cast by you. If one member is missing your Blessing, all selected Blessing reminders are shown; Blessings from another Paladin do not count.
+- On WoW Forever, Paladin Seal reminders also work as one group. Any active recognized Seal hides all selected Seal reminders; when no Seal is active, they are all shown.
 - Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
 - Shows the spell tooltip when hovering a reminder icon.
+- Hides live reminders while your character is dead or a ghost. The Edit Mode preview remains available.
 - Makes the reminder bar movable in Edit Mode and snaps it to other Edit Mode elements, screen edges, and the grid like Blizzard's own frames.
 - Clicking the bar in Edit Mode opens its settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the Cooldown Manager on the Buff Reminders tab.
 - Keeps a separate reminder selection for each specialization.
@@ -61,7 +65,7 @@ Locale files exist for all World of Warcraft client locales:
 
 `deDE`, `enUS`, `esES`, `esMX`, `frFR`, `itIT`, `koKR`, `ptBR`, `ruRU`, `zhCN`, and `zhTW`.
 
-The interface texts are currently translated into English and German; all other locales fall back to English.
+The interface texts are translated for all supported locales. Translations other than English and German are machine-generated and may benefit from native-speaker review.
 
 ## Author
 
