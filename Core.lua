@@ -182,7 +182,7 @@ local function IsSupportedClient()
 end
 
 local function IsSecret(value)
-	return issecretvalue and issecretvalue(value) or false
+	return CooldownManagerUtils:IsSecret(value)
 end
 
 local function GetReminderSpellInfo(spellID)
