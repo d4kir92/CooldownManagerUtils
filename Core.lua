@@ -62,8 +62,12 @@ local WEAPON_ENCHANT_FAMILIES = {
 	}
 }
 local HIT_CHARGE_AURAS = {
+	DRUID = {
+		{spells = {16689, 16810, 16811, 16812, 16813, 17329, 27009, 53312}, lockout = 1, schoolMask = 1}
+	},
 	SHAMAN = {
-		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5}
+		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5},
+		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960}, lockout = 3.5}
 	}
 }
 local PROFESSION_TRACKING_SPELLS = {
@@ -2052,7 +2056,7 @@ local function TrackAuraCharges(entry, aura)
 	end
 	local learnedCharges = GetLearnedAuras().charges
 	learnedCharges[entry.spellID] = math.max(learnedCharges[entry.spellID] or 0, charges)
-	local state = auraChargeCache[entry.spellID] or {lockout = definition.lockout, lockoutUntil = 0}
+	local state = auraChargeCache[entry.spellID] or {lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask}
 	state.charges = charges
 	auraChargeCache[entry.spellID] = state
 end
@@ -2060,7 +2064,7 @@ end
 local function ResetAuraCharges(entry)
 	local definition = GetHitChargeAura(entry)
 	local charges = definition and GetLearnedAuras().charges[entry.spellID]
-	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0} or nil
+	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask} or nil
 end
 
 local function TrackAuraExpiration(entry, aura)
@@ -2521,12 +2525,12 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if changed then self:ScheduleReminderUpdate() end
 end
 
-function CooldownManagerUtils:OnPlayerCombatEvent(action)
+function CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
 	if IsSecret(action) or action ~= "WOUND" then return end
 	local now = GetTime()
 	local changed = false
 	for _, state in pairs(auraChargeCache) do
-		if state.charges > 0 and now >= state.lockoutUntil then
+		if state.charges > 0 and now >= state.lockoutUntil and (not state.schoolMask or not IsSecret(schoolMask) and schoolMask == state.schoolMask) then
 			state.charges = state.charges - 1
 			state.lockoutUntil = now + state.lockout
 			changed = true
@@ -2650,8 +2654,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	elseif event == "UNIT_COMBAT" then
-		local _, action = ...
-		CooldownManagerUtils:OnPlayerCombatEvent(action)
+		local _, action, _, _, schoolMask = ...
+		CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
 	elseif event == "WEAPON_ENCHANT_CHANGED" then
 		CooldownManagerUtils:OnWeaponEnchantUpdate()
 	elseif event == "UNIT_INVENTORY_CHANGED" then
