@@ -2377,7 +2377,7 @@ local function GetUnitPaladinBlessingState(unit)
 	return unknown and "unknown" or "missing"
 end
 
-local function GetUnitBuffState(unit, entry)
+function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 	if GetUnitFlag(UnitIsConnected, unit) == false or GetUnitFlag(UnitIsDeadOrGhost, unit) == true or GetUnitFlag(UnitIsVisible, unit) == false then return "unchecked" end
 	if not IsUnitInBuffRange(unit, entry) then return "unchecked" end
 	if entry.paladinBlessing then return GetUnitPaladinBlessingState(unit) end
@@ -2403,7 +2403,7 @@ local function GetUnitBuffState(unit, entry)
 	return unknown and "unknown" or "missing"
 end
 
-local function UpdateGroupBuffState(entry, sharedPaladinState)
+function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
 	if entry.paladinBlessing and sharedPaladinState and sharedPaladinState.resolved then
 		groupBuffCache[entry.spellID] = sharedPaladinState.state
 		return
@@ -2420,7 +2420,7 @@ local function UpdateGroupBuffState(entry, sharedPaladinState)
 	local total, have, missing, unknown = 0, 0, 0, false
 	for _, unit in ipairs(units) do
 		if GetUnitFlag(UnitExists, unit) then
-			local state = GetUnitBuffState(unit, entry)
+			local state = CooldownManagerUtils.GetUnitBuffState(unit, entry)
 			if state ~= "unchecked" then total = total + 1 end
 			if state == "present" then
 				have = have + 1
@@ -2452,12 +2452,12 @@ local function UpdateGroupBuffState(entry, sharedPaladinState)
 	end
 end
 
-local function IsGroupBuffMissing(entry)
+function CooldownManagerUtils.IsGroupBuffMissing(entry)
 	local state = groupBuffCache[entry.spellID]
 	return state ~= nil and state.missing > 0
 end
 
-local function EntryMatchesSpell(entry, spellID, spellName)
+function CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName)
 	if entry.spellID == spellID or (spellName and entry.name == spellName) then return true end
 	for _, candidateSpellID in ipairs(entry.candidates) do
 		if candidateSpellID == spellID then return true end
@@ -2465,7 +2465,7 @@ local function EntryMatchesSpell(entry, spellID, spellName)
 	return false
 end
 
-local function GetSpellCooldownState(spellID)
+function CooldownManagerUtils.GetSpellCooldownState(spellID)
 	if not C_Spell then return false end
 	if C_Spell.GetSpellCooldownDuration then
 		local ok, duration = pcall(C_Spell.GetSpellCooldownDuration, spellID, true)
@@ -2487,10 +2487,10 @@ local function GetSpellCooldownState(spellID)
 	return true, nil, startTime, duration, not IsSecret(info.modRate) and info.modRate or 1
 end
 
-local function UpdateIconCooldown(icon, spellID, showTimer)
+function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer)
 	local cooldown = icon.Cooldown
 	cooldown:SetHideCountdownNumbers(not showTimer)
-	local onCooldown, durationObject, startTime, duration, modRate = GetSpellCooldownState(spellID)
+	local onCooldown, durationObject, startTime, duration, modRate = CooldownManagerUtils.GetSpellCooldownState(spellID)
 	if onCooldown and durationObject and cooldown.SetCooldownFromDurationObject then
 		cooldown:SetCooldownFromDurationObject(durationObject)
 	elseif onCooldown and startTime then
@@ -2501,7 +2501,7 @@ local function UpdateIconCooldown(icon, spellID, showTimer)
 	return onCooldown
 end
 
-local function UpdateIconGlow(icon, show, birth)
+function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
 	local alert = icon.SpellAlert
 	if not show then
 		if alert then
@@ -2549,9 +2549,9 @@ function CooldownManagerUtils:UpdateReminderBar()
 				seenEntries[entry] = true
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end
-				UpdateGroupBuffState(entry, sharedPaladinState)
-				local show = presenceCache[entry.spellID] == false or IsGroupBuffMissing(entry)
-				if entry.paladinBlessing and IsInGroup() then show = IsGroupBuffMissing(entry) end
+				CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
+				local show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
+				if entry.paladinBlessing and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
 				if entry.paladinSeal then
 					if not sharedPaladinSealState.resolved then
 						sharedPaladinSealState.present = GetPaladinSealState()
@@ -2608,8 +2608,8 @@ function CooldownManagerUtils:UpdateReminderBar()
 		else
 			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
 		end
-		local previewPresent = editModeActive and presenceCache[entry.spellID] == true and not IsGroupBuffMissing(entry)
-		local onCooldown = UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
+		local previewPresent = editModeActive and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
+		local onCooldown = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
 		icon.Texture:SetTexture(entry.iconID)
 		icon.Texture:SetDesaturated(previewPresent or onCooldown)
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
@@ -2621,12 +2621,12 @@ function CooldownManagerUtils:UpdateReminderBar()
 		icon:Show()
 		local glow = frame.showGlow and not previewPresent
 		if glow then glowingSpells[entry.spellID] = true end
-		UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
+		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end
 	frame.glowingSpells = glowingSpells
 
 	for index = #entries + 1, #frame.icons do
-		UpdateIconGlow(frame.icons[index], false)
+		CooldownManagerUtils.UpdateIconGlow(frame.icons[index], false)
 		frame.icons[index]:Hide()
 	end
 
@@ -2690,7 +2690,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	end
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
-		if entry and EntryMatchesSpell(entry, spellID, spellName) and GetReadableAuraState(entry) == nil then
+		if entry and CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName) and GetReadableAuraState(entry) == nil then
 			presenceCache[entry.spellID] = true
 			changed = true
 			local groupState = groupBuffCache[entry.spellID]
@@ -2739,7 +2739,7 @@ function CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
 	self:ScheduleReminderUpdate()
 end
 
-local function SetEditModeActive(active)
+function CooldownManagerUtils.SetEditModeActive(active)
 	editModeActive = active
 	CooldownManagerUtils:UpdateReminderBar()
 	if reminderFrame and reminderFrame.Selection then
@@ -2777,8 +2777,8 @@ function CooldownManagerUtils:Initialize()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	self:CreateReminderBar()
 	if EventRegistry then
-		EventRegistry:RegisterCallback("EditMode.Enter", function() SetEditModeActive(true) end, self)
-		EventRegistry:RegisterCallback("EditMode.Exit", function() SetEditModeActive(false) end, self)
+		EventRegistry:RegisterCallback("EditMode.Enter", function() CooldownManagerUtils.SetEditModeActive(true) end, self)
+		EventRegistry:RegisterCallback("EditMode.Exit", function() CooldownManagerUtils.SetEditModeActive(false) end, self)
 	end
 
 	self:InitializeReminderSettings()
