@@ -42,6 +42,40 @@ local CLASS_AURA_FALLBACKS = {
 		{spellID = 97462, auraSpellID = 97463}
 	}
 }
+local RACIAL_AURA_FALLBACKS = {
+	{spellID = 20594},
+	{spellID = 20600},
+	{spellID = 20580},
+	{spellID = 58984},
+	{spellID = 20572},
+	{spellID = 33697},
+	{spellID = 33702},
+	{spellID = 26297},
+	{spellID = 20577},
+	{spellID = 20589, foreverOnly = true},
+	{spellID = 28880},
+	{spellID = 59542},
+	{spellID = 59543},
+	{spellID = 59544},
+	{spellID = 59545},
+	{spellID = 59547},
+	{spellID = 59548},
+	{spellID = 68992},
+	{spellID = 265221},
+	{spellID = 274738},
+	{spellID = 291944},
+	{spellID = 1259799},
+	{spellID = 1299026},
+	{spellID = 1260270},
+	{spellID = 1259812},
+	{spellID = 1259813},
+	{spellID = 1259817},
+	{spellID = 1259821},
+	{spellID = 1259823},
+	{spellID = 1259416, auraSpellIDs = {1308663}},
+	{spellID = 1259705, auraSpellIDs = {1270842}},
+	{spellID = 1259686, auraSpellIDs = {1259688, 1270893}}
+}
 
 local WEAPON_ENCHANT_FAMILIES = {
 	PALADIN = {
@@ -70,7 +104,8 @@ local HIT_CHARGE_AURAS = {
 		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960}, lockout = 3.5}
 	}
 }
-local PROFESSION_TRACKING_SPELLS = {
+local MINIMAP_TRACKING_SPELLS = {
+	[2481] = true,
 	[2383] = true,
 	[2580] = true,
 	[8387] = true,
@@ -111,6 +146,17 @@ local PALADIN_SEAL_FAMILIES = {
 	{spells = {20166, 20356, 20357}},
 	{spells = {20375, 20915, 20918, 20919, 20920}},
 	{spells = {1311649, 1311656, 20163, 20419, 20421, 20422, 20423}}
+}
+local HUNTER_ASPECT_FAMILIES = {
+	{spells = {13165, 14318, 14319, 14320, 14321, 14322, 25296, 27044}},
+	{spells = {13163}},
+	{spells = {5118}},
+	{spells = {13159}},
+	{spells = {13161, 1299445, 1299446, 1299447}},
+	{spells = {20043, 20190, 27045, 49071}},
+	{spells = {34074, 415423}},
+	{spells = {61846, 61847}},
+	{spells = {469145}}
 }
 local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
 local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
@@ -154,6 +200,11 @@ local paladinSealAuraSpells
 local paladinSealPresent
 local paladinSealExpiration
 local paladinSealDuration
+local hunterAspectSpellLookup
+local hunterAspectAuraSpells
+local hunterAspectPresent
+local hunterAspectExpiration
+local hunterAspectDuration
 local activeLayoutKey
 local activeLayoutData
 local snapTargets = {}
@@ -286,6 +337,32 @@ local function GetPaladinSealAuraSpells()
 		end
 	end
 	paladinSealAuraSpells = spells
+	return spells
+end
+
+local function IsHunterAspectSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	if not hunterAspectSpellLookup then
+		hunterAspectSpellLookup = {}
+		for _, family in ipairs(HUNTER_ASPECT_FAMILIES) do
+			for _, familySpellID in ipairs(family.spells) do
+				hunterAspectSpellLookup[familySpellID] = true
+			end
+		end
+	end
+	return hunterAspectSpellLookup[spellID] == true
+end
+
+local function GetHunterAspectAuraSpells()
+	if hunterAspectAuraSpells then return hunterAspectAuraSpells end
+	local spells = {}
+	local seen = {}
+	for _, family in ipairs(HUNTER_ASPECT_FAMILIES) do
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(spells, seen, spellID)
+		end
+	end
+	hunterAspectAuraSpells = spells
 	return spells
 end
 
@@ -688,6 +765,24 @@ local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	end
 end
 
+local function AddRacialAuraFallbackMappings(knownAuraSpells, knownAuraSources)
+	for _, definition in ipairs(RACIAL_AURA_FALLBACKS) do
+		if not definition.foreverOnly or CooldownManagerUtils:IsForever() then
+			local spellID = definition.spellID
+			local mapping = {
+				candidates = {},
+				seen = {}
+			}
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			for _, auraSpellID in ipairs(definition.auraSpellIDs or {}) do
+				AddCandidate(mapping.candidates, mapping.seen, auraSpellID)
+			end
+			knownAuraSpells[spellID] = mapping
+			knownAuraSources[spellID] = spellID
+		end
+	end
+end
+
 local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
 	local _, class = UnitClass("player")
 	if class ~= "PALADIN" then return end
@@ -723,12 +818,31 @@ local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
 	end
 end
 
+local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
+	local _, class = UnitClass("player")
+	if class ~= "HUNTER" then return end
+	for _, family in ipairs(HUNTER_ASPECT_FAMILIES) do
+		local mapping = {
+			candidates = {},
+			seen = {},
+			hunterAspect = true
+		}
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			knownAuraSpells[spellID] = mapping
+			knownAuraSources[spellID] = family.spells[1]
+		end
+	end
+end
+
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local knownAuraSources = {}
+	AddRacialAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
 	AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
+	AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
 	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
 		knownAuraSources[spellID] = spellID
 	end
@@ -748,7 +862,7 @@ end
 
 local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
 	if not C_Spell then return false end
-	if PROFESSION_TRACKING_SPELLS[spellID] or PROFESSION_TRACKING_SPELLS[baseSpellID] then return true end
+	if MINIMAP_TRACKING_SPELLS[spellID] or MINIMAP_TRACKING_SPELLS[baseSpellID] then return true end
 	if GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
 	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
 	if IsLearnedBuffSpell(spellID) or IsLearnedBuffSpell(baseSpellID) then return true end
@@ -784,12 +898,21 @@ local function IsPaladinSealMapping(knownAuraSpells, ...)
 	return false
 end
 
+local function IsHunterAspectMapping(knownAuraSpells, ...)
+	for index = 1, select("#", ...) do
+		local mapping = knownAuraSpells[select(index, ...)]
+		if mapping and mapping.hunterAspect then return true end
+	end
+	return false
+end
+
 local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
 	local sourceSpellID = spellID
 	local groupBuff = IsGroupBuffMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinBlessing = IsPaladinBlessingMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinSeal = IsPaladinSealMapping(knownAuraSpells, spellID, baseSpellID)
+	local hunterAspect = IsHunterAspectMapping(knownAuraSpells, spellID, baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
 	if family then spellID = family.spells[1] end
 	local candidates = {}
@@ -814,7 +937,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	if spellName then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
 
 	local weaponEnchant = family ~= nil or IsWeaponEnchantSpell(sourceSpellID) or IsWeaponEnchantSpell(baseSpellID)
-	local minimapTracking = PROFESSION_TRACKING_SPELLS[sourceSpellID] == true or PROFESSION_TRACKING_SPELLS[baseSpellID] == true
+	local minimapTracking = MINIMAP_TRACKING_SPELLS[sourceSpellID] == true or MINIMAP_TRACKING_SPELLS[baseSpellID] == true
 	local existing = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
 	if existing then
 		availableBuffsBySpellID[spellID] = existing
@@ -824,6 +947,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.groupBuff = existing.groupBuff or groupBuff
 		existing.paladinBlessing = existing.paladinBlessing or paladinBlessing
 		existing.paladinSeal = existing.paladinSeal or paladinSeal
+		existing.hunterAspect = existing.hunterAspect or hunterAspect
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -847,6 +971,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		groupBuff = groupBuff,
 		paladinBlessing = paladinBlessing,
 		paladinSeal = paladinSeal,
+		hunterAspect = hunterAspect,
 		candidates = candidates
 	}
 
@@ -886,14 +1011,14 @@ local function AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableB
 	end
 end
 
-local function AddProfessionTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+local function AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	if not C_Minimap or type(C_Minimap.GetNumTrackingTypes) ~= "function" or type(C_Minimap.GetTrackingFilter) ~= "function" then return end
 	local countOK, count = pcall(C_Minimap.GetNumTrackingTypes)
 	if not countOK or IsSecret(count) or type(count) ~= "number" then return end
 	for index = 1, count do
 		local filterOK, filter = pcall(C_Minimap.GetTrackingFilter, index)
 		local spellID = filterOK and not IsSecret(filter) and type(filter) == "table" and filter.spellID
-		if PROFESSION_TRACKING_SPELLS[spellID] then AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
+		if MINIMAP_TRACKING_SPELLS[spellID] then AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 	end
 end
 
@@ -992,7 +1117,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	for skillLineIndex = 1, numSkillLines do
 		if skillLineIndex ~= generalLine then AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 	end
-	AddProfessionTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
@@ -1904,9 +2029,10 @@ local function GetSavedEntry(spellID)
 		name = spellInfo.name,
 		iconID = spellInfo.iconID,
 		weaponEnchant = IsWeaponEnchantSpell(spellID),
-		minimapTracking = PROFESSION_TRACKING_SPELLS[spellID] == true,
+		minimapTracking = MINIMAP_TRACKING_SPELLS[spellID] == true,
 		paladinBlessing = IsPaladinBlessingSpell(spellID),
 		paladinSeal = IsPaladinSealSpell(spellID),
+		hunterAspect = IsHunterAspectSpell(spellID),
 		groupBuff = IsPaladinBlessingSpell(spellID),
 		candidates = {spellID}
 	}
@@ -2010,6 +2136,50 @@ local function GetPaladinSealState()
 	end
 	paladinSealPresent = false
 	SetPaladinSealExpiration(nil)
+	return false
+end
+
+local function SetHunterAspectExpiration(expirationTime)
+	if hunterAspectExpiration == expirationTime then return end
+	hunterAspectExpiration = expirationTime
+	if not expirationTime then return end
+	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+end
+
+local function TrackHunterAspectAura(aura)
+	local expirationTime, duration = aura.expirationTime, aura.duration
+	if IsSecret(expirationTime) or IsSecret(duration) then return end
+	if type(duration) == "number" and duration > 0 then hunterAspectDuration = duration end
+	if type(expirationTime) ~= "number" or expirationTime <= 0 then expirationTime = nil end
+	SetHunterAspectExpiration(expirationTime)
+end
+
+local function GetHunterAspectState()
+	if not C_UnitAuras or type(C_UnitAuras.GetPlayerAuraBySpellID) ~= "function" then return end
+	local unknown = false
+	for _, spellID in ipairs(GetHunterAspectAuraSpells()) do
+		if IsAuraSecretNow(spellID) then
+			unknown = true
+		else
+			local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+			if not ok or IsSecret(aura) then
+				unknown = true
+			elseif aura then
+				TrackHunterAspectAura(aura)
+				hunterAspectPresent = true
+				return true
+			end
+		end
+	end
+	if unknown then
+		if hunterAspectExpiration and GetTime() >= hunterAspectExpiration then
+			hunterAspectPresent = false
+			SetHunterAspectExpiration(nil)
+		end
+		return hunterAspectPresent
+	end
+	hunterAspectPresent = false
+	SetHunterAspectExpiration(nil)
 	return false
 end
 
@@ -2371,6 +2541,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 	local seenEntries = {}
 	local sharedPaladinState = {}
 	local sharedPaladinSealState = {}
+	local sharedHunterAspectState = {}
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
@@ -2387,6 +2558,13 @@ function CooldownManagerUtils:UpdateReminderBar()
 						sharedPaladinSealState.resolved = true
 					end
 					if sharedPaladinSealState.present ~= nil then show = not sharedPaladinSealState.present end
+				end
+				if entry.hunterAspect then
+					if not sharedHunterAspectState.resolved then
+						sharedHunterAspectState.present = GetHunterAspectState()
+						sharedHunterAspectState.resolved = true
+					end
+					if sharedHunterAspectState.present ~= nil then show = not sharedHunterAspectState.present end
 				end
 				if editModeActive or show then table.insert(entries, entry) end
 			end
@@ -2503,6 +2681,11 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if IsPaladinSealSpell(spellID) then
 		paladinSealPresent = true
 		SetPaladinSealExpiration(paladinSealDuration and castTime + paladinSealDuration or nil)
+		changed = true
+	end
+	if IsHunterAspectSpell(spellID) then
+		hunterAspectPresent = true
+		SetHunterAspectExpiration(hunterAspectDuration and castTime + hunterAspectDuration or nil)
 		changed = true
 	end
 	for selectedSpellID in pairs(self:GetProfile().selected) do
