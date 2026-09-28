@@ -2619,7 +2619,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 		icon.GroupCount:SetText(groupState and (groupState.have .. "/" .. groupState.total) or "")
 		icon.GroupCount:SetShown(groupState ~= nil)
 		icon:Show()
-		local glow = frame.showGlow and not previewPresent
+		local glow = frame.showGlow and not previewPresent and not onCooldown
 		if glow then glowingSpells[entry.spellID] = true end
 		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end
