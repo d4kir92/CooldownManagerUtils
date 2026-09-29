@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("esMX", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Este
 CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar resplandor")
 CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS", "Recordatorios de activaciones")
 CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_EMPTY", "No hay habilidades reactivas disponibles para esta clase.")
-CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_TOOLTIP", "Arrástrala a «Habilidades seguidas» para mostrarla cuando se active.")
-CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Habilidades seguidas")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_TOOLTIP", "Arrástrala a «Activaciones rastreadas» para mostrarla cuando se active.")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Activaciones rastreadas")
 CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "No mostrado")

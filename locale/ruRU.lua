@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Эт
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_SHOW_GLOW", "Показывать свечение")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS", "Напоминания о срабатываниях")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_EMPTY", "Для этого класса нет подходящих реактивных способностей.")
-CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_TOOLTIP", "Перетащите в «Отслеживаемые способности», чтобы показывать способность при активации.")
-CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Отслеживаемые способности")
+CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_TOOLTIP", "Перетащите в «Отслеживаемые срабатывания», чтобы показывать способность при активации.")
+CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Отслеживаемые срабатывания")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Не отображается")

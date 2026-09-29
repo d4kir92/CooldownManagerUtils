@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("frFR", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Ce s
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_SHOW_GLOW", "Afficher la lueur")
 CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS", "Rappels de procs")
 CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_EMPTY", "Aucune technique réactive correspondante n'est disponible pour cette classe.")
-CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_TOOLTIP", "Faites-la glisser vers « Techniques suivies » pour l'afficher lorsqu'elle devient active.")
-CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Techniques suivies")
+CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_TOOLTIP", "Faites-la glisser vers « Procs suivis » pour l'afficher lorsqu'elle devient active.")
+CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Procs suivis")
 CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Non affiché")

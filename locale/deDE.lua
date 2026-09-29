@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("deDE", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Dies
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_SHOW_GLOW", "Glow anzeigen")
 CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS", "Proc-Erinnerungen")
 CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_EMPTY", "Für diese Klasse sind keine passenden reaktiven Fähigkeiten verfügbar.")
-CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_TOOLTIP", "Nach „Verfolgte Fähigkeiten“ ziehen, damit diese Fähigkeit angezeigt wird, sobald sie aktiv wird.")
-CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Verfolgte Fähigkeiten")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_TOOLTIP", "Nach „Verfolgte Procs“ ziehen, damit diese Fähigkeit angezeigt wird, sobald sie aktiv wird.")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Verfolgte Procs")
 CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Nicht angezeigt")

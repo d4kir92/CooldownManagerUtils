@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("itIT", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Ques
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostra bagliore")
 CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS", "Promemoria proc")
 CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_EMPTY", "Non sono disponibili abilità reattive adatte per questa classe.")
-CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_TOOLTIP", "Trascinala in «Abilità monitorate» per mostrarla quando diventa attiva.")
-CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Abilità monitorate")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_TOOLTIP", "Trascinala in «Proc monitorati» per mostrarla quando diventa attiva.")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Proc monitorati")
 CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Non visualizzato")

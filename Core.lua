@@ -2173,11 +2173,11 @@ local function SetupAddonEditModeFrame(frame)
 		self.isSelected = false
 	end
 	frame.SelectSystem = function(self)
+		if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.owner ~= self then reminderOptionsFrame:Hide() end
 		self.Selection:ShowSelected()
 		self.isSelected = true
-		if reminderOptionsFrame and reminderOptionsFrame:IsShown() then reminderOptionsFrame:Hide() end
 		local panel = CreateReminderOptionsFrame(self)
-		panel:Show()
+		if not panel:IsShown() then panel:Show() end
 	end
 	frame.ClearHighlight = function(self)
 		self.Selection:Hide()

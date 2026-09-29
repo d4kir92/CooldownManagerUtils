@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("zhCN", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "尚�
 CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_SHOW_GLOW", "显示发光")
 CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS", "触发提醒")
 CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_EMPTY", "该职业没有可用的反应型技能。")
-CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_TOOLTIP", "拖到“已追踪技能”，在技能激活时显示提醒。")
-CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "已追踪技能")
+CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_TOOLTIP", "拖到“已追踪触发”，在技能激活时显示提醒。")
+CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "已追踪触发")
 CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "不显示")

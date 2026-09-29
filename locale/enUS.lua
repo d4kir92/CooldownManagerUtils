@@ -13,6 +13,6 @@ CooldownManagerUtils:AddTrans("enUS", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "This
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_SHOW_GLOW", "Show Glow")
 CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS", "Proc Reminders")
 CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_EMPTY", "No matching reactive abilities are available for this class.")
-CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_TOOLTIP", "Drag to Tracked Abilities to show this ability when it becomes active.")
-CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Tracked Abilities")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_TOOLTIP", "Drag to Tracked Procs to show this ability when it becomes active.")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Tracked Procs")
 CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Not Displayed")
