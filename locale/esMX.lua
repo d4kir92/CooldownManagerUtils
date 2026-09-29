@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_DRAG", "Arrastra a \"No
 CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Beneficios rastreados")
 CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "No mostrado")
 CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar resplandor")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS", "Recordatorios de habilidades")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_EMPTY", "No hay habilidades reactivas disponibles para esta clase.")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_TOOLTIP", "Arrástrala a «Habilidades seguidas» para mostrarla cuando se active.")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Habilidades seguidas")
+CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "No mostrado")

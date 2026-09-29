@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_DRAG", "'표시 안 함
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "추적 중인 강화 효과")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "표시 안 함")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_SHOW_GLOW", "반짝임 표시")
+CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS", "능력 알림")
+CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_EMPTY", "이 직업에 사용할 수 있는 반응형 능력이 없습니다.")
+CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_TOOLTIP", "활성화될 때 표시하려면 추적 중인 능력으로 끌어다 놓으세요.")
+CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "추적 중인 능력")
+CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "표시 안 함")

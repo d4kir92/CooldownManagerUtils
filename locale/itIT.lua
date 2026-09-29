@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_DRAG", "Trascina in \"N
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Benefici tracciati")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Non mostrati")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostra bagliore")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS", "Promemoria abilità")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_EMPTY", "Non sono disponibili abilità reattive adatte per questa classe.")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_TOOLTIP", "Trascinala in «Abilità monitorate» per mostrarla quando diventa attiva.")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Abilità monitorate")
+CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Non visualizzato")

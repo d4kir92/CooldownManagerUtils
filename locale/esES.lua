@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_DRAG", "Arrastra a «No
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Beneficios rastreados")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "No mostrado")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar resplandor")
+CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS", "Recordatorios de facultades")
+CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS_EMPTY", "No hay facultades reactivas disponibles para esta clase.")
+CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS_TOOLTIP", "Arrástrala a «Facultades seguidas» para mostrarla cuando se active.")
+CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Facultades seguidas")
+CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "No mostrado")

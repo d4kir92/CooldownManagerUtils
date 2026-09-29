@@ -5,6 +5,7 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 ## Features
 
 - Adds a **Buff Reminders** tab to the side tabs of Blizzard's Cooldown Manager settings.
+- On WoW Forever Warriors, adds a separate **Ability Reminders** tab for **Overpower** and **Revenge**. Selected abilities appear on the reminder bar only while Blizzard marks their reactive combat window active.
 - Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
 - Includes the gathering tracking abilities **Find Herbs**, **Find Minerals**, and **Find Fish** when they are available to your character. Their reminders disappear while the matching minimap tracking is active.
 - Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. Tracked weapon enchants are checked together against every equipped weapon (main hand and, when dual wielding, off hand; shields only if a shield imbue is tracked): they stay hidden while every weapon carries one of them, otherwise the tracked enchants that are not active on any weapon are shown (or all of them, if each one is already active on another weapon).
@@ -41,6 +42,8 @@ The package also contains TOC files for the Classic clients. The add-on loads th
 3. Drag a buff from **Not Displayed** to **Tracked Buffs** to get a reminder while it is missing.
 4. Drag buffs within **Tracked Buffs** to change their order on the reminder bar.
 5. Drag a buff back to **Not Displayed** to remove its reminder.
+
+WoW Forever Warriors can use the adjacent **Ability Reminders** tab in the same way to track Overpower and Revenge.
 
 The search box of the Cooldown Manager also filters the Buff Reminders tab by buff name. Each group can be collapsed by clicking its header.
 

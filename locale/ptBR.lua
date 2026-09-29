@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_DRAG", "Arraste para \"
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Bônus rastreados")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Não exibido")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar brilho")
+CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS", "Lembretes de habilidades")
+CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_EMPTY", "Não há habilidades reativas disponíveis para esta classe.")
+CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_TOOLTIP", "Arraste para «Habilidades monitoradas» para exibi-la quando ficar ativa.")
+CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Habilidades monitoradas")
+CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Não exibido")

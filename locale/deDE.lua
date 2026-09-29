@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_DRAG", "Nach „Nicht a
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Verfolgte Buffs")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Nicht angezeigt")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_SHOW_GLOW", "Glow anzeigen")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS", "Fähigkeits-Erinnerungen")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_EMPTY", "Für diese Klasse sind keine passenden reaktiven Fähigkeiten verfügbar.")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_TOOLTIP", "Nach „Verfolgte Fähigkeiten“ ziehen, damit diese Fähigkeit angezeigt wird, sobald sie aktiv wird.")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Verfolgte Fähigkeiten")
+CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Nicht angezeigt")

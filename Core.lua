@@ -128,6 +128,12 @@ local HIT_CHARGE_AURAS = {
 		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960}, lockout = 3.5}
 	}
 }
+CooldownManagerUtils.foreverReactiveAbilityFamilies = {
+	WARRIOR = {
+		{spells = {7384, 7887, 11584, 11585}},
+		{spells = {6572, 6574, 7379, 11600, 11601, 25288, 25269, 30357, 57823}}
+	}
+}
 local MINIMAP_TRACKING_SPELLS = {
 	[2481] = true,
 	[2383] = true,
@@ -316,6 +322,16 @@ local function GetSpellNameSafe(spellID)
 	local name = spellInfo and spellInfo.name
 	if IsSecret(name) or type(name) ~= "string" then return end
 	return name
+end
+
+function CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID)
+	if not CooldownManagerUtils:IsForever() or type(spellID) ~= "number" then return end
+	local _, class = UnitClass("player")
+	for _, family in ipairs(CooldownManagerUtils.foreverReactiveAbilityFamilies[class] or {}) do
+		for _, familySpellID in ipairs(family.spells) do
+			if familySpellID == spellID then return family end
+		end
+	end
 end
 
 local function IsPaladinBlessingSpell(spellID)
@@ -868,6 +884,23 @@ local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
 	end
 end
 
+function CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells, knownAuraSources)
+	if not CooldownManagerUtils:IsForever() then return end
+	local _, class = UnitClass("player")
+	for _, family in ipairs(CooldownManagerUtils.foreverReactiveAbilityFamilies[class] or {}) do
+		local mapping = {
+			candidates = {},
+			seen = {},
+			reactiveAbility = true
+		}
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			knownAuraSpells[spellID] = mapping
+			knownAuraSources[spellID] = family.spells[1]
+		end
+	end
+end
+
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local knownAuraSources = {}
@@ -876,6 +909,7 @@ local function BuildKnownAuraSpellLookup()
 	AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
 	AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
 	AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
+	CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells, knownAuraSources)
 	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
 		knownAuraSources[spellID] = spellID
 	end
@@ -946,14 +980,22 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	local paladinBlessing = IsPaladinBlessingMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinSeal = IsPaladinSealMapping(knownAuraSpells, spellID, baseSpellID)
 	local hunterAspect = IsHunterAspectMapping(knownAuraSpells, spellID, baseSpellID)
+	local reactiveFamily = CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID) or CooldownManagerUtils.GetForeverReactiveAbilityFamily(baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
-	if family then spellID = family.spells[1] end
+	if family then
+		spellID = family.spells[1]
+	elseif reactiveFamily then
+		spellID = reactiveFamily.spells[1]
+	end
 	local candidates = {}
 	local seenCandidates = {}
 	AddCandidate(candidates, seenCandidates, spellID)
 	AddCandidate(candidates, seenCandidates, sourceSpellID)
 	AddCandidate(candidates, seenCandidates, baseSpellID)
 	for _, familySpellID in ipairs(family and family.spells or {}) do
+		AddCandidate(candidates, seenCandidates, familySpellID)
+	end
+	for _, familySpellID in ipairs(reactiveFamily and reactiveFamily.spells or {}) do
 		AddCandidate(candidates, seenCandidates, familySpellID)
 	end
 	local auraMapping = knownAuraSpells[spellID] or knownAuraSpells[baseSpellID]
@@ -981,6 +1023,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.paladinBlessing = existing.paladinBlessing or paladinBlessing
 		existing.paladinSeal = existing.paladinSeal or paladinSeal
 		existing.hunterAspect = existing.hunterAspect or hunterAspect
+		existing.reactiveAbility = existing.reactiveAbility or reactiveFamily ~= nil
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -1005,6 +1048,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		paladinBlessing = paladinBlessing,
 		paladinSeal = paladinSeal,
 		hunterAspect = hunterAspect,
+		reactiveAbility = reactiveFamily ~= nil,
 		candidates = candidates
 	}
 
@@ -1134,8 +1178,9 @@ function CooldownManagerUtils:GetReminderLayout(spellID)
 end
 
 function CooldownManagerUtils:SaveReminderLayout(categories)
-	local layout = {}
-	local selected = {}
+	local profile = self:GetProfile()
+	local layout = CopyTable(profile.layout)
+	local selected = CopyTable(profile.selected)
 	for _, category in ipairs(categories) do
 		for order, entry in ipairs(category.entries) do
 			layout[entry.spellID] = {
@@ -1143,11 +1188,14 @@ function CooldownManagerUtils:SaveReminderLayout(categories)
 				order = order
 			}
 
-			if category.key ~= "hidden" then selected[entry.spellID] = true end
+			if category.key ~= "hidden" then
+				selected[entry.spellID] = true
+			else
+				selected[entry.spellID] = nil
+			end
 		end
 	end
 
-	local profile = self:GetProfile()
 	profile.layout = layout
 	profile.selected = selected
 	self:UpdateReminderBar()
@@ -2109,6 +2157,7 @@ local function GetSavedEntry(spellID)
 		paladinBlessing = IsPaladinBlessingSpell(spellID),
 		paladinSeal = IsPaladinSealSpell(spellID),
 		hunterAspect = IsHunterAspectSpell(spellID),
+		reactiveAbility = CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID) ~= nil,
 		groupBuff = IsPaladinBlessingSpell(spellID),
 		candidates = {spellID}
 	}
@@ -2346,7 +2395,22 @@ local function GetMinimapTrackingState()
 	if found and not unknown then return false end
 end
 
+function CooldownManagerUtils.GetReactiveAbilityState(entry)
+	local overlay = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed
+	if type(overlay) ~= "function" then return end
+	local resolved = false
+	for _, spellID in ipairs(entry.candidates) do
+		local ok, active = pcall(overlay, spellID)
+		if ok and not IsSecret(active) then
+			resolved = true
+			if active == true then return true end
+		end
+	end
+	if resolved then return false end
+end
+
 local function GetReadableAuraState(entry)
+	if entry.reactiveAbility then return CooldownManagerUtils.GetReactiveAbilityState(entry) end
 	if entry.minimapTracking then return GetMinimapTrackingState() end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
@@ -2682,7 +2746,12 @@ function CooldownManagerUtils:UpdateReminderBar()
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end
 				CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
-				local show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
+				local show
+				if entry.reactiveAbility then
+					show = presenceCache[entry.spellID] == true
+				else
+					show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
+				end
 				if entry.paladinBlessing and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
 				if entry.paladinSeal then
 					if not sharedPaladinSealState.resolved then
@@ -2747,7 +2816,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 		else
 			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
 		end
-		local previewPresent = editModeActive and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
+		local previewPresent = editModeActive and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
 		local onCooldown = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
 		icon.Texture:SetTexture(entry.iconID)
 		icon.Texture:SetDesaturated(previewPresent or onCooldown)
@@ -2953,6 +3022,11 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_CONNECTION")
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
+	pcall(eventFrame.RegisterEvent, eventFrame, "ACTIONBAR_UPDATE_USABLE")
+	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_SHOW")
+	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_HIDE")
+	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
+	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "EDIT_MODE_LAYOUTS_UPDATED")
 end
@@ -3002,7 +3076,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
-	elseif event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
+	elseif event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" or event == "SPELL_ACTIVATION_OVERLAY_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_HIDE" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()

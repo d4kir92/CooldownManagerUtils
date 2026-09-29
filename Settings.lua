@@ -4,13 +4,15 @@ local GRID_COLUMNS = 7
 local ITEM_SIZE = 38
 local ITEM_SPACING = 8
 local CATEGORY_WIDTH = 344
+local TAB_ICON_SIZE = 32
 local CATEGORY_DEFINITIONS = {
-	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS"},
-	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN"}
+	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
+	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_HIDDEN"}
 }
 
 local settingsFrame
 local reminderTab
+local abilityReminderTab
 local reminderContent
 local reminderUndoButton
 local reminderRestorePoint
@@ -146,7 +148,7 @@ local function CreateItemButton(parent, index)
 		if draggedButton then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetSpellByID(self.entry.spellID)
-		GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine(CooldownManagerUtils:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_TOOLTIP" or "LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_DRAG"), 0.5, 0.8, 1, true)
 		GameTooltip:Show()
 	end)
@@ -214,10 +216,12 @@ local function BuildCategoryModels()
 		byKey[definition.key] = model
 	end
 	for _, entry in ipairs(CooldownManagerUtils:GetAvailableBuffs()) do
-		local layout = CooldownManagerUtils:GetReminderLayout(entry.spellID)
-		local categoryKey = layout and layout.category or "hidden"
-		if not IsValidCategory(categoryKey) then categoryKey = "hidden" end
-		table.insert(byKey[categoryKey].entries, entry)
+		if (entry.reactiveAbility == true) == (customMode == "ability") then
+			local layout = CooldownManagerUtils:GetReminderLayout(entry.spellID)
+			local categoryKey = layout and layout.category or "hidden"
+			if not IsValidCategory(categoryKey) then categoryKey = "hidden" end
+			table.insert(byKey[categoryKey].entries, entry)
+		end
 	end
 	for _, model in ipairs(models) do
 		table.sort(model.entries, function(left, right)
@@ -236,6 +240,7 @@ end
 function CooldownManagerUtils:RefreshReminderSettings()
 	if not reminderContent then return end
 	BuildCategoryModels()
+	reminderContent.Empty:SetText(self:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_EMPTY" or "LID_BUFFREMINDERS_EMPTY"))
 	local filter = settingsFrame and settingsFrame.filterText or ""
 	local yOffset = 0
 	for index, definition in ipairs(CATEGORY_DEFINITIONS) do
@@ -243,7 +248,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 		local frame = categoryFrames[index]
 		frame:ClearAllPoints()
 		frame:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
-		local title = _G[definition.titleGlobal] or self:Trans(definition.localeKey)
+		local title = customMode == "ability" and self:Trans(definition.abilityLocaleKey) or _G[definition.titleGlobal] or self:Trans(definition.localeKey)
 		local isCollapsed = collapsed[definition.key] == true
 		frame.Header:SetHeaderText(title)
 		frame.Header:UpdateCollapsedState(isCollapsed)
@@ -277,24 +282,26 @@ function CooldownManagerUtils:RefreshReminderSettings()
 	reminderContent.Empty:Hide()
 end
 
-local function SetCustomMode(enabled)
+local function SetCustomMode(mode)
 	if not settingsFrame or not reminderContent then return end
-	customMode = enabled
-	reminderContent:SetShown(enabled)
-	if enabled then
+	customMode = mode
+	reminderContent:SetShown(mode ~= false)
+	if mode ~= false then
 		settingsFrame.CooldownScroll:Hide()
 		settingsFrame.GroupBuffFilter:Hide()
 		settingsFrame.LayoutDropdown:Show()
 		settingsFrame.UndoButton:Hide()
 		reminderUndoButton:Show()
 		for _, tab in ipairs(stockTabs) do tab:SetChecked(false) end
-		reminderTab:SetChecked(true)
+		reminderTab:SetChecked(mode == "buff")
+		if abilityReminderTab then abilityReminderTab:SetChecked(mode == "ability") end
 		CooldownManagerUtils:RefreshReminderSettings()
 	else
 		settingsFrame.LayoutDropdown:Show()
 		settingsFrame.UndoButton:Show()
 		reminderUndoButton:Hide()
 		reminderTab:SetChecked(false)
+		if abilityReminderTab then abilityReminderTab:SetChecked(false) end
 	end
 end
 
@@ -316,16 +323,29 @@ local function CreateReminderContent(parent)
 	return content
 end
 
-local function CreateReminderTab(parent)
+local function CreateReminderTab(parent, mode)
 	local tab = CreateFrame("Frame", nil, parent, "LargeSideTabButtonTemplate")
-	tab.activeAtlas = "icon_trackedbuffs"
-	tab.inactiveAtlas = "icon_trackedbuffs"
-	tab.tooltipText = CooldownManagerUtils:Trans("LID_BUFFREMINDERS")
-	tab.Icon:SetAtlas("icon_trackedbuffs", true)
+	if mode == "buff" then
+		tab.tooltipText = CooldownManagerUtils:Trans("LID_BUFFREMINDERS")
+		tab.iconTexture = "Interface\\AddOns\\CooldownManagerUtils\\media\\buffreminder.blp"
+	else
+		tab.tooltipText = CooldownManagerUtils:Trans("LID_ABILITYREMINDERS")
+		tab.iconTexture = "Interface\\AddOns\\CooldownManagerUtils\\media\\proc.blp"
+	end
+	tab.SetChecked = function(self, checked)
+		self.Icon:SetTexture(self.iconTexture)
+		self.Icon:SetSize(TAB_ICON_SIZE, TAB_ICON_SIZE)
+		self.SelectedTexture:SetShown(checked)
+	end
+	tab:SetChecked(false)
 	tab:ClearAllPoints()
-	tab:SetPoint("TOP", parent.GroupBuffsTab, "BOTTOM", 0, -3)
+	if mode == "buff" then
+		tab:SetPoint("TOP", parent.GroupBuffsTab, "BOTTOM", 0, -3)
+	else
+		tab:SetPoint("TOP", reminderTab, "BOTTOM", 0, -3)
+	end
 	tab:SetCustomOnMouseUpHandler(function(_, button, upInside)
-		if button == "LeftButton" and upInside then SetCustomMode(true) end
+		if button == "LeftButton" and upInside then SetCustomMode(mode) end
 	end)
 	return tab
 end
@@ -341,7 +361,9 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	if not frame or not frame.SpellsTab or not frame.AurasTab or not frame.GroupBuffsTab then return end
 	settingsFrame = frame
 	reminderContent = CreateReminderContent(frame)
-	reminderTab = CreateReminderTab(frame)
+	reminderTab = CreateReminderTab(frame, "buff")
+	local _, class = UnitClass("player")
+	if self:IsForever() and class == "WARRIOR" then abilityReminderTab = CreateReminderTab(frame, "ability") end
 	reminderUndoButton = CreateReminderUndoButton(frame)
 	stockTabs = {frame.SpellsTab, frame.AurasTab, frame.GroupBuffsTab}
 	StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REVERT_REMINDER_CHANGES"] = {
@@ -360,7 +382,7 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	frame:HookScript("OnShow", function()
 		CooldownManagerUtils:OnCooldownManagerLayoutChanged()
 		CooldownManagerUtils:CaptureReminderRestorePoint()
-		if customMode then SetCustomMode(true) end
+		if customMode then SetCustomMode(customMode) end
 	end)
 	frame:HookScript("OnHide", function()
 		reminderRestorePoint = nil
@@ -376,5 +398,5 @@ function CooldownManagerUtils:InitializeReminderSettings()
 end
 
 function CooldownManagerUtils:ShowReminderSettingsTab()
-	if settingsFrame and settingsFrame:IsShown() then SetCustomMode(true) end
+	if settingsFrame and settingsFrame:IsShown() then SetCustomMode("buff") end
 end

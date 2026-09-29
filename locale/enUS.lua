@@ -8,3 +8,8 @@ CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_DRAG", "Drag to Not Dis
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Tracked Buffs")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Not Displayed")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_SHOW_GLOW", "Show Glow")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS", "Ability Reminders")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_EMPTY", "No matching reactive abilities are available for this class.")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_TOOLTIP", "Drag to Tracked Abilities to show this ability when it becomes active.")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_ABILITIES", "Tracked Abilities")
+CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "Not Displayed")
