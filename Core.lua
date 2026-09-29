@@ -42,6 +42,30 @@ local CLASS_AURA_FALLBACKS = {
 		{spellID = 97462, auraSpellID = 97463}
 	}
 }
+CooldownManagerUtils.foreverBattleShoutSpecs = {
+	[66] = true,
+	[70] = true,
+	[71] = true,
+	[72] = true,
+	[73] = true,
+	[103] = true,
+	[104] = true,
+	[250] = true,
+	[251] = true,
+	[252] = true,
+	[259] = true,
+	[260] = true,
+	[261] = true,
+	[263] = true,
+	[268] = true,
+	[269] = true,
+	[577] = true,
+	[581] = true
+}
+CooldownManagerUtils.foreverBattleShoutFallbackClasses = {
+	ROGUE = true,
+	WARRIOR = true
+}
 local RACIAL_AURA_FALLBACKS = {
 	{spellID = 20594},
 	{spellID = 20600},
@@ -2393,7 +2417,58 @@ local function GetUnitFlag(unitFunction, unit)
 	return value and true or false
 end
 
+function CooldownManagerUtils.EntryContainsSpell(entry, spellID)
+	if entry.spellID == spellID then return true end
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		if candidateSpellID == spellID then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils.IsForeverBattleShout(entry)
+	return CooldownManagerUtils:IsForever() and CooldownManagerUtils.EntryContainsSpell(entry, 6673)
+end
+
+function CooldownManagerUtils.GetUnitSpecializationID(unit)
+	if unit == "player" and type(GetSpecialization) == "function" and type(GetSpecializationInfo) == "function" then
+		local specializationIndex = GetSpecialization()
+		if specializationIndex then
+			local ok, specializationID = pcall(GetSpecializationInfo, specializationIndex)
+			if ok and not IsSecret(specializationID) and type(specializationID) == "number" then return specializationID end
+		end
+	end
+	local specializationInfo = C_SpecializationInfo
+	if specializationInfo and type(specializationInfo.GetInspectSpecialization) == "function" then
+		local ok, specializationID = pcall(specializationInfo.GetInspectSpecialization, unit)
+		if ok and not IsSecret(specializationID) and type(specializationID) == "number" and specializationID > 0 then return specializationID end
+	end
+end
+
+function CooldownManagerUtils.IsForeverBattleShoutUnitEligible(unit, entry)
+	if not CooldownManagerUtils.IsForeverBattleShout(entry) then return true end
+	local specializationID = CooldownManagerUtils.GetUnitSpecializationID(unit)
+	if specializationID then return CooldownManagerUtils.foreverBattleShoutSpecs[specializationID] == true end
+	local ok, _, class = pcall(UnitClass, unit)
+	return ok and not IsSecret(class) and CooldownManagerUtils.foreverBattleShoutFallbackClasses[class] == true
+end
+
+function CooldownManagerUtils.IsUnitInForeverBattleShoutRange(unit)
+	if unit == "player" then return true end
+	if type(UnitDistanceSquared) == "function" then
+		local ok, distanceSquared, checkedDistance = pcall(UnitDistanceSquared, unit)
+		if ok and not IsSecret(distanceSquared) and not IsSecret(checkedDistance) and checkedDistance == true and type(distanceSquared) == "number" then
+			return distanceSquared <= 529
+		end
+	end
+	if type(CheckInteractDistance) == "function" and (type(InCombatLockdown) ~= "function" or not InCombatLockdown()) then
+		local ok, inRange = pcall(CheckInteractDistance, unit, 4)
+		if ok and not IsSecret(inRange) then return inRange == true end
+	end
+	return false
+end
+
 local function IsUnitInBuffRange(unit, entry)
+	if CooldownManagerUtils.IsForeverBattleShout(entry) then return CooldownManagerUtils.IsUnitInForeverBattleShoutRange(unit) end
 	if unit == "player" or not C_Spell or type(C_Spell.IsSpellInRange) ~= "function" then return true end
 	local checked = false
 	local spellIDs = {entry.spellID}
@@ -2434,6 +2509,7 @@ end
 
 function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 	if GetUnitFlag(UnitIsConnected, unit) == false or GetUnitFlag(UnitIsDeadOrGhost, unit) == true or GetUnitFlag(UnitIsVisible, unit) == false then return "unchecked" end
+	if not CooldownManagerUtils.IsForeverBattleShoutUnitEligible(unit, entry) then return "unchecked" end
 	if not IsUnitInBuffRange(unit, entry) then return "unchecked" end
 	if entry.paladinBlessing then return GetUnitPaladinBlessingState(unit) end
 	local unknown = false
