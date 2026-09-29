@@ -2149,10 +2149,10 @@ local function CreateReminderOptionsFrame(owner)
 		self:Refresh()
 		self:Layout()
 	end)
+	panel:Hide()
 	panel:SetScript("OnHide", function()
 		if editModeActive and panel.owner and panel.owner.Selection then panel.owner:HighlightSystem() end
 	end)
-	panel:Hide()
 	reminderOptionsFrame = panel
 	return panel
 end
