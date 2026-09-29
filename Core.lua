@@ -110,7 +110,16 @@ local MINIMAP_TRACKING_SPELLS = {
 	[2580] = true,
 	[8387] = true,
 	[8388] = true,
-	[43308] = true
+	[43308] = true,
+	[1494] = true,
+	[19878] = true,
+	[19879] = true,
+	[19880] = true,
+	[19882] = true,
+	[19883] = true,
+	[19884] = true,
+	[19885] = true,
+	[229533] = true
 }
 local PALADIN_BLESSING_FAMILIES = {
 	{spells = {19740, 19834, 19835, 19836, 19837, 19838, 25291, 27140, 48931, 48932}},
@@ -1018,7 +1027,10 @@ local function AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availab
 	for index = 1, count do
 		local filterOK, filter = pcall(C_Minimap.GetTrackingFilter, index)
 		local spellID = filterOK and not IsSecret(filter) and type(filter) == "table" and filter.spellID
-		if MINIMAP_TRACKING_SPELLS[spellID] then AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
+		if not IsSecret(spellID) and type(spellID) == "number" then
+			MINIMAP_TRACKING_SPELLS[spellID] = true
+			AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+		end
 	end
 end
 
@@ -2246,29 +2258,32 @@ local function TrackAuraExpiration(entry, aura)
 	SetAuraExpiration(entry.spellID, expirationTime)
 end
 
-local function GetMinimapTrackingState(entry)
+local function GetMinimapTrackingState()
 	if not C_Minimap or type(C_Minimap.GetNumTrackingTypes) ~= "function" or type(C_Minimap.GetTrackingFilter) ~= "function" or type(C_Minimap.GetTrackingInfo) ~= "function" then return nil end
 	local countOK, count = pcall(C_Minimap.GetNumTrackingTypes)
 	if not countOK or IsSecret(count) or type(count) ~= "number" then return nil end
-	local candidateLookup = {}
-	for _, spellID in ipairs(entry.candidates) do
-		candidateLookup[spellID] = true
-	end
 	local found = false
+	local unknown = false
 	for index = 1, count do
 		local filterOK, filter = pcall(C_Minimap.GetTrackingFilter, index)
 		local infoOK, info = pcall(C_Minimap.GetTrackingInfo, index)
-		if filterOK and infoOK and not IsSecret(filter) and not IsSecret(info) and type(filter) == "table" and type(info) == "table" and candidateLookup[filter.spellID or info.spellID] then
-			found = true
-			if IsSecret(info.active) then return nil end
-			if info.active == true then return true end
+		if filterOK and infoOK and not IsSecret(filter) and not IsSecret(info) and type(filter) == "table" and type(info) == "table" then
+			local spellID = filter.spellID or info.spellID
+			if not IsSecret(spellID) and type(spellID) == "number" then
+				found = true
+				if IsSecret(info.active) then
+					unknown = true
+				elseif info.active == true then
+					return true
+				end
+			end
 		end
 	end
-	if found then return false end
+	if found and not unknown then return false end
 end
 
 local function GetReadableAuraState(entry)
-	if entry.minimapTracking then return GetMinimapTrackingState(entry) end
+	if entry.minimapTracking then return GetMinimapTrackingState() end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
 	local unknown = false
@@ -2542,6 +2557,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 	local sharedPaladinState = {}
 	local sharedPaladinSealState = {}
 	local sharedHunterAspectState = {}
+	local sharedMinimapTrackingState = {}
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
@@ -2565,6 +2581,13 @@ function CooldownManagerUtils:UpdateReminderBar()
 						sharedHunterAspectState.resolved = true
 					end
 					if sharedHunterAspectState.present ~= nil then show = not sharedHunterAspectState.present end
+				end
+				if entry.minimapTracking then
+					if not sharedMinimapTrackingState.resolved then
+						sharedMinimapTrackingState.present = GetMinimapTrackingState()
+						sharedMinimapTrackingState.resolved = true
+					end
+					if sharedMinimapTrackingState.present ~= nil then show = not sharedMinimapTrackingState.present end
 				end
 				if editModeActive or show then table.insert(entries, entry) end
 			end
