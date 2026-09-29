@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_TOOLTIP", "Перета
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_DRAG", "Перетащите в «Не отображается», чтобы удалить напоминание.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Отслеживаемые эффекты")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Не отображается")
+CooldownManagerUtils:AddTrans("ruRU", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "Не изучено")
+CooldownManagerUtils:AddTrans("ruRU", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Это заклинание не изучено и не может быть выбрано для напоминания.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_SHOW_GLOW", "Показывать свечение")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS", "Напоминания о срабатываниях")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_EMPTY", "Для этого класса нет подходящих реактивных способностей.")

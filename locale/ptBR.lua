@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_TOOLTIP", "Arraste para
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_DRAG", "Arraste para \"Não exibido\" para remover o lembrete.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Bônus rastreados")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Não exibido")
+CooldownManagerUtils:AddTrans("ptBR", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "Não aprendido")
+CooldownManagerUtils:AddTrans("ptBR", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Este feitiço não foi aprendido e não pode ser selecionado como lembrete.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar brilho")
 CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS", "Lembretes de procs")
 CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_EMPTY", "Não há habilidades reativas disponíveis para esta classe.")

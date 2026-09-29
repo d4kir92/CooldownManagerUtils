@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_TOOLTIP", "Trascina in 
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_DRAG", "Trascina in \"Non mostrati\" per rimuovere il promemoria.")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Benefici tracciati")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Non mostrati")
+CooldownManagerUtils:AddTrans("itIT", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "Non appreso")
+CooldownManagerUtils:AddTrans("itIT", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Questo incantesimo non è stato appreso e non può essere selezionato come promemoria.")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostra bagliore")
 CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS", "Promemoria proc")
 CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_EMPTY", "Non sono disponibili abilità reattive adatte per questa classe.")

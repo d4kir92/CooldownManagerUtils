@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_TOOLTIP", "Faites gliss
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_DRAG", "Faites glisser vers « Non affiché » pour supprimer le rappel.")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Améliorations suivies")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Non affiché")
+CooldownManagerUtils:AddTrans("frFR", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "Non appris")
+CooldownManagerUtils:AddTrans("frFR", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Ce sort n'a pas été appris et ne peut pas être sélectionné comme rappel.")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_SHOW_GLOW", "Afficher la lueur")
 CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS", "Rappels de procs")
 CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_EMPTY", "Aucune technique réactive correspondante n'est disponible pour cette classe.")

@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_TOOLTIP", "Nach „Verf
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_DRAG", "Nach „Nicht angezeigt“ ziehen, um den Reminder zu entfernen.")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Verfolgte Buffs")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Nicht angezeigt")
+CooldownManagerUtils:AddTrans("deDE", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "Nicht erlernt")
+CooldownManagerUtils:AddTrans("deDE", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Dieser Zauber wurde nicht erlernt und kann nicht als Erinnerung ausgewählt werden.")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_SHOW_GLOW", "Glow anzeigen")
 CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS", "Proc-Erinnerungen")
 CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_EMPTY", "Für diese Klasse sind keine passenden reaktiven Fähigkeiten verfügbar.")

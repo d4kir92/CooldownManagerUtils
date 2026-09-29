@@ -9,7 +9,7 @@ Cooldown Manager Utils adds missing-buff and reactive-proc reminders to World of
 - Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
 - Includes the gathering tracking abilities **Find Herbs**, **Find Minerals**, and **Find Fish** when they are available to your character. Their reminders disappear while the matching minimap tracking is active.
 - Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. Tracked weapon enchants are checked together against every equipped weapon (main hand and, when dual wielding, off hand; shields only if a shield imbue is tracked): they stay hidden while every weapon carries one of them, otherwise the tracked enchants that are not active on any weapon are shown (or all of them, if each one is already active on another weapon).
-- Sorts buffs into two groups, **Tracked Buffs** and **Not Displayed**, by drag and drop.
+- Sorts available entries into **Tracked Buffs/Abilities**, **Not Displayed**, and **Not Learned**. Learned entries can be moved by drag and drop; unlearned or currently unselected talent spells are shown disabled but retain their spell tooltip.
 - The **Buff Reminder** bar shows an icon for every tracked buff that is currently missing on your character. The bar is hidden while nothing is missing.
 - Group buffs (Blizzard's Group Buffs list, plus Mark of the Wild, Blessing of the Bronze, Arcane Intellect, Power Word: Fortitude, Skyfury, and Battle Shout) are also checked on every eligible party or raid member. Their reminder appears as soon as one living, connected, visible member in range is missing the buff, and the icon shows how many eligible members have it, for example `2/5` or `3/40`. Offline, dead, invisible, and out-of-range members are excluded from both numbers.
 - Paladin Blessing reminders work as one group: every eligible party or raid member needs any recognized Blessing cast by you. If one member is missing your Blessing, all selected Blessing reminders are shown; Blessings from another Paladin do not count.
@@ -39,7 +39,7 @@ The package also contains TOC files for the Classic clients. The add-on loads th
 
 1. Open Blizzard's Cooldown Manager settings.
 2. Select the **Buff Reminders** tab, the fourth tab on the side of the window.
-3. Drag a buff from **Not Displayed** to **Tracked Buffs** to get a reminder while it is missing.
+3. Drag a buff from **Not Displayed** to **Tracked Buffs** to get a reminder while it is missing. Spells under **Not Learned** cannot be selected until the character learns them.
 4. Drag buffs within **Tracked Buffs** to change their order on the reminder bar.
 5. Drag a buff back to **Not Displayed** to remove its reminder.
 
@@ -52,6 +52,7 @@ To move a reminder bar, open Edit Mode. **Buff Reminder** shows tracked buffs, w
 ## Notes
 
 - Passive spells and spells without a player buff are excluded. Class and specialization flyouts are included.
+- **Not Learned** uses the reminder-eligible spell sources available for the character's class and specialization. It does not display unrelated spells from other classes or races.
 - The game does not tell add-ons directly which buff a spell applies. Spells the game does not flag as buffs (for example Thorns) are learned automatically the first time their buff from you lands on your character; they then appear in the list.
 - A buff also counts as active when an aura with the same name is on you, so other ranks or IDs of the same buff are recognized.
 - Weapon enchant spells learn their exact enchant the first time you cast them. Until then, any temporary weapon enchant counts as active for them.

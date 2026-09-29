@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_TOOLTIP", "Arrastra a �
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_DRAG", "Arrastra a «No mostrado» para quitar el recordatorio.")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Beneficios rastreados")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "No mostrado")
+CooldownManagerUtils:AddTrans("esES", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "No aprendido")
+CooldownManagerUtils:AddTrans("esES", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "Este hechizo no se ha aprendido y no se puede seleccionar como recordatorio.")
 CooldownManagerUtils:AddTrans("esES", "LID_BUFFREMINDERS_SHOW_GLOW", "Mostrar resplandor")
 CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS", "Recordatorios de activaciones")
 CooldownManagerUtils:AddTrans("esES", "LID_ABILITYREMINDERS_EMPTY", "No hay facultades reactivas disponibles para esta clase.")

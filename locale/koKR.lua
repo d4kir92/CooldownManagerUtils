@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_TOOLTIP", "'추적 중�
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_DRAG", "'표시 안 함'으로 끌어다 놓으면 알림이 제거됩니다.")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "추적 중인 강화 효과")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "표시 안 함")
+CooldownManagerUtils:AddTrans("koKR", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "배우지 않음")
+CooldownManagerUtils:AddTrans("koKR", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "아직 배우지 않은 주문이므로 알림으로 선택할 수 없습니다.")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_SHOW_GLOW", "반짝임 표시")
 CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS", "발동 알림")
 CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_EMPTY", "이 직업에 사용할 수 있는 반응형 능력이 없습니다.")

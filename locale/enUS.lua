@@ -8,6 +8,8 @@ CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_TOOLTIP", "Drag to Trac
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_DRAG", "Drag to Not Displayed to remove the reminder.")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CATEGORY_BUFFS", "Tracked Buffs")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CATEGORY_HIDDEN", "Not Displayed")
+CooldownManagerUtils:AddTrans("enUS", "LID_REMINDERS_CATEGORY_NOT_LEARNED", "Not Learned")
+CooldownManagerUtils:AddTrans("enUS", "LID_REMINDERS_NOT_LEARNED_TOOLTIP", "This spell has not been learned and cannot be selected as a reminder.")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_SHOW_GLOW", "Show Glow")
 CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS", "Proc Reminders")
 CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_EMPTY", "No matching reactive abilities are available for this class.")

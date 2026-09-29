@@ -13,6 +13,21 @@ local REMINDER_CATEGORY_ORDER = {
 	trackedBuff = 1,
 	hidden = 2
 }
+local OBSOLETE_REMINDER_SPELLS = {
+	[78] = true,
+	[284] = true,
+	[285] = true,
+	[1608] = true,
+	[11564] = true,
+	[11565] = true,
+	[11566] = true,
+	[11567] = true,
+	[25286] = true,
+	[29707] = true,
+	[30324] = true,
+	[47449] = true,
+	[47450] = true
+}
 local COOLDOWN_AURA_CATEGORIES = {
 	"Essential",
 	"Utility",
@@ -736,7 +751,7 @@ local function AddAuraMappingSpell(mapping, spellID)
 	AddCandidate(mapping.candidates, mapping.seen, spellID)
 end
 
-local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, info)
+local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources, info)
 	if type(info) ~= "table" or info.hasAura ~= true or info.selfAura ~= true then return end
 	local mapping = {
 		candidates = {},
@@ -751,7 +766,11 @@ local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, info)
 		end
 	end
 	local sourceSpellID = info.overrideSpellID or info.spellID
-	if type(sourceSpellID) == "number" then knownAuraSources[sourceSpellID] = info.spellID or sourceSpellID end
+	if type(sourceSpellID) == "number" then
+		knownAuraSources[sourceSpellID] = info.spellID or sourceSpellID
+		unlearnedAuraSources[sourceSpellID] = true
+		if not IsSecret(info.isKnown) and type(info.isKnown) == "boolean" then learnedAuraSources[sourceSpellID] = info.isKnown end
+	end
 
 	for _, mappedSpellID in ipairs(mapping.candidates) do
 		knownAuraSpells[mappedSpellID] = knownAuraSpells[mappedSpellID] or {
@@ -765,19 +784,19 @@ local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, info)
 	end
 end
 
-local function AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, seenCooldownIDs)
+local function AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources, seenCooldownIDs)
 	local categoryOK, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, true)
 	if not categoryOK or type(cooldownIDs) ~= "table" then return end
 	for _, cooldownID in ipairs(cooldownIDs) do
 		if not seenCooldownIDs[cooldownID] then
 			seenCooldownIDs[cooldownID] = true
 			local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
-			if infoOK then AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, info) end
+			if infoOK then AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources, info) end
 		end
 	end
 end
 
-local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources)
+local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	if type(cooldownViewer.GetGroupBuffItems) ~= "function" then return end
 	local itemsOK, items = pcall(cooldownViewer.GetGroupBuffItems)
 	if not itemsOK or type(items) ~= "table" then return end
@@ -785,6 +804,7 @@ local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSo
 		local spellID = type(item) == "table" and item.spellID
 		if type(spellID) == "number" then
 			knownAuraSources[spellID] = spellID
+			unlearnedAuraSources[spellID] = true
 			knownAuraSpells[spellID] = knownAuraSpells[spellID] or {
 				candidates = {},
 				seen = {}
@@ -796,7 +816,7 @@ local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSo
 	end
 end
 
-local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
+local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local _, class = UnitClass("player")
 	local definitions = CLASS_AURA_FALLBACKS[class]
 	if not definitions then return end
@@ -811,6 +831,7 @@ local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 		AddCandidate(mapping.candidates, mapping.seen, definition.auraSpellID)
 		knownAuraSpells[spellID] = mapping
 		knownAuraSources[spellID] = spellID
+		unlearnedAuraSources[spellID] = true
 	end
 end
 
@@ -832,7 +853,7 @@ local function AddRacialAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 	end
 end
 
-local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
+local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local _, class = UnitClass("player")
 	if class ~= "PALADIN" then return end
 	for _, family in ipairs(PALADIN_BLESSING_FAMILIES) do
@@ -846,11 +867,12 @@ local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
 			knownAuraSources[spellID] = family.spells[1]
+			unlearnedAuraSources[spellID] = true
 		end
 	end
 end
 
-local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
+local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local _, class = UnitClass("player")
 	if class ~= "PALADIN" then return end
 	for _, family in ipairs(PALADIN_SEAL_FAMILIES) do
@@ -863,11 +885,12 @@ local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
 			knownAuraSources[spellID] = family.spells[1]
+			unlearnedAuraSources[spellID] = true
 		end
 	end
 end
 
-local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
+local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local _, class = UnitClass("player")
 	if class ~= "HUNTER" then return end
 	for _, family in ipairs(HUNTER_ASPECT_FAMILIES) do
@@ -880,11 +903,12 @@ local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
 			knownAuraSources[spellID] = family.spells[1]
+			unlearnedAuraSources[spellID] = true
 		end
 	end
 end
 
-function CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells, knownAuraSources)
+function CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	if not CooldownManagerUtils:IsForever() then return end
 	local _, class = UnitClass("player")
 	for _, family in ipairs(CooldownManagerUtils.foreverReactiveAbilityFamilies[class] or {}) do
@@ -897,6 +921,7 @@ function CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells,
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
 			knownAuraSources[spellID] = family.spells[1]
+			unlearnedAuraSources[spellID] = true
 		end
 	end
 end
@@ -904,27 +929,30 @@ end
 local function BuildKnownAuraSpellLookup()
 	local knownAuraSpells = {}
 	local knownAuraSources = {}
+	local unlearnedAuraSources = {}
+	local learnedAuraSources = {}
 	AddRacialAuraFallbackMappings(knownAuraSpells, knownAuraSources)
-	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources)
-	AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources)
-	AddPaladinSealMappings(knownAuraSpells, knownAuraSources)
-	AddHunterAspectMappings(knownAuraSpells, knownAuraSources)
-	CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells, knownAuraSources)
+	AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
+	AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
+	AddPaladinSealMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
+	AddHunterAspectMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
+	CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
 		knownAuraSources[spellID] = spellID
+		unlearnedAuraSources[spellID] = true
 	end
 	local cooldownViewer = C_CooldownViewer
 	local categoryEnum = Enum and Enum.CooldownViewerCategory
-	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells, knownAuraSources end
+	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources end
 
-	AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources)
+	AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local seenCooldownIDs = {}
 	for _, categoryName in ipairs(COOLDOWN_AURA_CATEGORIES) do
 		local category = categoryEnum[categoryName]
-		if category ~= nil then AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, seenCooldownIDs) end
+		if category ~= nil then AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources, seenCooldownIDs) end
 	end
 
-	return knownAuraSpells, knownAuraSources
+	return knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources
 end
 
 local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
@@ -973,8 +1001,9 @@ local function IsHunterAspectMapping(knownAuraSpells, ...)
 	return false
 end
 
-local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, learned)
 	if type(spellID) ~= "number" or not IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells) then return end
+	local isLearned = learned ~= false
 	local sourceSpellID = spellID
 	local groupBuff = IsGroupBuffMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinBlessing = IsPaladinBlessingMapping(knownAuraSpells, spellID, baseSpellID)
@@ -1024,6 +1053,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.paladinSeal = existing.paladinSeal or paladinSeal
 		existing.hunterAspect = existing.hunterAspect or hunterAspect
 		existing.reactiveAbility = existing.reactiveAbility or reactiveFamily ~= nil
+		existing.isLearned = existing.isLearned or isLearned
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
 			existingCandidates[candidateSpellID] = true
@@ -1049,6 +1079,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		paladinSeal = paladinSeal,
 		hunterAspect = hunterAspect,
 		reactiveAbility = reactiveFamily ~= nil,
+		isLearned = isLearned,
 		candidates = candidates
 	}
 
@@ -1102,14 +1133,92 @@ local function AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availab
 	end
 end
 
-local function AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-	if type(C_SpellBook.IsSpellKnownOrInSpellBook) ~= "function" then return end
+local function AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local isSpellKnown = C_SpellBook.IsSpellKnownOrInSpellBook
 	local playerBank = Enum.SpellBookSpellBank.Player
 	for spellID, baseSpellID in pairs(knownAuraSources) do
-		local knownOK, isKnown = pcall(C_SpellBook.IsSpellKnownOrInSpellBook, spellID, playerBank, true)
-		if knownOK and not IsSecret(isKnown) and isKnown == true then
-			AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+		local isKnown = learnedAuraSources[spellID]
+		if type(isKnown) ~= "boolean" and type(isSpellKnown) == "function" then
+			local knownOK, result = pcall(isSpellKnown, spellID, playerBank, true)
+			if knownOK and not IsSecret(result) and type(result) == "boolean" then isKnown = result end
 		end
+		if type(isKnown) == "boolean" and (isKnown or unlearnedAuraSources[spellID]) then
+			AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, isKnown)
+		end
+	end
+end
+
+function CooldownManagerUtils.GetTalentSpellLearnedState(spellID, learned)
+	if type(learned) == "boolean" then return learned end
+	local isSpellKnown = C_SpellBook and C_SpellBook.IsSpellKnownOrInSpellBook
+	if type(isSpellKnown) ~= "function" then return false end
+	local playerBank = Enum.SpellBookSpellBank.Player
+	local knownOK, result = pcall(isSpellKnown, spellID, playerBank, true)
+	return knownOK and not IsSecret(result) and result == true
+end
+
+function CooldownManagerUtils.AddTalentSpell(spellID, learned, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if IsSecret(spellID) or type(spellID) ~= "number" or spellID <= 0 then return end
+	AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, CooldownManagerUtils.GetTalentSpellLearnedState(spellID, learned))
+end
+
+function CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if not C_ClassTalents or type(C_ClassTalents.GetActiveConfigID) ~= "function" or not C_Traits or type(C_Traits.GetConfigInfo) ~= "function" or type(C_Traits.GetTreeNodes) ~= "function" or type(C_Traits.GetNodeInfo) ~= "function" or type(C_Traits.GetEntryInfo) ~= "function" or type(C_Traits.GetDefinitionInfo) ~= "function" then return false end
+	local configOK, configID = pcall(C_ClassTalents.GetActiveConfigID)
+	if not configOK or IsSecret(configID) or type(configID) ~= "number" then return false end
+	local infoOK, configInfo = pcall(C_Traits.GetConfigInfo, configID)
+	if not infoOK or type(configInfo) ~= "table" or type(configInfo.treeIDs) ~= "table" then return false end
+	local found = false
+	for _, treeID in ipairs(configInfo.treeIDs) do
+		local nodesOK, nodeIDs = pcall(C_Traits.GetTreeNodes, treeID)
+		if nodesOK and type(nodeIDs) == "table" then
+			for _, nodeID in ipairs(nodeIDs) do
+				local nodeOK, nodeInfo = pcall(C_Traits.GetNodeInfo, configID, nodeID)
+				if nodeOK and type(nodeInfo) == "table" and nodeInfo.isVisible ~= false and type(nodeInfo.entryIDs) == "table" then
+					for _, entryID in ipairs(nodeInfo.entryIDs) do
+						local entryOK, entryInfo = pcall(C_Traits.GetEntryInfo, configID, entryID)
+						local definitionID = entryOK and type(entryInfo) == "table" and entryInfo.definitionID
+						if type(definitionID) == "number" then
+							local definitionOK, definitionInfo = pcall(C_Traits.GetDefinitionInfo, definitionID)
+							local spellID = definitionOK and type(definitionInfo) == "table" and definitionInfo.spellID
+							if type(spellID) == "number" then
+								CooldownManagerUtils.AddTalentSpell(spellID, nil, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+								found = true
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return found
+end
+
+function CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local getTalentInfo = C_SpecializationInfo and C_SpecializationInfo.GetTalentInfo
+	if type(getTalentInfo) ~= "function" then return end
+	local _, _, classID = UnitClass("player")
+	local getSpecCount = C_SpecializationInfo.GetNumSpecializationsForClassID
+	local specCount = type(getSpecCount) == "function" and classID and getSpecCount(classID) or type(GetNumTalentTabs) == "function" and GetNumTalentTabs() or 3
+	local groupIndex = type(C_SpecializationInfo.GetActiveSpecGroup) == "function" and C_SpecializationInfo.GetActiveSpecGroup() or nil
+	for specializationIndex = 1, specCount do
+		local talentCount = type(GetNumTalents) == "function" and GetNumTalents(specializationIndex) or 100
+		if type(talentCount) ~= "number" then talentCount = 100 end
+		for talentIndex = 1, talentCount do
+			local talentOK, talentInfo = pcall(getTalentInfo, {specializationIndex = specializationIndex, talentIndex = talentIndex, isInspect = false, isPet = false, groupIndex = groupIndex})
+			if talentOK and type(talentInfo) == "table" then
+				local learned = type(talentInfo.known) == "boolean" and talentInfo.known or type(talentInfo.rank) == "number" and talentInfo.rank > 0
+				CooldownManagerUtils.AddTalentSpell(talentInfo.spellID, learned, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+			elseif type(GetNumTalents) ~= "function" then
+				break
+			end
+		end
+	end
+end
+
+function CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	if not CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID) then
+		CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	end
 end
 
@@ -1121,6 +1230,13 @@ function CooldownManagerUtils:GetCooldownManagerLayoutKey()
 	local ok, layoutID = pcall(manager.GetActiveLayoutID, manager)
 	if ok and not IsSecret(layoutID) and layoutID ~= nil then return "layout:" .. tostring(layoutID) end
 	return "starter"
+end
+
+function CooldownManagerUtils.PruneObsoleteReminderSpells(profile)
+	for spellID in pairs(OBSOLETE_REMINDER_SPELLS) do
+		profile.selected[spellID] = nil
+		profile.layout[spellID] = nil
+	end
 end
 
 function CooldownManagerUtils:GetProfile()
@@ -1151,6 +1267,7 @@ function CooldownManagerUtils:GetProfile()
 
 	profile.selected = profile.selected or {}
 	profile.layout = profile.layout or {}
+	CooldownManagerUtils.PruneObsoleteReminderSpells(profile)
 	return profile
 end
 
@@ -1182,16 +1299,18 @@ function CooldownManagerUtils:SaveReminderLayout(categories)
 	local layout = CopyTable(profile.layout)
 	local selected = CopyTable(profile.selected)
 	for _, category in ipairs(categories) do
-		for order, entry in ipairs(category.entries) do
-			layout[entry.spellID] = {
-				category = category.key,
-				order = order
-			}
+		if not category.readOnly then
+			for order, entry in ipairs(category.entries) do
+				layout[entry.spellID] = {
+					category = category.key,
+					order = order
+				}
 
-			if category.key ~= "hidden" then
-				selected[entry.spellID] = true
-			else
-				selected[entry.spellID] = nil
+				if category.key ~= "hidden" then
+					selected[entry.spellID] = true
+				else
+					selected[entry.spellID] = nil
+				end
 			end
 		end
 	end
@@ -1234,15 +1353,16 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	wipe(availableBuffsByName)
 	weaponEnchantFallbackNames = nil
 	LearnCurrentPlayerAuras()
-	local knownAuraSpells, knownAuraSources = BuildKnownAuraSpellLookup()
+	local knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
 	local generalLine = skillLineEnum and skillLineEnum.General or 1
 	local numSkillLines = type(C_SpellBook.GetNumSpellBookSkillLines) == "function" and C_SpellBook.GetNumSpellBookSkillLines() or 3
 	for skillLineIndex = 1, numSkillLines do
 		if skillLineIndex ~= generalLine then AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 	end
+	CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-	AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
 	self.availableBuffs = availableBuffs
@@ -2767,7 +2887,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
-			if entry and (entry.reactiveAbility == true) == (reminderType == "ability") and not seenEntries[entry] then
+			if entry and entry.isLearned ~= false and (entry.reactiveAbility == true) == (reminderType == "ability") and not seenEntries[entry] then
 				seenEntries[entry] = true
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end

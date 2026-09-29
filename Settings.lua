@@ -7,7 +7,8 @@ local CATEGORY_WIDTH = 344
 local TAB_ICON_SIZE = 32
 local CATEGORY_DEFINITIONS = {
 	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
-	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_HIDDEN"}
+	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_HIDDEN"},
+	{key = "notLearned", localeKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", abilityLocaleKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", readOnly = true}
 }
 
 local settingsFrame
@@ -29,7 +30,7 @@ local dragPreview
 
 local function IsValidCategory(key)
 	for _, definition in ipairs(CATEGORY_DEFINITIONS) do
-		if definition.key == key then return true end
+		if definition.key == key and not definition.readOnly then return true end
 	end
 	return false
 end
@@ -115,7 +116,7 @@ local function CreateReminderUndoButton(parent)
 end
 
 local function BeginDrag(button)
-	if not button.entry then return end
+	if not button.entry or button.category.readOnly then return end
 	draggedButton = button
 	dropCategory = button.category
 	dropEntry = button.entry
@@ -143,13 +144,17 @@ local function CreateItemButton(parent, index)
 	button:SetScript("OnDragStop", FinishDrag)
 	button:SetScript("OnEnter", function(self)
 		if not self.entry then return end
-		dropCategory = self.category
-		dropEntry = self.entry
+		dropCategory = not self.category.readOnly and self.category or nil
+		dropEntry = dropCategory and self.entry or nil
 		if draggedButton then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetSpellByID(self.entry.spellID)
-		GameTooltip:AddLine(CooldownManagerUtils:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_TOOLTIP" or "LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
-		GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_DRAG"), 0.5, 0.8, 1, true)
+		if self.category.readOnly then
+			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_REMINDERS_NOT_LEARNED_TOOLTIP"), 0.6, 0.6, 0.6, true)
+		else
+			GameTooltip:AddLine(CooldownManagerUtils:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_TOOLTIP" or "LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
+			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_DRAG"), 0.5, 0.8, 1, true)
+		end
 		GameTooltip:Show()
 	end)
 	button:SetScript("OnLeave", GameTooltip_Hide)
@@ -173,8 +178,11 @@ local function CreateCategoryFrame(parent, definition, index)
 		end
 	end)
 	frame.Header:HookScript("OnEnter", function()
-		if draggedButton then
+		if draggedButton and not definition.readOnly then
 			dropCategory = categoryByKey[definition.key]
+			dropEntry = nil
+		elseif draggedButton then
+			dropCategory = nil
 			dropEntry = nil
 		end
 	end)
@@ -191,14 +199,20 @@ local function CreateCategoryFrame(parent, definition, index)
 	frame.Container.Empty.Icon:SetAllPoints()
 	frame.Container.Empty.Icon:SetAtlas("cdm-empty")
 	frame.Container.Empty:SetScript("OnEnter", function()
-		if draggedButton then
+		if draggedButton and not definition.readOnly then
 			dropCategory = categoryByKey[definition.key]
+			dropEntry = nil
+		elseif draggedButton then
+			dropCategory = nil
 			dropEntry = nil
 		end
 	end)
 	frame.Container:SetScript("OnEnter", function()
-		if draggedButton then
+		if draggedButton and not definition.readOnly then
 			dropCategory = categoryByKey[definition.key]
+			dropEntry = nil
+		elseif draggedButton then
+			dropCategory = nil
 			dropEntry = nil
 		end
 	end)
@@ -211,20 +225,21 @@ local function BuildCategoryModels()
 	local models = {}
 	local byKey = {}
 	for _, definition in ipairs(CATEGORY_DEFINITIONS) do
-		local model = {key = definition.key, entries = {}}
+		local model = {key = definition.key, entries = {}, readOnly = definition.readOnly}
 		table.insert(models, model)
 		byKey[definition.key] = model
 	end
 	for _, entry in ipairs(CooldownManagerUtils:GetAvailableBuffs()) do
 		if (entry.reactiveAbility == true) == (customMode == "ability") then
-			local layout = CooldownManagerUtils:GetReminderLayout(entry.spellID)
-			local categoryKey = layout and layout.category or "hidden"
-			if not IsValidCategory(categoryKey) then categoryKey = "hidden" end
+			local layout = entry.isLearned ~= false and CooldownManagerUtils:GetReminderLayout(entry.spellID)
+			local categoryKey = entry.isLearned == false and "notLearned" or layout and layout.category or "hidden"
+			if entry.isLearned ~= false and not IsValidCategory(categoryKey) then categoryKey = "hidden" end
 			table.insert(byKey[categoryKey].entries, entry)
 		end
 	end
 	for _, model in ipairs(models) do
 		table.sort(model.entries, function(left, right)
+			if model.readOnly then return left.name < right.name end
 			local leftLayout = CooldownManagerUtils:GetReminderLayout(left.spellID)
 			local rightLayout = CooldownManagerUtils:GetReminderLayout(right.spellID)
 			local leftOrder = leftLayout and leftLayout.order or math.huge
@@ -248,7 +263,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 		local frame = categoryFrames[index]
 		frame:ClearAllPoints()
 		frame:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
-		local title = customMode == "ability" and self:Trans(definition.abilityLocaleKey) or _G[definition.titleGlobal] or self:Trans(definition.localeKey)
+		local title = customMode == "ability" and self:Trans(definition.abilityLocaleKey) or definition.titleGlobal and _G[definition.titleGlobal] or self:Trans(definition.localeKey)
 		local isCollapsed = collapsed[definition.key] == true
 		frame.Header:SetHeaderText(title)
 		frame.Header:UpdateCollapsedState(isCollapsed)
@@ -263,6 +278,8 @@ function CooldownManagerUtils:RefreshReminderSettings()
 			button.entry = entry
 			button.category = model
 			button.Icon:SetTexture(entry.iconID)
+			button.Icon:SetDesaturated(entry.isLearned == false)
+			button:SetAlpha(entry.isLearned == false and 0.45 or 1)
 			button.Filter:SetShown(filter ~= "" and not entry.name:lower():find(filter, 1, true))
 			button:Show()
 		end
