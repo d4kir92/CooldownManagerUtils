@@ -5,7 +5,7 @@ Cooldown Manager Utils adds missing-buff and reactive-proc reminders to World of
 ## Features
 
 - Adds a **Buff Reminders** tab to the side tabs of Blizzard's Cooldown Manager settings.
-- On WoW Forever Warriors, adds a separate **Proc Reminders** tab for **Overpower** and **Revenge**. Selected abilities appear on the Proc Reminder bar only while Blizzard marks their reactive combat window active.
+- Adds a separate **Proc Reminders** tab. On Retail it lists the Essential and Utility spells of the Cooldown Manager; on WoW Forever Warriors, Rogues, and Hunters it lists their reactive abilities (**Overpower**, **Revenge**, **Riposte**, **Mongoose Bite**, **Counterattack**). Selected abilities appear on the Proc Reminder bar only while Blizzard marks their reactive combat window active.
 - Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
 - Includes the gathering tracking abilities **Find Herbs**, **Find Minerals**, and **Find Fish** when they are available to your character. Their reminders disappear while the matching minimap tracking is active.
 - Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. Tracked weapon enchants are checked together against every equipped weapon (main hand and, when dual wielding, off hand; shields only if a shield imbue is tracked): they stay hidden while every weapon carries one of them, otherwise the tracked enchants that are not active on any weapon are shown (or all of them, if each one is already active on another weapon).
@@ -43,7 +43,9 @@ The package also contains TOC files for the Classic clients. The add-on loads th
 4. Drag buffs within **Tracked Buffs** to change their order on the reminder bar.
 5. Drag a buff back to **Not Displayed** to remove its reminder.
 
-WoW Forever Warriors can use the adjacent **Proc Reminders** tab in the same way to track **Overpower** and **Revenge**. Overpower becomes available when the target dodges one of the Warrior's attacks. Revenge becomes available when the Warrior dodges, parries, or blocks an incoming attack. The add-on follows Blizzard's activation state for both abilities, including expiration and consumption.
+WoW Forever Warriors can use the adjacent **Proc Reminders** tab in the same way to track **Overpower** and **Revenge**. Overpower becomes available when the target dodges one of the Warrior's attacks. Revenge becomes available when the Warrior dodges, parries, or blocks an incoming attack. Rogues can track **Riposte**, available after parrying an attack. Hunters can track **Mongoose Bite**, available after dodging an attack, and the Survival talent **Counterattack**, available after parrying an attack. The add-on follows Blizzard's activation state for these abilities, including expiration and consumption.
+
+On Retail, the **Proc Reminders** tab lists your specialization's Essential and Utility Cooldown Manager spells. A tracked spell appears on the Proc Reminder bar while Blizzard shows its proc glow. Spells that are already Buff Reminder entries stay in the Buff Reminders tab.
 
 The Cooldown Manager search box filters the currently open Buff Reminders or Proc Reminders tab by spell name. Each group can be collapsed by clicking its header.
 

@@ -36,6 +36,10 @@ local COOLDOWN_AURA_CATEGORIES = {
 	"HiddenActive",
 	"HiddenPassive"
 }
+CooldownManagerUtils.retailProcCategories = {
+	"Essential",
+	"Utility"
+}
 local CLASS_AURA_FALLBACKS = {
 	DRUID = {
 		{spellID = 1126, groupBuff = true}
@@ -147,6 +151,13 @@ CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 	WARRIOR = {
 		{spells = {7384, 7887, 11584, 11585}},
 		{spells = {6572, 6574, 7379, 11600, 11601, 25288, 25269, 30357, 57823}}
+	},
+	ROGUE = {
+		{spells = {14251}}
+	},
+	HUNTER = {
+		{spells = {1495, 14269, 14270, 14271, 36916, 53339}},
+		{spells = {19306, 20909, 20910, 27067, 48998, 48999}}
 	}
 }
 local MINIMAP_TRACKING_SPELLS = {
@@ -337,6 +348,19 @@ local function GetSpellNameSafe(spellID)
 	local name = spellInfo and spellInfo.name
 	if IsSecret(name) or type(name) ~= "string" then return end
 	return name
+end
+
+function CooldownManagerUtils:HasRetailProcAbilities()
+	if self:IsForever() then return false end
+	if not C_SpellActivationOverlay or type(C_SpellActivationOverlay.IsSpellOverlayed) ~= "function" then return false end
+	return C_CooldownViewer ~= nil and type(C_CooldownViewer.GetCooldownViewerCategorySet) == "function" and type(C_CooldownViewer.GetCooldownViewerCooldownInfo) == "function" and Enum ~= nil and Enum.CooldownViewerCategory ~= nil
+end
+
+function CooldownManagerUtils:HasReactiveAbilities()
+	if self:HasRetailProcAbilities() then return true end
+	if not self:IsForever() then return false end
+	local _, class = UnitClass("player")
+	return self.foreverReactiveAbilityFamilies[class] ~= nil
 end
 
 function CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID)
@@ -1336,6 +1360,54 @@ function CooldownManagerUtils:SetReminderSelected(spellID, selected)
 	self:UpdateReminderBar()
 end
 
+function CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
+	if not CooldownManagerUtils:HasRetailProcAbilities() then return end
+	local cooldownViewer = C_CooldownViewer
+	local categoryEnum = Enum.CooldownViewerCategory
+	local seenCooldownIDs = {}
+	for _, categoryName in ipairs(CooldownManagerUtils.retailProcCategories) do
+		local category = categoryEnum[categoryName]
+		local categoryOK, cooldownIDs = false, nil
+		if category ~= nil then categoryOK, cooldownIDs = pcall(cooldownViewer.GetCooldownViewerCategorySet, category, true) end
+		if categoryOK and type(cooldownIDs) == "table" then
+			for _, cooldownID in ipairs(cooldownIDs) do
+				if not seenCooldownIDs[cooldownID] then
+					seenCooldownIDs[cooldownID] = true
+					local infoOK, info = pcall(cooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
+					local spellID = infoOK and type(info) == "table" and info.spellID
+					if not IsSecret(spellID) and type(spellID) == "number" and not availableBuffsBySpellID[spellID] then
+						local overrideSpellID = not IsSecret(info.overrideSpellID) and type(info.overrideSpellID) == "number" and info.overrideSpellID or nil
+						local spellInfo = GetReminderSpellInfo(spellID)
+						if spellInfo and spellInfo.name and not (overrideSpellID and availableBuffsBySpellID[overrideSpellID]) then
+							local candidates = {}
+							local seenCandidates = {}
+							AddCandidate(candidates, seenCandidates, spellID)
+							AddCandidate(candidates, seenCandidates, overrideSpellID)
+							if type(info.linkedSpellIDs) == "table" then
+								for _, linkedSpellID in ipairs(info.linkedSpellIDs) do
+									if not IsSecret(linkedSpellID) then AddCandidate(candidates, seenCandidates, linkedSpellID) end
+								end
+							end
+							local entry = {
+								spellID = spellID,
+								name = spellInfo.name,
+								iconID = spellInfo.iconID,
+								defaultCategory = "hidden",
+								reactiveAbility = true,
+								isLearned = IsSecret(info.isKnown) or info.isKnown ~= false,
+								candidates = candidates
+							}
+							availableBuffsBySpellID[spellID] = entry
+							if overrideSpellID then availableBuffsBySpellID[overrideSpellID] = entry end
+							table.insert(availableBuffs, entry)
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 function CooldownManagerUtils:RefreshAvailableBuffs()
 	if InCombatLockdown() then
 		self.pendingSourceRefresh = true
@@ -1363,6 +1435,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
 
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
 	self.availableBuffs = availableBuffs
@@ -3002,8 +3075,7 @@ end
 
 function CooldownManagerUtils:UpdateReminderBar()
 	self:UpdateReminderBarType("buff")
-	local _, class = UnitClass("player")
-	if self:IsForever() and class == "WARRIOR" then self:UpdateReminderBarType("ability") end
+	if self:HasReactiveAbilities() then self:UpdateReminderBarType("ability") end
 end
 
 function CooldownManagerUtils:ScheduleReminderUpdate()
@@ -3142,8 +3214,7 @@ function CooldownManagerUtils:Initialize()
 	if not IsSupportedClient() then return end
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	self:CreateReminderBar("buff")
-	local _, class = UnitClass("player")
-	if self:IsForever() and class == "WARRIOR" then self:CreateReminderBar("ability") end
+	if self:HasReactiveAbilities() then self:CreateReminderBar("ability") end
 	if EventRegistry then
 		EventRegistry:RegisterCallback("EditMode.Enter", function() CooldownManagerUtils.SetEditModeActive(true) end, self)
 		EventRegistry:RegisterCallback("EditMode.Exit", function() CooldownManagerUtils.SetEditModeActive(false) end, self)

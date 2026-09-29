@@ -379,8 +379,7 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	settingsFrame = frame
 	reminderContent = CreateReminderContent(frame)
 	reminderTab = CreateReminderTab(frame, "buff")
-	local _, class = UnitClass("player")
-	if self:IsForever() and class == "WARRIOR" then abilityReminderTab = CreateReminderTab(frame, "ability") end
+	if self:HasReactiveAbilities() then abilityReminderTab = CreateReminderTab(frame, "ability") end
 	reminderUndoButton = CreateReminderUndoButton(frame)
 	stockTabs = {frame.SpellsTab, frame.AurasTab, frame.GroupBuffsTab}
 	StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REVERT_REMINDER_CHANGES"] = {
