@@ -18,7 +18,8 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 - Hides live reminders while your character is dead or a ghost. The Edit Mode preview remains available.
 - Makes the reminder bar movable in Edit Mode and snaps it to other Edit Mode elements, screen edges, and the grid like Blizzard's own frames.
 - Clicking the bar in Edit Mode opens its settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the Cooldown Manager on the Buff Reminders tab.
-- Keeps a separate reminder selection for each specialization.
+- Keeps a separate reminder selection for each Cooldown Manager layout and specialization.
+- Keeps Blizzard's Cooldown Manager layout dropdown visible on the Buff Reminders tab and provides a matching add-on-owned Revert Changes button for reminder edits made since opening the window or selecting the layout.
 
 ## Supported clients
 
@@ -56,8 +57,8 @@ To move the reminder bar, open Edit Mode. The bar then shows all tracked buffs, 
 - While an aura is hidden this way, its reminder still appears when the buff runs out: the add-on uses the last known expiration time, or the cast time plus the buff's remembered duration if you cast it during combat. The duration is remembered whenever the game reveals the buff, for example out of combat.
 - The same applies to group members: while their auras are hidden, the last known count is kept. Casting the group buff yourself during that time counts every member as buffed.
 - A buff that is cancelled or dispelled while it is hidden cannot be detected; its reminder appears once the game reveals the aura again, usually when combat ends.
-- Reminder selections are saved per character and specialization.
-- Bar position and all bar settings are saved per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. Switching the Edit Mode layout switches the bar along with it. A layout the add-on has not seen yet starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
+- Reminder selections and their order are saved per Cooldown Manager layout and specialization. Switching between layouts such as Starter Layout and a custom layout switches the reminder contents too. A layout the add-on has not seen yet starts with a copy of the previously active reminder setup.
+- Bar position and all bar settings are saved separately per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. A new Edit Mode layout starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
 
 ## Localization
 

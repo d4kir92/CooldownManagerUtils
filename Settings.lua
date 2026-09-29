@@ -12,8 +12,9 @@ local CATEGORY_DEFINITIONS = {
 local settingsFrame
 local reminderTab
 local reminderContent
+local reminderUndoButton
+local reminderRestorePoint
 local customMode = false
-local stockControls = {}
 local stockTabs = {}
 local categoryFrames = {}
 local categoryModels = {}
@@ -23,12 +24,6 @@ local draggedButton
 local dropCategory
 local dropEntry
 local dragPreview
-
-local function SetStockControlsShown(shown)
-	for _, control in ipairs(stockControls) do
-		if control then control:SetShown(shown) end
-	end
-end
 
 local function IsValidCategory(key)
 	for _, definition in ipairs(CATEGORY_DEFINITIONS) do
@@ -81,11 +76,40 @@ local function FinishDrag()
 			targetIndex = math.max(1, math.min(targetIndex, #dropCategory.entries + 1))
 			table.insert(dropCategory.entries, targetIndex, sourceEntry)
 			CooldownManagerUtils:SaveReminderLayout(categoryModels)
+			if reminderUndoButton then reminderUndoButton:Enable() end
 		end
 	end
 	dropCategory = nil
 	dropEntry = nil
 	CooldownManagerUtils:RefreshReminderSettings()
+end
+
+function CooldownManagerUtils:CaptureReminderRestorePoint()
+	reminderRestorePoint = CopyTable(self:GetProfile())
+	if reminderUndoButton then reminderUndoButton:Disable() end
+end
+
+local function RestoreReminderProfile()
+	if not reminderRestorePoint then return end
+	local profile = CooldownManagerUtils:GetProfile()
+	wipe(profile)
+	for key, value in pairs(reminderRestorePoint) do profile[key] = CopyTable(value) end
+	CooldownManagerUtils:RefreshReminderSettings()
+	CooldownManagerUtils:UpdateReminderBar()
+	if reminderUndoButton then reminderUndoButton:Disable() end
+end
+
+local function CreateReminderUndoButton(parent)
+	local button = CreateFrame("Button", nil, parent, "UIPanelButtonNoTooltipTemplate, UIButtonTemplate")
+	button:SetSize(164, 22)
+	button:SetPoint("BOTTOMRIGHT", -3, 4)
+	button:SetText(COOLDOWN_VIEWER_SETTINGS_BUTTON_REVERT_CHANGES)
+	button:SetScript("OnClick", function()
+		StaticPopup_Show("COOLDOWN_MANAGER_UTILS_REVERT_REMINDER_CHANGES")
+	end)
+	button:Disable()
+	button:Hide()
+	return button
 end
 
 local function BeginDrag(button)
@@ -260,12 +284,16 @@ local function SetCustomMode(enabled)
 	if enabled then
 		settingsFrame.CooldownScroll:Hide()
 		settingsFrame.GroupBuffFilter:Hide()
-		SetStockControlsShown(false)
+		settingsFrame.LayoutDropdown:Show()
+		settingsFrame.UndoButton:Hide()
+		reminderUndoButton:Show()
 		for _, tab in ipairs(stockTabs) do tab:SetChecked(false) end
 		reminderTab:SetChecked(true)
 		CooldownManagerUtils:RefreshReminderSettings()
 	else
-		SetStockControlsShown(true)
+		settingsFrame.LayoutDropdown:Show()
+		settingsFrame.UndoButton:Show()
+		reminderUndoButton:Hide()
 		reminderTab:SetChecked(false)
 	end
 end
@@ -314,15 +342,36 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	settingsFrame = frame
 	reminderContent = CreateReminderContent(frame)
 	reminderTab = CreateReminderTab(frame)
+	reminderUndoButton = CreateReminderUndoButton(frame)
 	stockTabs = {frame.SpellsTab, frame.AurasTab, frame.GroupBuffsTab}
-	stockControls = {frame.LayoutDropdown, frame.UndoButton}
+	StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REVERT_REMINDER_CHANGES"] = {
+		text = COOLDOWN_VIEWER_SETTINGS_DIALOG_TEXT_REVERT_CHANGES,
+		button1 = YES,
+		button2 = NO,
+		OnAccept = RestoreReminderProfile,
+		timeout = 0,
+		whileDead = 1,
+		hideOnEscape = 1
+	}
 	hooksecurefunc(frame, "SetDisplayMode", function() SetCustomMode(false) end)
 	hooksecurefunc(frame, "SetFilterText", function()
 		if customMode then CooldownManagerUtils:RefreshReminderSettings() end
 	end)
 	frame:HookScript("OnShow", function()
+		CooldownManagerUtils:OnCooldownManagerLayoutChanged()
+		CooldownManagerUtils:CaptureReminderRestorePoint()
 		if customMode then SetCustomMode(true) end
 	end)
+	frame:HookScript("OnHide", function()
+		reminderRestorePoint = nil
+		reminderUndoButton:Disable()
+	end)
+	if EventRegistry then
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
+			CooldownManagerUtils:ScheduleCooldownManagerLayoutCheck()
+		end, self)
+	end
+	self:OnCooldownManagerLayoutChanged()
 	self:RefreshReminderSettings()
 end
 

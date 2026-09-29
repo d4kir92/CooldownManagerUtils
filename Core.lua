@@ -1045,15 +1045,36 @@ local function AddKnownAuraSources(knownAuraSources, knownAuraSpells, availableB
 	end
 end
 
+function CooldownManagerUtils:GetCooldownManagerLayoutKey()
+	local settings = CooldownViewerSettings
+	if not settings or type(settings.GetLayoutManager) ~= "function" then return "starter" end
+	local manager = settings:GetLayoutManager()
+	if not manager or type(manager.GetActiveLayoutID) ~= "function" then return "starter" end
+	local ok, layoutID = pcall(manager.GetActiveLayoutID, manager)
+	if ok and not IsSecret(layoutID) and layoutID ~= nil then return "layout:" .. tostring(layoutID) end
+	return "starter"
+end
+
 function CooldownManagerUtils:GetProfile()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
-	CooldownManagerUtilsDB.profiles = CooldownManagerUtilsDB.profiles or {}
+	CooldownManagerUtilsDB.cooldownManagerProfiles = CooldownManagerUtilsDB.cooldownManagerProfiles or {}
 	local specKey = GetSpecKey()
-	CooldownManagerUtilsDB.profiles[specKey] = CooldownManagerUtilsDB.profiles[specKey] or {
-		selected = {}
-	}
+	local layoutKey = self:GetCooldownManagerLayoutKey()
+	local profiles = CooldownManagerUtilsDB.cooldownManagerProfiles
+	profiles[specKey] = profiles[specKey] or {}
+	local profile = profiles[specKey][layoutKey]
+	if type(profile) ~= "table" then
+		local template
+		if self.activeCooldownManagerSpecKey == specKey then template = self.activeCooldownManagerProfile end
+		if not template and CooldownManagerUtilsDB.profiles then template = CooldownManagerUtilsDB.profiles[specKey] end
+		if not template and activeLayoutData and activeLayoutData.profiles then template = activeLayoutData.profiles[specKey] end
+		profile = template and CopyTable(template) or {selected = {}}
+		profiles[specKey][layoutKey] = profile
+	end
 
-	local profile = CooldownManagerUtilsDB.profiles[specKey]
+	self.activeCooldownManagerSpecKey = specKey
+	self.activeCooldownManagerLayoutKey = layoutKey
+	self.activeCooldownManagerProfile = profile
 	if profile.layoutVersion ~= 4 then
 		profile.selected = {}
 		profile.layout = {}
@@ -1063,6 +1084,25 @@ function CooldownManagerUtils:GetProfile()
 	profile.selected = profile.selected or {}
 	profile.layout = profile.layout or {}
 	return profile
+end
+
+function CooldownManagerUtils:OnCooldownManagerLayoutChanged()
+	local previousSpecKey = self.activeCooldownManagerSpecKey
+	local previousLayoutKey = self.activeCooldownManagerLayoutKey
+	self:GetProfile()
+	if previousSpecKey == self.activeCooldownManagerSpecKey and previousLayoutKey == self.activeCooldownManagerLayoutKey then return end
+	if self.CaptureReminderRestorePoint then self:CaptureReminderRestorePoint() end
+	if self.RefreshReminderSettings then self:RefreshReminderSettings() end
+	self:UpdateReminderBar()
+end
+
+function CooldownManagerUtils:ScheduleCooldownManagerLayoutCheck()
+	if self.cooldownManagerLayoutCheckPending then return end
+	self.cooldownManagerLayoutCheckPending = true
+	C_Timer.After(0, function()
+		CooldownManagerUtils.cooldownManagerLayoutCheckPending = nil
+		CooldownManagerUtils:OnCooldownManagerLayoutChanged()
+	end)
 end
 
 function CooldownManagerUtils:GetReminderLayout(spellID)
@@ -2808,6 +2848,7 @@ function CooldownManagerUtils:Initialize()
 	PruneLearnedWeaponEnchants()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
+	self:ScheduleCooldownManagerLayoutCheck()
 	C_Timer.NewTicker(GROUP_BUFF_REFRESH_INTERVAL, function()
 		if IsInGroup() then CooldownManagerUtils:ScheduleGroupBuffUpdate() end
 	end)
@@ -2874,9 +2915,14 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		CooldownManagerUtils:OnWeaponEnchantUpdate(true)
 		CooldownManagerUtils:ScheduleEditModeLayoutCheck()
+		CooldownManagerUtils:ScheduleCooldownManagerLayoutCheck()
 	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 		CooldownManagerUtils:RefreshAvailableBuffs()
 		CooldownManagerUtils:ScheduleEditModeLayoutCheck()
+		CooldownManagerUtils:ScheduleCooldownManagerLayoutCheck()
+	elseif event == "COOLDOWN_VIEWER_DATA_LOADED" then
+		CooldownManagerUtils:RefreshAvailableBuffs()
+		CooldownManagerUtils:ScheduleCooldownManagerLayoutCheck()
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
