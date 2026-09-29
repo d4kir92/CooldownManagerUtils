@@ -216,7 +216,7 @@ local WEAPON_ENCHANT_REQUIRED_SLOTS = {
 }
 
 local eventFrame = CreateFrame("Frame")
-local reminderFrame
+CooldownManagerUtils.reminderFrames = {}
 local reminderOptionsFrame
 local editModeActive = false
 local updatePending = false
@@ -1298,14 +1298,25 @@ local function ResolveActiveLayoutData()
 			template = {position = CooldownManagerUtilsDB.position, settings = CooldownManagerUtilsDB.reminderSettings}
 		end
 		data = {
-			position = template and template.position and CopyTable(template.position) or nil,
-			settings = template and template.settings and CopyTable(template.settings) or {}
+			positions = {
+				buff = template and (template.positions and template.positions.buff or template.position) and CopyTable(template.positions and template.positions.buff or template.position) or nil,
+				ability = template and template.positions and template.positions.ability and CopyTable(template.positions.ability) or nil
+			},
+			barSettings = {
+				buff = template and (template.barSettings and template.barSettings.buff or template.settings) and CopyTable(template.barSettings and template.barSettings.buff or template.settings) or {},
+				ability = template and template.barSettings and template.barSettings.ability and CopyTable(template.barSettings.ability) or {}
+			}
 		}
 		store[key] = data
 		CooldownManagerUtilsDB.position = nil
 		CooldownManagerUtilsDB.reminderSettings = nil
 	end
-	data.settings = type(data.settings) == "table" and data.settings or {}
+	data.positions = type(data.positions) == "table" and data.positions or {buff = data.position}
+	data.barSettings = type(data.barSettings) == "table" and data.barSettings or {buff = type(data.settings) == "table" and data.settings or {}}
+	data.barSettings.buff = type(data.barSettings.buff) == "table" and data.barSettings.buff or {}
+	data.barSettings.ability = type(data.barSettings.ability) == "table" and data.barSettings.ability or {}
+	data.position = nil
+	data.settings = nil
 	local changed = key ~= activeLayoutKey or data ~= activeLayoutData
 	activeLayoutKey = key
 	activeLayoutData = data
@@ -1317,7 +1328,8 @@ local function GetActiveLayoutData()
 end
 
 local function RestorePosition(frame)
-	local position = GetActiveLayoutData().position
+	local position = GetActiveLayoutData().positions[frame.reminderType]
+	local defaultY = frame.reminderType == "ability" and DEFAULT_REMINDER_Y - 60 or DEFAULT_REMINDER_Y
 	frame:ClearAllPoints()
 	if position then
 		local relativeTo = position.relativeTo and _G[position.relativeTo] or UIParent
@@ -1325,9 +1337,9 @@ local function RestorePosition(frame)
 			frame.snapTarget = relativeTo
 			relativeTo = relativeTo.Selection
 		end
-		frame:SetPoint(position.point or "CENTER", relativeTo, position.relativePoint or "CENTER", position.x or DEFAULT_REMINDER_X, position.y or DEFAULT_REMINDER_Y)
+		frame:SetPoint(position.point or "CENTER", relativeTo, position.relativePoint or "CENTER", position.x or DEFAULT_REMINDER_X, position.y or defaultY)
 	else
-		frame:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
+		frame:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, defaultY)
 	end
 end
 
@@ -1347,7 +1359,7 @@ local function SavePosition(frame)
 		x = centerX - parentCenterX
 		y = centerY - parentCenterY
 	end
-	GetActiveLayoutData().position = {
+	GetActiveLayoutData().positions[frame.reminderType] = {
 		point = point,
 		relativeTo = relativeName,
 		relativeSelection = relativeSelection,
@@ -1357,8 +1369,8 @@ local function SavePosition(frame)
 	}
 end
 
-local function GetReminderSettings()
-	local settings = GetActiveLayoutData().settings
+local function GetReminderSettings(reminderType)
+	local settings = GetActiveLayoutData().barSettings[reminderType or "buff"]
 	for key, value in pairs(reminderSettingDefaults) do
 		if settings[key] == nil then settings[key] = value end
 	end
@@ -1368,7 +1380,7 @@ local function GetReminderSettings()
 end
 
 local function ApplyReminderSettings(frame)
-	local settings = GetReminderSettings()
+	local settings = GetReminderSettings(frame.reminderType)
 	frame.orientationSetting = settings.orientation
 	frame.iconDirection = settings.iconDirection
 	frame.iconScale = settings.iconSize / 100
@@ -1379,7 +1391,7 @@ local function ApplyReminderSettings(frame)
 	frame.showGlow = settings.showGlow == 1
 	frame:SetAlpha(settings.opacity / 100)
 	CooldownManagerUtils:UpdateReminderBar()
-	if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.Refresh then reminderOptionsFrame:Refresh() end
+	if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.owner == frame and reminderOptionsFrame.Refresh then reminderOptionsFrame:Refresh() end
 end
 
 local function IsSnapEnabled()
@@ -1747,7 +1759,7 @@ local function ApplyMagnetism(frame)
 end
 
 local function AddSnapTarget(target)
-	if not target or target == reminderFrame or snapTargetLookup[target] then return end
+	if not target or target.isDragging or snapTargetLookup[target] then return end
 	local forbidden = target.IsForbidden and target:IsForbidden()
 	if forbidden or type(target.Selection) ~= "table" or not target.Selection.ShowHighlighted then return end
 	snapTargetLookup[target] = true
@@ -1809,12 +1821,13 @@ local function CreateDropdownSetting(parent, layoutIndex, labelText, key, values
 	row.Dropdown:SetupMenu(function(_, rootDescription)
 		for _, value in ipairs(values) do
 			rootDescription:CreateRadio(getText(value), function(option)
-				return GetReminderSettings()[key] == option
+				local owner = parent:GetParent().owner
+				return owner and GetReminderSettings(owner.reminderType)[key] == option
 			end, function(option)
-				GetReminderSettings()[key] = option
 				local panel = parent:GetParent()
+				GetReminderSettings(panel.owner.reminderType)[key] = option
 				if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
-				ApplyReminderSettings(reminderFrame)
+				ApplyReminderSettings(panel.owner)
 			end, value)
 		end
 	end)
@@ -1838,18 +1851,19 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 		[MinimalSliderWithSteppersMixin.Label.Right] = CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
 	}
 	local steps = (maximum - minimum) / step
-	row.Slider:Init(GetReminderSettings()[key], minimum, maximum, steps, formatters)
+	row.Slider:Init(reminderSettingDefaults[key], minimum, maximum, steps, formatters)
 	row.cbrHandles = EventUtil.CreateCallbackHandleContainer()
 	row.cbrHandles:RegisterCallback(row.Slider, MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(self, value)
 		if self.refreshing then return end
-		GetReminderSettings()[key] = math.floor(value / step + 0.5) * step
 		local panel = parent:GetParent()
+		GetReminderSettings(panel.owner.reminderType)[key] = math.floor(value / step + 0.5) * step
 		if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
-		ApplyReminderSettings(reminderFrame)
+		ApplyReminderSettings(panel.owner)
 	end, row)
 	row.Refresh = function(self)
 		self.refreshing = true
-		self.Slider:SetValue(GetReminderSettings()[key])
+		local owner = parent:GetParent().owner
+		self.Slider:SetValue(GetReminderSettings(owner.reminderType)[key])
 		self.refreshing = nil
 	end
 	row:Show()
@@ -1876,18 +1890,24 @@ local function CreateCheckboxSetting(parent, layoutIndex, labelText, key)
 	row.Label:SetText(labelText)
 	row.Button:SetScript("OnClick", function(self)
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-		GetReminderSettings()[key] = self:GetChecked() and 1 or 0
 		local panel = parent:GetParent()
+		GetReminderSettings(panel.owner.reminderType)[key] = self:GetChecked() and 1 or 0
 		if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
-		ApplyReminderSettings(reminderFrame)
+		ApplyReminderSettings(panel.owner)
 	end)
-	row.Refresh = function(self) self.Button:SetChecked(GetReminderSettings()[key] == 1) end
+	row.Refresh = function(self)
+		local owner = parent:GetParent().owner
+		self.Button:SetChecked(GetReminderSettings(owner.reminderType)[key] == 1)
+	end
 	row:Show()
 	return row
 end
 
 local function CreateReminderOptionsFrame(owner)
-	if reminderOptionsFrame then return reminderOptionsFrame end
+	if reminderOptionsFrame then
+		reminderOptionsFrame.owner = owner
+		return reminderOptionsFrame
+	end
 	local panel = CreateFrame("Frame", "CooldownManagerUtilsReminderOptions", UIParent, "ResizeLayoutFrame")
 	panel:SetSize(300, 350)
 	panel:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -250, 250)
@@ -1906,7 +1926,7 @@ local function CreateReminderOptionsFrame(owner)
 	panel.Border.ignoreInLayout = true
 	panel.Title = panel:CreateFontString(nil, nil, "GameFontHighlightLarge")
 	panel.Title:SetPoint("TOP", 0, -15)
-	panel.Title:SetText(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_EDITMODE"))
+	panel.owner = owner
 	panel.Close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
 	panel.Close:SetPoint("TOPRIGHT")
 	panel.Close.ignoreInLayout = true
@@ -1922,7 +1942,7 @@ local function CreateReminderOptionsFrame(owner)
 		return value == 0 and (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ORIENTATION_HORIZONTAL or HORIZONTAL or "Horizontal") or (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ORIENTATION_VERTICAL or VERTICAL or "Vertical")
 	end
 	local function DirectionText(value)
-		local vertical = GetReminderSettings().orientation == 1
+		local vertical = GetReminderSettings(panel.owner.reminderType).orientation == 1
 		if vertical then return value == 0 and (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_DOWN or "Down") or (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_UP or "Up") end
 		return value == 0 and (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_LEFT or "Left") or (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_RIGHT or "Right")
 	end
@@ -1959,10 +1979,10 @@ local function CreateReminderOptionsFrame(owner)
 	panel.RevertChanges:SetEnabled(false)
 	panel.RevertChanges:SetScript("OnClick", function(self)
 		if not panel.originalSettings then return end
-		local settings = GetReminderSettings()
+		local settings = GetReminderSettings(panel.owner.reminderType)
 		for key, value in pairs(panel.originalSettings) do settings[key] = value end
 		self:SetEnabled(false)
-		ApplyReminderSettings(owner)
+		ApplyReminderSettings(panel.owner)
 	end)
 	panel.Divider = panel.Buttons:CreateTexture(nil, "ARTWORK")
 	panel.Divider:SetSize(330, 16)
@@ -1972,10 +1992,10 @@ local function CreateReminderOptionsFrame(owner)
 	panel.Reset.layoutIndex = 3
 	panel.Reset:SetText(_G.HUD_EDIT_MODE_RESET_POSITION or RESET_POSITION or "Reset position")
 	panel.Reset:SetScript("OnClick", function()
-		owner:ClearAllPoints()
-		owner:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, DEFAULT_REMINDER_Y)
-		owner.snapTarget = nil
-		GetActiveLayoutData().position = nil
+		local frame = panel.owner
+		frame.snapTarget = nil
+		GetActiveLayoutData().positions[frame.reminderType] = nil
+		RestorePosition(frame)
 	end)
 	panel.EditModeClose = CreateFrame("Button", "CooldownManagerUtilsEditModeClose", UIParent, "InsecureActionButtonTemplate")
 	panel.EditModeClose:Hide()
@@ -1995,21 +2015,22 @@ local function CreateReminderOptionsFrame(owner)
 	end
 	panel.CooldownSettings:SetScript("PostClick", function()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-		CooldownManagerUtils:ShowReminderSettingsTab()
+		CooldownManagerUtils:ShowReminderSettingsTab(panel.owner.reminderType)
 	end)
 	panel.Refresh = function(self)
 		for _, control in ipairs(self.controls) do control:Refresh() end
 		if self:IsShown() then self:Layout() end
 	end
 	panel:SetScript("OnShow", function(self)
+		self.Title:SetText(CooldownManagerUtils:Trans(self.owner.labelKey))
 		self.originalSettings = {}
-		for key, value in pairs(GetReminderSettings()) do self.originalSettings[key] = value end
+		for key, value in pairs(GetReminderSettings(self.owner.reminderType)) do self.originalSettings[key] = value end
 		self.RevertChanges:SetEnabled(false)
 		self:Refresh()
 		self:Layout()
 	end)
 	panel:SetScript("OnHide", function()
-		if editModeActive and owner.Selection then owner:HighlightSystem() end
+		if editModeActive and panel.owner and panel.owner.Selection then panel.owner:HighlightSystem() end
 	end)
 	panel:Hide()
 	reminderOptionsFrame = panel
@@ -2026,7 +2047,7 @@ local function SetupAddonEditModeFrame(frame)
 	frame.Selection:SetAllPoints()
 	frame.Selection:SetSystem(frame)
 	frame.Selection:Hide()
-	frame.GetSystemName = function() return CooldownManagerUtils:Trans("LID_BUFFREMINDERS_EDITMODE") end
+	frame.GetSystemName = function(self) return CooldownManagerUtils:Trans(self.labelKey) end
 	frame.HighlightSystem = function(self)
 		self.Selection:ShowHighlighted()
 		self.isSelected = false
@@ -2034,6 +2055,7 @@ local function SetupAddonEditModeFrame(frame)
 	frame.SelectSystem = function(self)
 		self.Selection:ShowSelected()
 		self.isSelected = true
+		if reminderOptionsFrame and reminderOptionsFrame:IsShown() then reminderOptionsFrame:Hide() end
 		local panel = CreateReminderOptionsFrame(self)
 		panel:Show()
 	end
@@ -2108,15 +2130,19 @@ local function CreateReminderIcon(parent, index)
 	return icon
 end
 
-function CooldownManagerUtils:CreateReminderBar()
-	if reminderFrame then return reminderFrame end
+function CooldownManagerUtils:CreateReminderBar(reminderType)
+	reminderType = reminderType or "buff"
+	if self.reminderFrames[reminderType] then return self.reminderFrames[reminderType] end
 	local nativeSelection = IsNativeSelectionAvailable()
 	local template = nativeSelection and nil or "BackdropTemplate"
-	local frame = CreateFrame("Frame", "CooldownManagerUtilsReminderFrame", UIParent, template)
+	local frameName = reminderType == "ability" and "CooldownManagerUtilsAbilityReminderFrame" or "CooldownManagerUtilsReminderFrame"
+	local frame = CreateFrame("Frame", frameName, UIParent, template)
 	frame:SetFrameStrata("MEDIUM")
 	frame:SetClampedToScreen(true)
 	frame.icons = {}
-	reminderFrame = frame
+	frame.reminderType = reminderType
+	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or "LID_BUFFREMINDERS_EDITMODE"
+	self.reminderFrames[reminderType] = frame
 	if nativeSelection then
 		SetupAddonEditModeFrame(frame)
 	else
@@ -2131,7 +2157,7 @@ function CooldownManagerUtils:CreateReminderBar()
 		frame:SetBackdropBorderColor(0.2, 0.6, 1, 0)
 		frame.Label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		frame.Label:SetPoint("CENTER")
-		frame.Label:SetText(self:Trans("LID_BUFFREMINDERS_EDITMODE"))
+		frame.Label:SetText(self:Trans(frame.labelKey))
 		frame.Label:Hide()
 		frame:SetScript("OnDragStart", function(mover) if editModeActive then mover:StartMoving() end end)
 		frame:SetScript("OnDragStop", function(mover)
@@ -2729,8 +2755,8 @@ function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
 	end
 end
 
-function CooldownManagerUtils:UpdateReminderBar()
-	local frame = self:CreateReminderBar()
+function CooldownManagerUtils:UpdateReminderBarType(reminderType)
+	local frame = self:CreateReminderBar(reminderType)
 	local selected = self:GetProfile().selected
 	local entries = {}
 	local seenEntries = {}
@@ -2741,7 +2767,7 @@ function CooldownManagerUtils:UpdateReminderBar()
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
-			if entry and not seenEntries[entry] then
+			if entry and (entry.reactiveAbility == true) == (reminderType == "ability") and not seenEntries[entry] then
 				seenEntries[entry] = true
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end
@@ -2854,6 +2880,12 @@ function CooldownManagerUtils:UpdateReminderBar()
 	frame:SetShown(editModeActive or visible)
 end
 
+function CooldownManagerUtils:UpdateReminderBar()
+	self:UpdateReminderBarType("buff")
+	local _, class = UnitClass("player")
+	if self:IsForever() and class == "WARRIOR" then self:UpdateReminderBarType("ability") end
+end
+
 function CooldownManagerUtils:ScheduleReminderUpdate()
 	if updatePending then return end
 	updatePending = true
@@ -2950,30 +2982,36 @@ end
 function CooldownManagerUtils.SetEditModeActive(active)
 	editModeActive = active
 	CooldownManagerUtils:UpdateReminderBar()
-	if reminderFrame and reminderFrame.Selection then
-		if active then
-			RefreshSnapTargets()
-			reminderFrame:HighlightSystem()
-		else
-			StopSnapTargetScan()
-			wipe(snapTargets)
-			wipe(snapTargetLookup)
-			HideSnapPreview()
-			if reminderOptionsFrame then reminderOptionsFrame:Hide() end
-			reminderFrame:ClearHighlight()
-			reminderFrame:SetScript("OnUpdate", nil)
-			reminderFrame:StopMovingOrSizing()
+	if active then RefreshSnapTargets() end
+	for _, frame in pairs(CooldownManagerUtils.reminderFrames) do
+		if frame.Selection then
+			if active then
+				frame:HighlightSystem()
+			else
+				frame:ClearHighlight()
+				frame:SetScript("OnUpdate", nil)
+				frame:StopMovingOrSizing()
+			end
 		end
+	end
+	if not active then
+		StopSnapTargetScan()
+		wipe(snapTargets)
+		wipe(snapTargetLookup)
+		HideSnapPreview()
+		if reminderOptionsFrame then reminderOptionsFrame:Hide() end
 	end
 end
 
 function CooldownManagerUtils:OnEditModeLayoutChanged()
 	local _, changed = ResolveActiveLayoutData()
-	if not changed or not reminderFrame then return end
+	if not changed then return end
 	if reminderOptionsFrame and reminderOptionsFrame:IsShown() then reminderOptionsFrame:Hide() end
-	reminderFrame.snapTarget = nil
-	RestorePosition(reminderFrame)
-	ApplyReminderSettings(reminderFrame)
+	for _, frame in pairs(self.reminderFrames) do
+		frame.snapTarget = nil
+		RestorePosition(frame)
+		ApplyReminderSettings(frame)
+	end
 end
 
 function CooldownManagerUtils:ScheduleEditModeLayoutCheck()
@@ -2983,7 +3021,9 @@ end
 function CooldownManagerUtils:Initialize()
 	if not IsSupportedClient() then return end
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
-	self:CreateReminderBar()
+	self:CreateReminderBar("buff")
+	local _, class = UnitClass("player")
+	if self:IsForever() and class == "WARRIOR" then self:CreateReminderBar("ability") end
 	if EventRegistry then
 		EventRegistry:RegisterCallback("EditMode.Enter", function() CooldownManagerUtils.SetEditModeActive(true) end, self)
 		EventRegistry:RegisterCallback("EditMode.Exit", function() CooldownManagerUtils.SetEditModeActive(false) end, self)

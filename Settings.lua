@@ -397,6 +397,6 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	self:RefreshReminderSettings()
 end
 
-function CooldownManagerUtils:ShowReminderSettingsTab()
-	if settingsFrame and settingsFrame:IsShown() then SetCustomMode("buff") end
+function CooldownManagerUtils:ShowReminderSettingsTab(reminderType)
+	if settingsFrame and settingsFrame:IsShown() then SetCustomMode(reminderType == "ability" and "ability" or "buff") end
 end

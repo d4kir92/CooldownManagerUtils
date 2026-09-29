@@ -5,7 +5,7 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 ## Features
 
 - Adds a **Buff Reminders** tab to the side tabs of Blizzard's Cooldown Manager settings.
-- On WoW Forever Warriors, adds a separate **Ability Reminders** tab for **Overpower** and **Revenge**. Selected abilities appear on the reminder bar only while Blizzard marks their reactive combat window active.
+- On WoW Forever Warriors, adds a separate **Proc Reminders** tab for **Overpower** and **Revenge**. Selected abilities appear on the Proc Reminder bar only while Blizzard marks their reactive combat window active.
 - Lists active spells from all class spellbook tabs (on Retail: class and current specialization) that apply a buff to your character, independently of Blizzard's Auras tab.
 - Includes the gathering tracking abilities **Find Herbs**, **Find Minerals**, and **Find Fish** when they are available to your character. Their reminders disappear while the matching minimap tracking is active.
 - Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. Tracked weapon enchants are checked together against every equipped weapon (main hand and, when dual wielding, off hand; shields only if a shield imbue is tracked): they stay hidden while every weapon carries one of them, otherwise the tracked enchants that are not active on any weapon are shown (or all of them, if each one is already active on another weapon).
@@ -17,8 +17,8 @@ Cooldown Manager Utils adds missing-buff reminders to World of Warcraft's built-
 - Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
 - Shows the spell tooltip when hovering a reminder icon.
 - Hides live reminders while your character is dead or a ghost. The Edit Mode preview remains available.
-- Makes the reminder bar movable in Edit Mode and snaps it to other Edit Mode elements, screen edges, and the grid like Blizzard's own frames.
-- Clicking the bar in Edit Mode opens its settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the Cooldown Manager on the Buff Reminders tab.
+- Adds independently movable **Buff Reminder** and **Proc Reminder** bars to Edit Mode. Both snap to other Edit Mode elements, screen edges, the grid, and each other like Blizzard's own frames.
+- Clicking either bar in Edit Mode opens its independent settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the matching Cooldown Manager tab.
 - Keeps a separate reminder selection for each Cooldown Manager layout and specialization.
 - Keeps Blizzard's Cooldown Manager layout dropdown visible on the Buff Reminders tab and provides a matching add-on-owned Revert Changes button for reminder edits made since opening the window or selecting the layout.
 
@@ -43,11 +43,11 @@ The package also contains TOC files for the Classic clients. The add-on loads th
 4. Drag buffs within **Tracked Buffs** to change their order on the reminder bar.
 5. Drag a buff back to **Not Displayed** to remove its reminder.
 
-WoW Forever Warriors can use the adjacent **Ability Reminders** tab in the same way to track Overpower and Revenge.
+WoW Forever Warriors can use the adjacent **Proc Reminders** tab in the same way to track Overpower and Revenge.
 
 The search box of the Cooldown Manager also filters the Buff Reminders tab by buff name. Each group can be collapsed by clicking its header.
 
-To move the reminder bar, open Edit Mode. The bar then shows all tracked buffs, with active buffs greyed out, and can be dragged to a new position. The position is saved as soon as you release the bar.
+To move a reminder bar, open Edit Mode. **Buff Reminder** shows tracked buffs, with active buffs greyed out, while **Proc Reminder** shows tracked reactive abilities. Each bar can be dragged and configured independently; its position is saved as soon as you release it.
 
 ## Notes
 
@@ -61,7 +61,7 @@ To move the reminder bar, open Edit Mode. The bar then shows all tracked buffs, 
 - The same applies to group members: while their auras are hidden, the last known count is kept. Casting the group buff yourself during that time counts every member as buffed.
 - A buff that is cancelled or dispelled while it is hidden cannot be detected; its reminder appears once the game reveals the aura again, usually when combat ends.
 - Reminder selections and their order are saved per Cooldown Manager layout and specialization. Switching between layouts such as Starter Layout and a custom layout switches the reminder contents too. A layout the add-on has not seen yet starts with a copy of the previously active reminder setup.
-- Bar position and all bar settings are saved separately per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. A new Edit Mode layout starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
+- Both bar positions and each bar's settings are saved separately per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. A new Edit Mode layout starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
 
 ## Localization
 
