@@ -2618,13 +2618,25 @@ end
 
 function CooldownManagerUtils.GetReactiveAbilityState(entry)
 	local overlay = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed
-	if type(overlay) ~= "function" then return end
+	if type(overlay) ~= "function" then overlay = nil end
+	local isSpellUsable = CooldownManagerUtils.GetForeverReactiveAbilityFamily(entry.spellID) and (C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell)
+	if type(isSpellUsable) ~= "function" then isSpellUsable = nil end
+	if not overlay and not isSpellUsable then return end
 	local resolved = false
 	for _, spellID in ipairs(entry.candidates) do
-		local ok, active = pcall(overlay, spellID)
-		if ok and not IsSecret(active) then
-			resolved = true
-			if active == true then return true end
+		if overlay then
+			local ok, active = pcall(overlay, spellID)
+			if ok and not IsSecret(active) then
+				resolved = true
+				if active == true then return true end
+			end
+		end
+		if isSpellUsable then
+			local ok, usable = pcall(isSpellUsable, spellID)
+			if ok and not IsSecret(usable) then
+				resolved = true
+				if usable == true then return true end
+			end
 		end
 	end
 	if resolved then return false end
