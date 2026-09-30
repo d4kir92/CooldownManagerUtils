@@ -16,7 +16,7 @@ Cooldown Manager Utils adds missing-buff and reactive-proc reminders to World of
 - On WoW Forever, Paladin Seal reminders also work as one group. Any active recognized Seal hides all selected Seal reminders; when no Seal is active, they are all shown.
 - Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
 - Shows the spell tooltip when hovering a reminder icon.
-- Hides live reminders while your character is dead or a ghost. The Edit Mode preview remains available.
+- Hides live reminders while your character is dead, a ghost, flying, or on a flight path. The Edit Mode preview remains available.
 - Adds independently movable **Buff Reminder** and **Proc Reminder** bars to Edit Mode. Both snap to other Edit Mode elements, screen edges, the grid, and each other like Blizzard's own frames.
 - Clicking either bar in Edit Mode opens its independent settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the matching Cooldown Manager tab.
 - Keeps a separate reminder selection for each Cooldown Manager layout and specialization.

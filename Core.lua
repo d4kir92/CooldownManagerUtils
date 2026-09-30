@@ -2702,6 +2702,19 @@ local function GetUnitFlag(unitFunction, unit)
 	return value and true or false
 end
 
+function CooldownManagerUtils.IsPlayerFlying()
+	local ok, flying = pcall(IsFlying)
+	if ok and not IsSecret(flying) and flying then return true end
+	return GetUnitFlag(UnitOnTaxi, "player") == true
+end
+
+function CooldownManagerUtils.CheckFlyingState()
+	local flying = CooldownManagerUtils.IsPlayerFlying()
+	if flying == CooldownManagerUtils.playerFlying then return end
+	CooldownManagerUtils.playerFlying = flying
+	CooldownManagerUtils:ScheduleReminderUpdate()
+end
+
 function CooldownManagerUtils.EntryContainsSpell(entry, spellID)
 	if entry.spellID == spellID then return true end
 	for _, candidateSpellID in ipairs(entry.candidates) do
@@ -2980,7 +2993,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local expiringEntries = {}
 	local warningTime = reminderType == "expiring" and self:GetExpiryWarningTime()
 	local layouts = self:GetProfile().layout
-	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
+	if editModeActive or (GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true and not self.IsPlayerFlying()) then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
 			local entryLayout = entry and layouts[entry.spellID]
@@ -3283,6 +3296,8 @@ function CooldownManagerUtils:Initialize()
 	C_Timer.NewTicker(GROUP_BUFF_REFRESH_INTERVAL, function()
 		if IsInGroup() then CooldownManagerUtils:ScheduleGroupBuffUpdate() end
 	end)
+	self.playerFlying = self.IsPlayerFlying()
+	C_Timer.NewTicker(0.25, self.CheckFlyingState)
 end
 
 if IsSupportedClient() then
