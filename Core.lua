@@ -224,12 +224,14 @@ local HUNTER_ASPECT_FAMILIES = {
 	{spells = {61846, 61847}},
 	{spells = {469145}}
 }
-local WEAPON_ENCHANT_LEARN_WINDOW = 0.5
-local WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2
-local WEAPON_ENCHANT_REFRESH_MS = 5000
-local AURA_EXPIRY_GRACE = 0.1
-local GROUP_BUFF_UPDATE_DELAY = 0.5
-local GROUP_BUFF_REFRESH_INTERVAL = 2
+local TIMING = {
+	WEAPON_ENCHANT_LEARN_WINDOW = 0.5,
+	WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2,
+	WEAPON_ENCHANT_REFRESH_MS = 5000,
+	AURA_EXPIRY_GRACE = 0.1,
+	GROUP_BUFF_UPDATE_DELAY = 0.5,
+	GROUP_BUFF_REFRESH_INTERVAL = 2
+}
 local WEAPON_ENCHANT_INVENTORY_SLOTS = {INVSLOT_MAINHAND or 16, INVSLOT_OFFHAND or 17, INVSLOT_RANGED or 18}
 local WEAPON_ENCHANT_SLOT_NAMES = {"MainHand", "OffHand", "Ranged"}
 local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
@@ -635,7 +637,7 @@ local function RecordWeaponEnchantChanges(silent)
 		local changed = not previous or previous.enchantID ~= enchant.enchantID
 		if not changed and enchant.remaining and previous.remaining then
 			local expected = previous.remaining - (now - previous.time) * 1000
-			changed = enchant.remaining - expected > WEAPON_ENCHANT_REFRESH_MS
+			changed = enchant.remaining - expected > TIMING.WEAPON_ENCHANT_REFRESH_MS
 		end
 		if changed and not silent then
 			table.insert(recentWeaponEnchantChanges, {enchantID = enchant.enchantID, time = now})
@@ -650,7 +652,7 @@ end
 
 local function PruneRecentEvents(list, now)
 	for index = #list, 1, -1 do
-		if now - list[index].time > WEAPON_ENCHANT_LEARN_WINDOW * 2 then table.remove(list, index) end
+		if now - list[index].time > TIMING.WEAPON_ENCHANT_LEARN_WINDOW * 2 then table.remove(list, index) end
 	end
 end
 
@@ -706,7 +708,7 @@ local function MatchWeaponEnchantLearning()
 		local bestCast, bestDelta
 		for _, cast in ipairs(recentPlayerCasts) do
 			local delta = change.time - cast.time
-			if delta >= -WEAPON_ENCHANT_LATE_CAST_WINDOW and delta <= WEAPON_ENCHANT_LEARN_WINDOW and (not bestDelta or math.abs(delta) < bestDelta) then bestCast, bestDelta = cast, math.abs(delta) end
+			if delta >= -TIMING.WEAPON_ENCHANT_LATE_CAST_WINDOW and delta <= TIMING.WEAPON_ENCHANT_LEARN_WINDOW and (not bestDelta or math.abs(delta) < bestDelta) then bestCast, bestDelta = cast, math.abs(delta) end
 		end
 		if bestCast then
 			if LearnWeaponEnchant(bestCast.spellID, bestCast.name, change.enchantID) then learnedNew = true end
@@ -2228,6 +2230,38 @@ local function CreateReminderOptionsFrame(owner)
 	panel:SetScript("OnHide", function()
 		if editModeActive and panel.owner and panel.owner.Selection then panel.owner:HighlightSystem() end
 	end)
+	panel:SetScript("OnUpdate", function(self)
+		local dialog = EditModeSystemSettingsDialog
+		local attached = dialog and dialog:IsShown() and dialog.attachedToSystem or nil
+		if attached and attached ~= self.blizzardDialogSystem then
+			self:Hide()
+			return
+		end
+		self.blizzardDialogSystem = attached
+	end)
+	panel.AvoidBlizzardDialog = function(self)
+		local dialog = EditModeSystemSettingsDialog
+		if not dialog or not dialog:IsShown() then return end
+		local dLeft, dBottom, dWidth, dHeight = dialog:GetRect()
+		local pLeft, pBottom, pWidth, pHeight = self:GetRect()
+		if not dLeft or not pLeft then return end
+		local ratio = dialog:GetEffectiveScale() / self:GetEffectiveScale()
+		dLeft, dBottom, dWidth, dHeight = dLeft * ratio, dBottom * ratio, dWidth * ratio, dHeight * ratio
+		if pLeft >= dLeft + dWidth or pLeft + pWidth <= dLeft or pBottom >= dBottom + dHeight or pBottom + pHeight <= dBottom then return end
+		local parentTop = UIParent:GetTop() * UIParent:GetEffectiveScale() / self:GetEffectiveScale()
+		self:ClearAllPoints()
+		if dBottom + dHeight + pHeight <= parentTop then
+			self:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", dLeft, dBottom + dHeight)
+		else
+			self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", dLeft, dBottom)
+		end
+	end
+	panel.ShowFor = function(self)
+		local dialog = EditModeSystemSettingsDialog
+		self.blizzardDialogSystem = dialog and dialog:IsShown() and dialog.attachedToSystem or nil
+		if not self:IsShown() then self:Show() end
+		if InCombatLockdown() then self:AvoidBlizzardDialog() end
+	end
 	reminderOptionsFrame = panel
 	return panel
 end
@@ -2251,8 +2285,7 @@ local function SetupAddonEditModeFrame(frame)
 		if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.owner ~= self then reminderOptionsFrame:Hide() end
 		self.Selection:ShowSelected()
 		self.isSelected = true
-		local panel = CreateReminderOptionsFrame(self)
-		if not panel:IsShown() then panel:Show() end
+		CreateReminderOptionsFrame(self):ShowFor()
 	end
 	frame.ClearHighlight = function(self)
 		self.Selection:Hide()
@@ -2278,6 +2311,23 @@ local function SetupAddonEditModeFrame(frame)
 	frame.Selection:SetScript("OnMouseDown", function(_, button)
 		if button == "LeftButton" then frame:SelectSystem() end
 	end)
+	if EditModeSystemSettingsDialog and EditModeSystemSettingsDialog.CloseButton then
+		local clicker = CreateFrame("Button", nil, frame.Selection, "InsecureActionButtonTemplate")
+		clicker:SetAllPoints()
+		clicker:RegisterForClicks("LeftButtonUp")
+		clicker:RegisterForDrag("LeftButton")
+		clicker:SetAttribute("useOnKeyDown", false)
+		clicker:SetAttribute("type", "click")
+		clicker:SetAttribute("clickbutton", EditModeSystemSettingsDialog.CloseButton)
+		clicker:SetScript("OnMouseDown", function(_, button)
+			if button == "LeftButton" then frame:SelectSystem() end
+		end)
+		clicker:SetScript("OnDragStart", function() frame:OnDragStart() end)
+		clicker:SetScript("OnDragStop", function() frame:OnDragStop() end)
+		clicker:SetScript("OnEnter", function() frame.Selection:OnEnter() end)
+		clicker:SetScript("OnLeave", function() frame.Selection:OnLeave() end)
+		frame.Selection.Clicker = clicker
+	end
 	RestorePosition(frame)
 	ApplyReminderSettings(frame)
 end
@@ -2445,7 +2495,7 @@ local function SetPaladinSealExpiration(expirationTime)
 	if paladinSealExpiration == expirationTime then return end
 	paladinSealExpiration = expirationTime
 	if not expirationTime then return end
-	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+	C_Timer.After(math.max(expirationTime - GetTime(), 0) + TIMING.AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
 end
 
 local function TrackPaladinSealAura(aura)
@@ -2489,7 +2539,7 @@ local function SetHunterAspectExpiration(expirationTime)
 	if hunterAspectExpiration == expirationTime then return end
 	hunterAspectExpiration = expirationTime
 	if not expirationTime then return end
-	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+	C_Timer.After(math.max(expirationTime - GetTime(), 0) + TIMING.AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
 end
 
 local function TrackHunterAspectAura(aura)
@@ -2533,7 +2583,7 @@ local function SetAuraExpiration(entrySpellID, expirationTime)
 	if auraExpirationCache[entrySpellID] == expirationTime then return end
 	auraExpirationCache[entrySpellID] = expirationTime
 	if not expirationTime then return end
-	C_Timer.After(math.max(expirationTime - GetTime(), 0) + AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+	C_Timer.After(math.max(expirationTime - GetTime(), 0) + TIMING.AURA_EXPIRY_GRACE, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
 end
 
 local function GetHitChargeAura(entry)
@@ -2916,6 +2966,7 @@ function CooldownManagerUtils.GetSpellCooldownState(spellID)
 				if isZero then return false end
 				return true, duration
 			end
+			if zeroOK then return false, duration, nil, nil, nil, true, isZero end
 		end
 	end
 	if not C_Spell.GetSpellCooldown then return false end
@@ -2939,15 +2990,29 @@ end
 function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer)
 	local cooldown = icon.Cooldown
 	cooldown:SetHideCountdownNumbers(not showTimer)
-	local onCooldown, durationObject, startTime, duration, modRate = CooldownManagerUtils.GetSpellCooldownState(spellID)
-	if onCooldown and durationObject and cooldown.SetCooldownFromDurationObject then
+	local onCooldown, durationObject, startTime, duration, modRate, isSecret, secretIsZero = CooldownManagerUtils.GetSpellCooldownState(spellID)
+	if (onCooldown or isSecret) and durationObject and cooldown.SetCooldownFromDurationObject then
 		cooldown:SetCooldownFromDurationObject(durationObject)
 	elseif onCooldown and startTime then
 		cooldown:SetCooldown(startTime, duration, modRate or 1)
 	else
 		cooldown:Clear()
 	end
-	return onCooldown
+	return onCooldown, isSecret, secretIsZero
+end
+
+function CooldownManagerUtils.SetIconDesaturation(texture, desaturated, isSecret, secretIsZero)
+	if desaturated or not isSecret then
+		texture:SetDesaturated(desaturated == true)
+		return
+	end
+	local evaluate = C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean
+	if type(evaluate) ~= "function" then
+		texture:SetDesaturated(false)
+		return
+	end
+	local ok, value = pcall(evaluate, secretIsZero, 0, 1)
+	if not ok or not pcall(texture.SetDesaturation, texture, value) then texture:SetDesaturated(false) end
 end
 
 function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
@@ -2987,7 +3052,7 @@ function CooldownManagerUtils.ScheduleExpiryWarning(warningAt)
 	local pending = CooldownManagerUtils.expiryWarningAt
 	if pending and pending > GetTime() and pending <= warningAt then return end
 	CooldownManagerUtils.expiryWarningAt = warningAt
-	C_Timer.After(math.max(warningAt - GetTime(), 0) + AURA_EXPIRY_GRACE, function()
+	C_Timer.After(math.max(warningAt - GetTime(), 0) + TIMING.AURA_EXPIRY_GRACE, function()
 		if CooldownManagerUtils.expiryWarningAt == warningAt then CooldownManagerUtils.expiryWarningAt = nil end
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	end)
@@ -3107,15 +3172,15 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		end
 		local expiring = expiringEntries[entry]
 		local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
-		local onCooldown
+		local onCooldown, cooldownSecret, cooldownSecretIsZero
 		if expiring then
 			icon.Cooldown:SetHideCountdownNumbers(false)
 			icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
 		else
-			onCooldown = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
+			onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
 		end
 		icon.Texture:SetTexture(entry.iconID)
-		icon.Texture:SetDesaturated(previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(entry.spellID))
+		CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(entry.spellID), cooldownSecret, cooldownSecretIsZero)
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
@@ -3168,7 +3233,7 @@ end
 function CooldownManagerUtils:ScheduleGroupBuffUpdate()
 	if groupUpdatePending then return end
 	groupUpdatePending = true
-	C_Timer.After(GROUP_BUFF_UPDATE_DELAY, function()
+	C_Timer.After(TIMING.GROUP_BUFF_UPDATE_DELAY, function()
 		groupUpdatePending = false
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	end)
@@ -3305,7 +3370,7 @@ function CooldownManagerUtils:Initialize()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
 	self:ScheduleCooldownManagerLayoutCheck()
-	C_Timer.NewTicker(GROUP_BUFF_REFRESH_INTERVAL, function()
+	C_Timer.NewTicker(TIMING.GROUP_BUFF_REFRESH_INTERVAL, function()
 		if IsInGroup() then CooldownManagerUtils:ScheduleGroupBuffUpdate() end
 	end)
 	self.playerFlying = self.IsPlayerFlying()
