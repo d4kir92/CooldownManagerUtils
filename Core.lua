@@ -3182,6 +3182,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		icon.Texture:SetTexture(entry.iconID)
 		CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(entry.spellID), cooldownSecret, cooldownSecretIsZero)
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
+		icon:SetMouseClickEnabled(false)
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
 		local groupState = groupBuffCache[entry.spellID]
