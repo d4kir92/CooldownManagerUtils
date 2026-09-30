@@ -10,8 +10,9 @@ local FRAME_PADDING = 6
 local DEFAULT_REMINDER_X = 0
 local DEFAULT_REMINDER_Y = -180
 local REMINDER_CATEGORY_ORDER = {
-	trackedBuff = 1,
-	hidden = 2
+	expiringBuff = 1,
+	trackedBuff = 2,
+	hidden = 3
 }
 local OBSOLETE_REMINDER_SPELLS = {
 	[78] = true,
@@ -1508,6 +1509,7 @@ local function ResolveActiveLayoutData()
 	data.barSettings = type(data.barSettings) == "table" and data.barSettings or {buff = type(data.settings) == "table" and data.settings or {}}
 	data.barSettings.buff = type(data.barSettings.buff) == "table" and data.barSettings.buff or {}
 	data.barSettings.ability = type(data.barSettings.ability) == "table" and data.barSettings.ability or {}
+	data.barSettings.expiring = type(data.barSettings.expiring) == "table" and data.barSettings.expiring or {}
 	data.position = nil
 	data.settings = nil
 	local changed = key ~= activeLayoutKey or data ~= activeLayoutData
@@ -1522,7 +1524,7 @@ end
 
 local function RestorePosition(frame)
 	local position = GetActiveLayoutData().positions[frame.reminderType]
-	local defaultY = frame.reminderType == "ability" and DEFAULT_REMINDER_Y - 60 or DEFAULT_REMINDER_Y
+	local defaultY = frame.reminderType == "ability" and DEFAULT_REMINDER_Y - 60 or frame.reminderType == "expiring" and DEFAULT_REMINDER_Y + 60 or DEFAULT_REMINDER_Y
 	frame:ClearAllPoints()
 	if position then
 		local relativeTo = position.relativeTo and _G[position.relativeTo] or UIParent
@@ -2328,13 +2330,13 @@ function CooldownManagerUtils:CreateReminderBar(reminderType)
 	if self.reminderFrames[reminderType] then return self.reminderFrames[reminderType] end
 	local nativeSelection = IsNativeSelectionAvailable()
 	local template = nativeSelection and nil or "BackdropTemplate"
-	local frameName = reminderType == "ability" and "CooldownManagerUtilsAbilityReminderFrame" or "CooldownManagerUtilsReminderFrame"
+	local frameName = reminderType == "ability" and "CooldownManagerUtilsAbilityReminderFrame" or reminderType == "expiring" and "CooldownManagerUtilsExpiringReminderFrame" or "CooldownManagerUtilsReminderFrame"
 	local frame = CreateFrame("Frame", frameName, UIParent, template)
 	frame:SetFrameStrata("MEDIUM")
 	frame:SetClampedToScreen(true)
 	frame.icons = {}
 	frame.reminderType = reminderType
-	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or "LID_BUFFREMINDERS_EDITMODE"
+	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or reminderType == "expiring" and "LID_EXPIRINGBUFFS_EDITMODE" or "LID_BUFFREMINDERS_EDITMODE"
 	self.reminderFrames[reminderType] = frame
 	if nativeSelection then
 		SetupAddonEditModeFrame(frame)
@@ -2901,6 +2903,14 @@ function CooldownManagerUtils.GetSpellCooldownState(spellID)
 	return true, nil, startTime, duration, not IsSecret(info.modRate) and info.modRate or 1
 end
 
+function CooldownManagerUtils.HasInsufficientPower(spellID)
+	local isSpellUsable = C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell
+	if type(isSpellUsable) ~= "function" then return false end
+	local ok, _, insufficientPower = pcall(isSpellUsable, spellID)
+	if not ok or IsSecret(insufficientPower) then return false end
+	return insufficientPower == true
+end
+
 function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer)
 	local cooldown = icon.Cooldown
 	cooldown:SetHideCountdownNumbers(not showTimer)
@@ -2948,6 +2958,16 @@ function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
 	end
 end
 
+function CooldownManagerUtils.ScheduleExpiryWarning(warningAt)
+	local pending = CooldownManagerUtils.expiryWarningAt
+	if pending and pending > GetTime() and pending <= warningAt then return end
+	CooldownManagerUtils.expiryWarningAt = warningAt
+	C_Timer.After(math.max(warningAt - GetTime(), 0) + AURA_EXPIRY_GRACE, function()
+		if CooldownManagerUtils.expiryWarningAt == warningAt then CooldownManagerUtils.expiryWarningAt = nil end
+		CooldownManagerUtils:ScheduleReminderUpdate()
+	end)
+end
+
 function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local frame = self:CreateReminderBar(reminderType)
 	local selected = self:GetProfile().selected
@@ -2957,10 +2977,15 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local sharedPaladinSealState = {}
 	local sharedHunterAspectState = {}
 	local sharedMinimapTrackingState = {}
+	local expiringEntries = {}
+	local warningTime = reminderType == "expiring" and self:GetExpiryWarningTime()
+	local layouts = self:GetProfile().layout
 	if editModeActive or GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
-			if entry and entry.isLearned ~= false and (entry.reactiveAbility == true) == (reminderType == "ability") and not seenEntries[entry] then
+			local entryLayout = entry and layouts[entry.spellID]
+			local entryBarType = entry and (entry.reactiveAbility and "ability" or entryLayout and entryLayout.category == "expiringBuff" and "expiring" or "buff")
+			if entry and entry.isLearned ~= false and entryBarType == reminderType and not seenEntries[entry] then
 				seenEntries[entry] = true
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end
@@ -2992,6 +3017,26 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 						sharedMinimapTrackingState.resolved = true
 					end
 					if sharedMinimapTrackingState.present ~= nil then show = not sharedMinimapTrackingState.present end
+				end
+				if not show and warningTime and not entry.reactiveAbility then
+					local expirationTime, duration
+					if entry.paladinSeal then
+						expirationTime, duration = sharedPaladinSealState.present and paladinSealExpiration, paladinSealDuration
+					elseif entry.hunterAspect then
+						expirationTime, duration = sharedHunterAspectState.present and hunterAspectExpiration, hunterAspectDuration
+					elseif not entry.minimapTracking and not entry.weaponEnchant and presenceCache[entry.spellID] == true then
+						expirationTime, duration = auraExpirationCache[entry.spellID], GetLearnedAuras().durations[entry.spellID]
+					end
+					local remaining = expirationTime and expirationTime - GetTime()
+					if remaining and remaining > 0 then
+						if remaining <= warningTime then
+							show = true
+							if not duration or duration < remaining then duration = remaining end
+							expiringEntries[entry] = {expirationTime = expirationTime, duration = duration}
+						else
+							CooldownManagerUtils.ScheduleExpiryWarning(expirationTime - warningTime)
+						end
+					end
 				end
 				if editModeActive or show then table.insert(entries, entry) end
 			end
@@ -3035,10 +3080,17 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		else
 			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
 		end
-		local previewPresent = editModeActive and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
-		local onCooldown = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
+		local expiring = expiringEntries[entry]
+		local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
+		local onCooldown
+		if expiring then
+			icon.Cooldown:SetHideCountdownNumbers(false)
+			icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
+		else
+			onCooldown = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
+		end
 		icon.Texture:SetTexture(entry.iconID)
-		icon.Texture:SetDesaturated(previewPresent or onCooldown)
+		icon.Texture:SetDesaturated(previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(entry.spellID))
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
@@ -3046,7 +3098,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		icon.GroupCount:SetText(groupState and (groupState.have .. "/" .. groupState.total) or "")
 		icon.GroupCount:SetShown(groupState ~= nil)
 		icon:Show()
-		local glow = frame.showGlow and not previewPresent and not onCooldown
+		local glow = frame.showGlow and not previewPresent and not onCooldown and not expiring
 		if glow then glowingSpells[entry.spellID] = true end
 		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end
@@ -3075,6 +3127,7 @@ end
 
 function CooldownManagerUtils:UpdateReminderBar()
 	self:UpdateReminderBarType("buff")
+	self:UpdateReminderBarType("expiring")
 	if self:HasReactiveAbilities() then self:UpdateReminderBarType("ability") end
 end
 
@@ -3214,6 +3267,7 @@ function CooldownManagerUtils:Initialize()
 	if not IsSupportedClient() then return end
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	self:CreateReminderBar("buff")
+	self:CreateReminderBar("expiring")
 	if self:HasReactiveAbilities() then self:CreateReminderBar("ability") end
 	if EventRegistry then
 		EventRegistry:RegisterCallback("EditMode.Enter", function() CooldownManagerUtils.SetEditModeActive(true) end, self)
@@ -3221,6 +3275,7 @@ function CooldownManagerUtils:Initialize()
 	end
 
 	self:InitializeReminderSettings()
+	self:InitMinimapButton()
 	PruneLearnedWeaponEnchants()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
@@ -3254,6 +3309,7 @@ if IsSupportedClient() then
 	pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_CONNECTION")
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ACTIONBAR_UPDATE_USABLE")
+	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_UPDATE_USABLE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_SHOW")
 	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_HIDE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
@@ -3307,7 +3363,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
-	elseif event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" or event == "SPELL_ACTIVATION_OVERLAY_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_HIDE" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
+	elseif event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" or event == "SPELL_UPDATE_USABLE" or event == "SPELL_ACTIVATION_OVERLAY_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_HIDE" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()

@@ -56,3 +56,4 @@ locale\zhTW.lua
 
 Core.lua
 Settings.lua
+Options.lua

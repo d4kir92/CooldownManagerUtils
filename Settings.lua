@@ -6,6 +6,7 @@ local ITEM_SPACING = 8
 local CATEGORY_WIDTH = 344
 local TAB_ICON_SIZE = 32
 local CATEGORY_DEFINITIONS = {
+	{key = "expiringBuff", localeKey = "LID_BUFFREMINDERS_CATEGORY_EXPIRING", buffOnly = true},
 	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
 	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_HIDDEN"},
 	{key = "notLearned", localeKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", abilityLocaleKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", readOnly = true}
@@ -30,7 +31,7 @@ local dragPreview
 
 local function IsValidCategory(key)
 	for _, definition in ipairs(CATEGORY_DEFINITIONS) do
-		if definition.key == key and not definition.readOnly then return true end
+		if definition.key == key and not definition.readOnly then return not definition.buffOnly or customMode ~= "ability" end
 	end
 	return false
 end
@@ -262,38 +263,42 @@ function CooldownManagerUtils:RefreshReminderSettings()
 		local model = categoryModels[index]
 		local frame = categoryFrames[index]
 		frame:ClearAllPoints()
-		frame:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
-		local title = customMode == "ability" and self:Trans(definition.abilityLocaleKey) or definition.titleGlobal and _G[definition.titleGlobal] or self:Trans(definition.localeKey)
-		local isCollapsed = collapsed[definition.key] == true
-		frame.Header:SetHeaderText(title)
-		frame.Header:UpdateCollapsedState(isCollapsed)
-		frame.Container:SetShown(not isCollapsed)
-		frame.Container.Empty:SetShown(#model.entries == 0)
-		for itemIndex, entry in ipairs(model.entries) do
-			local button = frame.Container.buttons[itemIndex] or CreateItemButton(frame.Container, itemIndex)
-			local column = (itemIndex - 1) % GRID_COLUMNS
-			local row = math.floor((itemIndex - 1) / GRID_COLUMNS)
-			button:ClearAllPoints()
-			button:SetPoint("TOPLEFT", column * (ITEM_SIZE + ITEM_SPACING), -row * (ITEM_SIZE + ITEM_SPACING))
-			button.entry = entry
-			button.category = model
-			button.Icon:SetTexture(entry.iconID)
-			button.Icon:SetDesaturated(entry.isLearned == false)
-			button:SetAlpha(entry.isLearned == false and 0.45 or 1)
-			button.Filter:SetShown(filter ~= "" and not entry.name:lower():find(filter, 1, true))
-			button:Show()
+		if definition.buffOnly and customMode == "ability" then
+			frame:Hide()
+		else
+			frame:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
+			local title = customMode == "ability" and self:Trans(definition.abilityLocaleKey) or definition.titleGlobal and _G[definition.titleGlobal] or self:Trans(definition.localeKey)
+			local isCollapsed = collapsed[definition.key] == true
+			frame.Header:SetHeaderText(title)
+			frame.Header:UpdateCollapsedState(isCollapsed)
+			frame.Container:SetShown(not isCollapsed)
+			frame.Container.Empty:SetShown(#model.entries == 0)
+			for itemIndex, entry in ipairs(model.entries) do
+				local button = frame.Container.buttons[itemIndex] or CreateItemButton(frame.Container, itemIndex)
+				local column = (itemIndex - 1) % GRID_COLUMNS
+				local row = math.floor((itemIndex - 1) / GRID_COLUMNS)
+				button:ClearAllPoints()
+				button:SetPoint("TOPLEFT", column * (ITEM_SIZE + ITEM_SPACING), -row * (ITEM_SIZE + ITEM_SPACING))
+				button.entry = entry
+				button.category = model
+				button.Icon:SetTexture(entry.iconID)
+				button.Icon:SetDesaturated(entry.isLearned == false)
+				button:SetAlpha(entry.isLearned == false and 0.45 or 1)
+				button.Filter:SetShown(filter ~= "" and not entry.name:lower():find(filter, 1, true))
+				button:Show()
+			end
+			for itemIndex = #model.entries + 1, #frame.Container.buttons do
+				frame.Container.buttons[itemIndex].entry = nil
+				frame.Container.buttons[itemIndex]:Hide()
+			end
+			local rowCount = math.max(1, math.ceil(#model.entries / GRID_COLUMNS))
+			local containerHeight = rowCount * ITEM_SIZE + math.max(0, rowCount - 1) * ITEM_SPACING
+			frame.Container:SetHeight(containerHeight)
+			local frameHeight = isCollapsed and 22 or 22 + 15 + containerHeight + 10
+			frame:SetHeight(frameHeight)
+			frame:Show()
+			yOffset = yOffset + frameHeight + 18
 		end
-		for itemIndex = #model.entries + 1, #frame.Container.buttons do
-			frame.Container.buttons[itemIndex].entry = nil
-			frame.Container.buttons[itemIndex]:Hide()
-		end
-		local rowCount = math.max(1, math.ceil(#model.entries / GRID_COLUMNS))
-		local containerHeight = rowCount * ITEM_SIZE + math.max(0, rowCount - 1) * ITEM_SPACING
-		frame.Container:SetHeight(containerHeight)
-		local frameHeight = isCollapsed and 22 or 22 + 15 + containerHeight + 10
-		frame:SetHeight(frameHeight)
-		frame:Show()
-		yOffset = yOffset + frameHeight + 18
 	end
 	reminderContent.ScrollChild:SetHeight(math.max(1, yOffset))
 	reminderContent.Empty:Hide()
@@ -367,6 +372,33 @@ local function CreateReminderTab(parent, mode)
 	return tab
 end
 
+local function CreateOptionsButton(parent)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(18, 18)
+	if parent.CloseButton then
+		button:SetPoint("RIGHT", parent.CloseButton, "LEFT", -2, 0)
+	else
+		button:SetPoint("TOPRIGHT", -28, -3)
+	end
+	if parent.CloseButton then button:SetFrameLevel(parent.CloseButton:GetFrameLevel()) end
+	button.Icon = button:CreateTexture(nil, "ARTWORK")
+	button.Icon:SetAllPoints()
+	button.Icon:SetTexture(134376)
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	button:SetScript("OnClick", function()
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		CooldownManagerUtils:ToggleOptions()
+	end)
+	button:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Cooldown Manager Utils")
+		GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_OPENSETTINGS"), 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", GameTooltip_Hide)
+	return button
+end
+
 function CooldownManagerUtils:InitializeReminderSettings()
 	if settingsFrame then return end
 	if not C_AddOns or not C_AddOns.LoadAddOn then return end
@@ -381,6 +413,7 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	reminderTab = CreateReminderTab(frame, "buff")
 	if self:HasReactiveAbilities() then abilityReminderTab = CreateReminderTab(frame, "ability") end
 	reminderUndoButton = CreateReminderUndoButton(frame)
+	CreateOptionsButton(frame)
 	stockTabs = {frame.SpellsTab, frame.AurasTab, frame.GroupBuffsTab}
 	StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REVERT_REMINDER_CHANGES"] = {
 		text = COOLDOWN_VIEWER_SETTINGS_DIALOG_TEXT_REVERT_CHANGES,
