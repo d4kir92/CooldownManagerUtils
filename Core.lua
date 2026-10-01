@@ -144,8 +144,8 @@ local HIT_CHARGE_AURAS = {
 		{spells = {16689, 16810, 16811, 16812, 16813, 17329, 27009, 53312}, lockout = 1, schoolMask = 1}
 	},
 	SHAMAN = {
-		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5},
-		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960}, lockout = 3.5}
+		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5, castCharges = 3},
+		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960}, lockout = 3.5, castCharges = 3}
 	}
 }
 CooldownManagerUtils.foreverReactiveAbilityFamilies = {
@@ -2629,7 +2629,7 @@ end
 
 local function ResetAuraCharges(entry)
 	local definition = GetHitChargeAura(entry)
-	local charges = definition and GetLearnedAuras().charges[entry.spellID]
+	local charges = definition and (definition.castCharges or GetLearnedAuras().charges[entry.spellID])
 	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask} or nil
 end
 
@@ -3266,7 +3266,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	end
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
-		if entry and CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName) and GetReadableAuraState(entry) == nil then
+		if entry and CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName) and (GetReadableAuraState(entry) == nil or (GetHitChargeAura(entry) and GetHitChargeAura(entry).castCharges)) then
 			presenceCache[entry.spellID] = true
 			changed = true
 			local groupState = groupBuffCache[entry.spellID]
