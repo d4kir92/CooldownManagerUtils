@@ -14,6 +14,7 @@ local REMINDER_CATEGORY_ORDER = {
 	trackedBuff = 2,
 	hidden = 3
 }
+
 local OBSOLETE_REMINDER_SPELLS = {
 	[78] = true,
 	[284] = true,
@@ -29,39 +30,52 @@ local OBSOLETE_REMINDER_SPELLS = {
 	[47449] = true,
 	[47450] = true
 }
-local COOLDOWN_AURA_CATEGORIES = {
-	"Essential",
-	"Utility",
-	"TrackedBuff",
-	"TrackedBar",
-	"HiddenActive",
-	"HiddenPassive"
-}
-CooldownManagerUtils.retailProcCategories = {
-	"Essential",
-	"Utility"
-}
+
+local COOLDOWN_AURA_CATEGORIES = {"Essential", "Utility", "TrackedBuff", "TrackedBar", "HiddenActive", "HiddenPassive"}
+CooldownManagerUtils.retailProcCategories = {"Essential", "Utility"}
 local CLASS_AURA_FALLBACKS = {
 	DRUID = {
-		{spellID = 1126, groupBuff = true}
+		{
+			spellID = 1126,
+			groupBuff = true
+		}
 	},
 	EVOKER = {
-		{spellID = 364342, groupBuff = true}
+		{
+			spellID = 364342,
+			groupBuff = true
+		}
 	},
 	MAGE = {
-		{spellID = 1459, groupBuff = true}
+		{
+			spellID = 1459,
+			groupBuff = true
+		}
 	},
 	PRIEST = {
-		{spellID = 21562, groupBuff = true}
+		{
+			spellID = 21562,
+			groupBuff = true
+		}
 	},
 	SHAMAN = {
-		{spellID = 462854, groupBuff = true}
+		{
+			spellID = 462854,
+			groupBuff = true
+		}
 	},
 	WARRIOR = {
-		{spellID = 6673, groupBuff = true},
-		{spellID = 97462, auraSpellID = 97463}
+		{
+			spellID = 6673,
+			groupBuff = true
+		},
+		{
+			spellID = 97462,
+			auraSpellID = 97463
+		}
 	}
 }
+
 CooldownManagerUtils.foreverBattleShoutSpecs = {
 	[66] = true,
 	[70] = true,
@@ -82,85 +96,214 @@ CooldownManagerUtils.foreverBattleShoutSpecs = {
 	[577] = true,
 	[581] = true
 }
+
 CooldownManagerUtils.foreverBattleShoutFallbackClasses = {
 	ROGUE = true,
 	WARRIOR = true
 }
+
 local RACIAL_AURA_FALLBACKS = {
-	{spellID = 20594},
-	{spellID = 20600},
-	{spellID = 20580},
-	{spellID = 58984},
-	{spellID = 20572},
-	{spellID = 33697},
-	{spellID = 33702},
-	{spellID = 26297},
-	{spellID = 20577},
-	{spellID = 20589, foreverOnly = true},
-	{spellID = 28880},
-	{spellID = 59542},
-	{spellID = 59543},
-	{spellID = 59544},
-	{spellID = 59545},
-	{spellID = 59547},
-	{spellID = 59548},
-	{spellID = 68992},
-	{spellID = 265221},
-	{spellID = 274738},
-	{spellID = 291944},
-	{spellID = 1259799},
-	{spellID = 1299026},
-	{spellID = 1260270},
-	{spellID = 1259812},
-	{spellID = 1259813},
-	{spellID = 1259817},
-	{spellID = 1259821},
-	{spellID = 1259823},
-	{spellID = 1259416, auraSpellIDs = {1308663}},
-	{spellID = 1259705, auraSpellIDs = {1270842}},
-	{spellID = 1259686, auraSpellIDs = {1259688, 1270893}}
+	{
+		spellID = 20594
+	},
+	{
+		spellID = 20600
+	},
+	{
+		spellID = 20580
+	},
+	{
+		spellID = 58984
+	},
+	{
+		spellID = 20572
+	},
+	{
+		spellID = 33697
+	},
+	{
+		spellID = 33702
+	},
+	{
+		spellID = 26297
+	},
+	{
+		spellID = 20577
+	},
+	{
+		spellID = 20589,
+		foreverOnly = true
+	},
+	{
+		spellID = 28880
+	},
+	{
+		spellID = 59542
+	},
+	{
+		spellID = 59543
+	},
+	{
+		spellID = 59544
+	},
+	{
+		spellID = 59545
+	},
+	{
+		spellID = 59547
+	},
+	{
+		spellID = 59548
+	},
+	{
+		spellID = 68992
+	},
+	{
+		spellID = 265221
+	},
+	{
+		spellID = 274738
+	},
+	{
+		spellID = 291944
+	},
+	{
+		spellID = 1259799
+	},
+	{
+		spellID = 1299026
+	},
+	{
+		spellID = 1260270
+	},
+	{
+		spellID = 1259812
+	},
+	{
+		spellID = 1259813
+	},
+	{
+		spellID = 1259817
+	},
+	{
+		spellID = 1259821
+	},
+	{
+		spellID = 1259823
+	},
+	{
+		spellID = 1259416,
+		auraSpellIDs = {1308663}
+	},
+	{
+		spellID = 1259705,
+		auraSpellIDs = {1270842}
+	},
+	{
+		spellID = 1259686,
+		auraSpellIDs = {1259688, 1270893}
+	}
 }
 
 local WEAPON_ENCHANT_FAMILIES = {
 	PALADIN = {
-		{spells = {433568}, enchants = {7143}},
-		{spells = {433583}, enchants = {7144}}
+		{
+			spells = {433568},
+			enchants = {7143}
+		},
+		{
+			spells = {433583},
+			enchants = {7144}
+		}
 	},
 	SHAMAN = {
-		{spells = {8017, 8018, 8019, 10399, 16314, 16315, 16316, 25479, 25485}, enchants = {29, 6, 1, 503, 1663, 683, 1664}},
-		{spells = {8024, 8027, 8030, 16339, 16341, 16342, 25489, 58785, 58789, 58790}, enchants = {5, 4, 3, 523, 1665, 1666, 2634, 3779, 3780, 3781}},
-		{spells = {8033, 8038, 10456, 16355, 16356, 25500, 58794, 58795, 58796}, enchants = {2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784}},
-		{spells = {8232, 8235, 10486, 16362, 25505, 58801, 58803, 58804}, enchants = {283, 284, 525, 1669, 2636, 3785, 3786, 3787}},
-		{spells = {51730, 51988, 51991, 51992, 51993, 51994}, enchants = {3345, 3346, 3347, 3348, 3349, 3350}},
-		{spells = {318038}},
-		{spells = {33757}},
-		{spells = {382021}},
-		{spells = {457481}, shield = true},
-		{spells = {462757}, shield = true}
+		{
+			spells = {8017, 8018, 8019, 10399, 16314, 16315, 16316, 25479, 25485},
+			enchants = {29, 6, 1, 503, 1663, 683, 1664}
+		},
+		{
+			spells = {8024, 8027, 8030, 16339, 16341, 16342, 25489, 58785, 58789, 58790},
+			enchants = {5, 4, 3, 523, 1665, 1666, 2634, 3779, 3780, 3781}
+		},
+		{
+			spells = {8033, 8038, 10456, 16355, 16356, 25500, 58794, 58795, 58796},
+			enchants = {2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784}
+		},
+		{
+			spells = {8232, 8235, 10486, 16362, 25505, 58801, 58803, 58804},
+			enchants = {283, 284, 525, 1669, 2636, 3785, 3786, 3787}
+		},
+		{
+			spells = {51730, 51988, 51991, 51992, 51993, 51994},
+			enchants = {3345, 3346, 3347, 3348, 3349, 3350}
+		},
+		{
+			spells = {318038}
+		},
+		{
+			spells = {33757}
+		},
+		{
+			spells = {382021}
+		},
+		{
+			spells = {457481},
+			shield = true
+		},
+		{
+			spells = {462757},
+			shield = true
+		}
 	}
 }
+
 local HIT_CHARGE_AURAS = {
 	DRUID = {
-		{spells = {16689, 16810, 16811, 16812, 16813, 17329, 27009, 53312}, lockout = 1, schoolMask = 1}
+		{
+			spells = {16689, 16810, 16811, 16812, 16813, 17329, 27009, 53312},
+			lockout = 1,
+			schoolMask = 1
+		}
 	},
 	SHAMAN = {
-		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5, castCharges = 3},
-		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960, 408510}, lockout = 3.5, castCharges = 3}
+		{
+			spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281},
+			lockout = 3.5,
+			castCharges = 3
+		},
+		{
+			spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960, 408510},
+			lockout = 3.5,
+			castCharges = 3,
+			healCrit = true
+		}
 	}
 }
+
 CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 	WARRIOR = {
-		{spells = {7384, 7887, 11584, 11585}},
-		{spells = {6572, 6574, 7379, 11600, 11601, 25288, 25269, 30357, 57823}}
+		{
+			spells = {7384, 7887, 11584, 11585}
+		},
+		{
+			spells = {6572, 6574, 7379, 11600, 11601, 25288, 25269, 30357, 57823}
+		}
 	},
 	ROGUE = {
-		{spells = {14251}}
+		{
+			spells = {14251}
+		}
 	},
 	HUNTER = {
-		{spells = {1495, 14269, 14270, 14271, 36916, 53339}},
-		{spells = {19306, 20909, 20910, 27067, 48998, 48999}}
+		{
+			spells = {1495, 14269, 14270, 14271, 36916, 53339}
+		},
+		{
+			spells = {19306, 20909, 20910, 27067, 48998, 48999}
+		}
 	}
 }
+
 local MINIMAP_TRACKING_SPELLS = {
 	[2481] = true,
 	[2383] = true,
@@ -178,52 +321,101 @@ local MINIMAP_TRACKING_SPELLS = {
 	[19885] = true,
 	[229533] = true
 }
+
 local PALADIN_BLESSING_FAMILIES = {
-	{spells = {19740, 19834, 19835, 19836, 19837, 19838, 25291, 27140, 48931, 48932}},
-	{spells = {25782, 25916, 27141, 48933, 48934}},
-	{spells = {19742, 19850, 19852, 19853, 19854, 25290, 27142, 48935, 48936}},
-	{spells = {25894, 25918, 27143, 48937, 48938}},
-	{spells = {20217}},
-	{spells = {25898}},
-	{spells = {20911, 20912, 20913, 20914, 27168}},
-	{spells = {25899}},
-	{spells = {1038}},
-	{spells = {25895}},
-	{spells = {19977, 19978, 19979, 27144, 32770}},
-	{spells = {25890}}
+	{
+		spells = {19740, 19834, 19835, 19836, 19837, 19838, 25291, 27140, 48931, 48932}
+	},
+	{
+		spells = {25782, 25916, 27141, 48933, 48934}
+	},
+	{
+		spells = {19742, 19850, 19852, 19853, 19854, 25290, 27142, 48935, 48936}
+	},
+	{
+		spells = {25894, 25918, 27143, 48937, 48938}
+	},
+	{
+		spells = {20217}
+	},
+	{
+		spells = {25898}
+	},
+	{
+		spells = {20911, 20912, 20913, 20914, 27168}
+	},
+	{
+		spells = {25899}
+	},
+	{
+		spells = {1038}
+	},
+	{
+		spells = {25895}
+	},
+	{
+		spells = {19977, 19978, 19979, 27144, 32770}
+	},
+	{
+		spells = {25890}
+	}
 }
-local PALADIN_OTHER_BLESSING_AURA_SPELLS = {
-	1022,
-	1044,
-	5599,
-	6940,
-	10278,
-	20729,
-	27147,
-	27148,
-	48949,
-	48950
-}
+
+local PALADIN_OTHER_BLESSING_AURA_SPELLS = {1022, 1044, 5599, 6940, 10278, 20729, 27147, 27148, 48949, 48950}
 local PALADIN_SEAL_FAMILIES = {
-	{spells = {21084, 20287, 20288, 20289, 20290, 20291, 20292, 20293}},
-	{spells = {21082, 20162, 20305, 20306, 20307, 20308}},
-	{spells = {20164}},
-	{spells = {20165, 20347, 20348, 20349}},
-	{spells = {20166, 20356, 20357}},
-	{spells = {20375, 20915, 20918, 20919, 20920}},
-	{spells = {1311649, 1311656, 20163, 20419, 20421, 20422, 20423}}
+	{
+		spells = {21084, 20287, 20288, 20289, 20290, 20291, 20292, 20293}
+	},
+	{
+		spells = {21082, 20162, 20305, 20306, 20307, 20308}
+	},
+	{
+		spells = {20164}
+	},
+	{
+		spells = {20165, 20347, 20348, 20349}
+	},
+	{
+		spells = {20166, 20356, 20357}
+	},
+	{
+		spells = {20375, 20915, 20918, 20919, 20920}
+	},
+	{
+		spells = {1311649, 1311656, 20163, 20419, 20421, 20422, 20423}
+	}
 }
+
 local HUNTER_ASPECT_FAMILIES = {
-	{spells = {13165, 14318, 14319, 14320, 14321, 14322, 25296, 27044}},
-	{spells = {13163}},
-	{spells = {5118}},
-	{spells = {13159}},
-	{spells = {13161, 1299445, 1299446, 1299447}},
-	{spells = {20043, 20190, 27045, 49071}},
-	{spells = {34074, 415423}},
-	{spells = {61846, 61847}},
-	{spells = {469145}}
+	{
+		spells = {13165, 14318, 14319, 14320, 14321, 14322, 25296, 27044}
+	},
+	{
+		spells = {13163}
+	},
+	{
+		spells = {5118}
+	},
+	{
+		spells = {13159}
+	},
+	{
+		spells = {13161, 1299445, 1299446, 1299447}
+	},
+	{
+		spells = {20043, 20190, 27045, 49071}
+	},
+	{
+		spells = {34074, 415423}
+	},
+	{
+		spells = {61846, 61847}
+	},
+	{
+		spells = {469145}
+	}
 }
+
 local TIMING = {
 	WEAPON_ENCHANT_LEARN_WINDOW = 0.5,
 	WEAPON_ENCHANT_LATE_CAST_WINDOW = 0.2,
@@ -232,6 +424,7 @@ local TIMING = {
 	GROUP_BUFF_UPDATE_DELAY = 0.5,
 	GROUP_BUFF_REFRESH_INTERVAL = 2
 }
+
 local WEAPON_ENCHANT_INVENTORY_SLOTS = {INVSLOT_MAINHAND or 16, INVSLOT_OFFHAND or 17, INVSLOT_RANGED or 18}
 local WEAPON_ENCHANT_SLOT_NAMES = {"MainHand", "OffHand", "Ranged"}
 local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
@@ -239,6 +432,7 @@ local WEAPON_ENCHANT_SLOT_BY_INVENTORY = {
 	[INVSLOT_OFFHAND or 17] = "OffHand",
 	[INVSLOT_RANGED or 18] = "Ranged"
 }
+
 local WEAPON_ENCHANT_REQUIRED_SLOTS = {
 	MainHand = INVSLOT_MAINHAND or 16,
 	OffHand = INVSLOT_OFFHAND or 17
@@ -285,10 +479,19 @@ local SNAP_CORNER_DISTANCE_SQ = SNAP_DISTANCE * SNAP_DISTANCE * 2
 local SNAP_SELECTION_PADDING = 2
 local SNAP_LINE_WIDTH = 1.5
 local snapExclusions = {}
-local snapSidesCache = setmetatable({}, {__mode = "k"})
+local snapSidesCache = setmetatable({}, {
+	__mode = "k"
+})
+
 local topLevelParent = {}
 local SNAP_CORNER_POINTS = {"TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT"}
-local SNAP_DIAGONAL_CORNERS = {TOPLEFT = "BOTTOMRIGHT", TOPRIGHT = "BOTTOMLEFT", BOTTOMLEFT = "TOPRIGHT", BOTTOMRIGHT = "TOPLEFT"}
+local SNAP_DIAGONAL_CORNERS = {
+	TOPLEFT = "BOTTOMRIGHT",
+	TOPRIGHT = "BOTTOMLEFT",
+	BOTTOMLEFT = "TOPRIGHT",
+	BOTTOMRIGHT = "TOPLEFT"
+}
+
 local reminderSettingDefaults = {
 	orientation = 0,
 	iconDirection = 1,
@@ -300,6 +503,7 @@ local reminderSettingDefaults = {
 	showTooltips = 1,
 	showGlow = 1
 }
+
 local function IsSupportedClient()
 	return CooldownManagerUtils:GetWoWBuildNr() >= 120000 or CooldownManagerUtils:IsForever()
 end
@@ -398,9 +602,11 @@ local function GetPaladinBlessingAuraSpells()
 			AddCandidate(spells, seen, spellID)
 		end
 	end
+
 	for _, spellID in ipairs(PALADIN_OTHER_BLESSING_AURA_SPELLS) do
 		AddCandidate(spells, seen, spellID)
 	end
+
 	paladinBlessingAuraSpells = spells
 	return spells
 end
@@ -427,6 +633,7 @@ local function GetPaladinSealAuraSpells()
 			AddCandidate(spells, seen, spellID)
 		end
 	end
+
 	paladinSealAuraSpells = spells
 	return spells
 end
@@ -453,6 +660,7 @@ local function GetHunterAspectAuraSpells()
 			AddCandidate(spells, seen, spellID)
 		end
 	end
+
 	hunterAspectAuraSpells = spells
 	return spells
 end
@@ -464,6 +672,7 @@ local function GetLearnedAuras()
 		learned = {}
 		CooldownManagerUtilsDB.learnedAuras = learned
 	end
+
 	learned.spells = learned.spells or {}
 	learned.names = learned.names or {}
 	learned.durations = learned.durations or {}
@@ -544,6 +753,7 @@ local function GetWeaponEnchantFallbackNames()
 		local name = GetSpellNameSafe(family.spells[1])
 		if name and not names[name] then names[name] = family end
 	end
+
 	weaponEnchantFallbackNames = names
 	return names
 end
@@ -575,6 +785,7 @@ local function AddTemporaryWeaponEnchant(enchants, slot, enchantID, remaining)
 		enchants.hasSecret = true
 		return
 	end
+
 	if type(enchantID) ~= "number" or enchants.slots[slot] then return end
 	enchants.slots[slot] = true
 	table.insert(enchants, {
@@ -585,7 +796,10 @@ local function AddTemporaryWeaponEnchant(enchants, slot, enchantID, remaining)
 end
 
 local function GetTemporaryWeaponEnchants()
-	local enchants = {slots = {}}
+	local enchants = {
+		slots = {}
+	}
+
 	if C_Item and type(C_Item.GetWeaponEnchantInfo) == "function" and Enum and Enum.WeaponSlot then
 		local permanentType = Enum.ItemEnchantType and Enum.ItemEnchantType.Permanent or 1
 		for _, slotName in ipairs(WEAPON_ENCHANT_SLOT_NAMES) do
@@ -596,14 +810,13 @@ local function GetTemporaryWeaponEnchants()
 					enchants.hasSecret = true
 				elseif ok and type(list) == "table" then
 					for _, info in pairs(list) do
-						if type(info) == "table" and info.hasEnchant == true and info.enchantType ~= permanentType then
-							AddTemporaryWeaponEnchant(enchants, slotName, info.enchantID, info.timeLeft)
-						end
+						if type(info) == "table" and info.hasEnchant == true and info.enchantType ~= permanentType then AddTemporaryWeaponEnchant(enchants, slotName, info.enchantID, info.timeLeft) end
 					end
 				end
 			end
 		end
 	end
+
 	if C_PaperDollInfo and type(C_PaperDollInfo.GetTemporaryEnchantmentInfo) == "function" then
 		for _, slot in ipairs(WEAPON_ENCHANT_INVENTORY_SLOTS) do
 			local ok, info = pcall(C_PaperDollInfo.GetTemporaryEnchantmentInfo, slot)
@@ -614,6 +827,7 @@ local function GetTemporaryWeaponEnchants()
 			end
 		end
 	end
+
 	if #enchants == 0 and type(GetWeaponEnchantInfo) == "function" then
 		local ok, hasMainHand, mainHandRemaining, _, mainHandID, hasOffHand, offHandRemaining, _, offHandID = pcall(GetWeaponEnchantInfo)
 		if ok and (IsSecret(hasMainHand) or IsSecret(hasOffHand)) then
@@ -639,11 +853,21 @@ local function RecordWeaponEnchantChanges(silent)
 			local expected = previous.remaining - (now - previous.time) * 1000
 			changed = enchant.remaining - expected > TIMING.WEAPON_ENCHANT_REFRESH_MS
 		end
+
 		if changed and not silent then
-			table.insert(recentWeaponEnchantChanges, {enchantID = enchant.enchantID, time = now})
+			table.insert(recentWeaponEnchantChanges, {
+				enchantID = enchant.enchantID,
+				time = now
+			})
 		end
-		weaponEnchantState[enchant.slot] = {enchantID = enchant.enchantID, remaining = enchant.remaining, time = now}
+
+		weaponEnchantState[enchant.slot] = {
+			enchantID = enchant.enchantID,
+			remaining = enchant.remaining,
+			time = now
+		}
 	end
+
 	if current.hasSecret then return end
 	for slot in pairs(weaponEnchantState) do
 		if not seenSlots[slot] then weaponEnchantState[slot] = nil end
@@ -662,9 +886,11 @@ local function PruneLearnedEnchantIDs(list, key, family)
 		list[key] = nil
 		return
 	end
+
 	for enchantID in pairs(enchantIDs) do
 		if IsForeignWeaponEnchant(family, enchantID) then enchantIDs[enchantID] = nil end
 	end
+
 	if not next(enchantIDs) then list[key] = nil end
 end
 
@@ -673,6 +899,7 @@ local function PruneLearnedWeaponEnchants()
 	for spellID in pairs(learned.weaponSpells) do
 		PruneLearnedEnchantIDs(learned.weaponSpells, spellID, GetWeaponEnchantCatalogFamily(spellID))
 	end
+
 	for spellName in pairs(learned.weaponNames) do
 		PruneLearnedEnchantIDs(learned.weaponNames, spellName, GetWeaponEnchantFallbackNames()[spellName])
 	end
@@ -688,6 +915,7 @@ local function LearnWeaponEnchant(spellID, spellName, enchantID)
 		learned.weaponSpells[spellID][enchantID] = true
 		changed = true
 	end
+
 	if spellName then
 		learned.weaponNames[spellName] = learned.weaponNames[spellName] or {}
 		if not learned.weaponNames[spellName][enchantID] then
@@ -710,6 +938,7 @@ local function MatchWeaponEnchantLearning()
 			local delta = change.time - cast.time
 			if delta >= -TIMING.WEAPON_ENCHANT_LATE_CAST_WINDOW and delta <= TIMING.WEAPON_ENCHANT_LEARN_WINDOW and (not bestDelta or math.abs(delta) < bestDelta) then bestCast, bestDelta = cast, math.abs(delta) end
 		end
+
 		if bestCast then
 			if LearnWeaponEnchant(bestCast.spellID, bestCast.name, change.enchantID) then learnedNew = true end
 			table.remove(recentWeaponEnchantChanges, changeIndex)
@@ -725,6 +954,7 @@ local function GetKnownWeaponEnchantIDs()
 			knownEnchantIDs[enchantID] = true
 		end
 	end
+
 	for _, enchantIDs in pairs(GetLearnedWeaponEnchants().weaponSpells) do
 		for enchantID in pairs(enchantIDs) do
 			knownEnchantIDs[enchantID] = true
@@ -741,14 +971,17 @@ local function GetEntryWeaponEnchantIDs(entry)
 		for _, enchantID in ipairs(family and family.enchants or {}) do
 			enchantIDs[enchantID] = true
 		end
+
 		for enchantID in pairs(learned.weaponSpells[spellID] or {}) do
 			enchantIDs[enchantID] = true
 		end
 	end
+
 	AddSpell(entry.spellID)
 	for _, candidateSpellID in ipairs(entry.candidates) do
 		AddSpell(candidateSpellID)
 	end
+
 	for enchantID in pairs(learned.weaponNames[entry.name] or {}) do
 		enchantIDs[enchantID] = true
 	end
@@ -784,6 +1017,7 @@ local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, unlearn
 		candidates = {},
 		seen = {}
 	}
+
 	AddAuraMappingSpell(mapping, info.overrideSpellID)
 	AddAuraMappingSpell(mapping, info.overrideTooltipSpellID)
 	AddAuraMappingSpell(mapping, info.spellID)
@@ -792,6 +1026,7 @@ local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, unlearn
 			AddAuraMappingSpell(mapping, linkedSpellID)
 		end
 	end
+
 	local sourceSpellID = info.overrideSpellID or info.spellID
 	if type(sourceSpellID) == "number" then
 		knownAuraSources[sourceSpellID] = info.spellID or sourceSpellID
@@ -804,6 +1039,7 @@ local function AddCooldownAuraMapping(knownAuraSpells, knownAuraSources, unlearn
 			candidates = {},
 			seen = {}
 		}
+
 		local target = knownAuraSpells[mappedSpellID]
 		for _, candidateSpellID in ipairs(mapping.candidates) do
 			AddCandidate(target.candidates, target.seen, candidateSpellID)
@@ -836,6 +1072,7 @@ local function AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSo
 				candidates = {},
 				seen = {}
 			}
+
 			local mapping = knownAuraSpells[spellID]
 			mapping.groupBuff = true
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
@@ -854,6 +1091,7 @@ local function AddClassAuraFallbackMappings(knownAuraSpells, knownAuraSources, u
 			seen = {},
 			groupBuff = definition.groupBuff
 		}
+
 		AddCandidate(mapping.candidates, mapping.seen, spellID)
 		AddCandidate(mapping.candidates, mapping.seen, definition.auraSpellID)
 		knownAuraSpells[spellID] = mapping
@@ -870,10 +1108,12 @@ local function AddRacialAuraFallbackMappings(knownAuraSpells, knownAuraSources)
 				candidates = {},
 				seen = {}
 			}
+
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			for _, auraSpellID in ipairs(definition.auraSpellIDs or {}) do
 				AddCandidate(mapping.candidates, mapping.seen, auraSpellID)
 			end
+
 			knownAuraSpells[spellID] = mapping
 			knownAuraSources[spellID] = spellID
 		end
@@ -890,6 +1130,7 @@ local function AddPaladinBlessingMappings(knownAuraSpells, knownAuraSources, unl
 			groupBuff = true,
 			paladinBlessing = true
 		}
+
 		for _, spellID in ipairs(family.spells) do
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
@@ -908,6 +1149,7 @@ local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources, unlearn
 			seen = {},
 			paladinSeal = true
 		}
+
 		for _, spellID in ipairs(family.spells) do
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
@@ -926,6 +1168,7 @@ local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources, unlear
 			seen = {},
 			hunterAspect = true
 		}
+
 		for _, spellID in ipairs(family.spells) do
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
@@ -944,6 +1187,7 @@ function CooldownManagerUtils.AddForeverReactiveAbilityMappings(knownAuraSpells,
 			seen = {},
 			reactiveAbility = true
 		}
+
 		for _, spellID in ipairs(family.spells) do
 			AddCandidate(mapping.candidates, mapping.seen, spellID)
 			knownAuraSpells[spellID] = mapping
@@ -968,17 +1212,16 @@ local function BuildKnownAuraSpellLookup()
 		knownAuraSources[spellID] = spellID
 		unlearnedAuraSources[spellID] = true
 	end
+
 	local cooldownViewer = C_CooldownViewer
 	local categoryEnum = Enum and Enum.CooldownViewerCategory
 	if not cooldownViewer or not categoryEnum or not cooldownViewer.GetCooldownViewerCategorySet or not cooldownViewer.GetCooldownViewerCooldownInfo then return knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources end
-
 	AddGroupBuffMappings(cooldownViewer, knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local seenCooldownIDs = {}
 	for _, categoryName in ipairs(COOLDOWN_AURA_CATEGORIES) do
 		local category = categoryEnum[categoryName]
 		if category ~= nil then AddCooldownCategoryMappings(cooldownViewer, category, knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources, seenCooldownIDs) end
 	end
-
 	return knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources
 end
 
@@ -1043,6 +1286,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	elseif reactiveFamily then
 		spellID = reactiveFamily.spells[1]
 	end
+
 	local candidates = {}
 	local seenCandidates = {}
 	AddCandidate(candidates, seenCandidates, spellID)
@@ -1051,22 +1295,25 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	for _, familySpellID in ipairs(family and family.spells or {}) do
 		AddCandidate(candidates, seenCandidates, familySpellID)
 	end
+
 	for _, familySpellID in ipairs(reactiveFamily and reactiveFamily.spells or {}) do
 		AddCandidate(candidates, seenCandidates, familySpellID)
 	end
+
 	local auraMapping = knownAuraSpells[spellID] or knownAuraSpells[baseSpellID]
 	if auraMapping then
 		for _, auraSpellID in ipairs(auraMapping.candidates) do
 			AddCandidate(candidates, seenCandidates, auraSpellID)
 		end
 	end
+
 	if C_Spell.GetBaseSpell then
 		local ok, result = pcall(C_Spell.GetBaseSpell, spellID)
 		if ok and not IsSecret(result) then AddCandidate(candidates, seenCandidates, result) end
 	end
+
 	local spellName = GetSpellNameSafe(spellID)
 	if spellName then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
-
 	local weaponEnchant = family ~= nil or IsWeaponEnchantSpell(sourceSpellID) or IsWeaponEnchantSpell(baseSpellID)
 	local minimapTracking = MINIMAP_TRACKING_SPELLS[sourceSpellID] == true or MINIMAP_TRACKING_SPELLS[baseSpellID] == true
 	local existing = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
@@ -1169,9 +1416,8 @@ local function AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learn
 			local knownOK, result = pcall(isSpellKnown, spellID, playerBank, true)
 			if knownOK and not IsSecret(result) and type(result) == "boolean" then isKnown = result end
 		end
-		if type(isKnown) == "boolean" and (isKnown or unlearnedAuraSources[spellID]) then
-			AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, isKnown)
-		end
+
+		if type(isKnown) == "boolean" and (isKnown or unlearnedAuraSources[spellID]) then AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, isKnown) end
 	end
 end
 
@@ -1232,7 +1478,14 @@ function CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, ava
 		local talentCount = type(GetNumTalents) == "function" and GetNumTalents(specializationIndex) or 100
 		if type(talentCount) ~= "number" then talentCount = 100 end
 		for talentIndex = 1, talentCount do
-			local talentOK, talentInfo = pcall(getTalentInfo, {specializationIndex = specializationIndex, talentIndex = talentIndex, isInspect = false, isPet = false, groupIndex = groupIndex})
+			local talentOK, talentInfo = pcall(getTalentInfo, {
+				specializationIndex = specializationIndex,
+				talentIndex = talentIndex,
+				isInspect = false,
+				isPet = false,
+				groupIndex = groupIndex
+			})
+
 			if talentOK and type(talentInfo) == "table" then
 				local learned = type(talentInfo.known) == "boolean" and talentInfo.known or type(talentInfo.rank) == "number" and talentInfo.rank > 0
 				CooldownManagerUtils.AddTalentSpell(talentInfo.spellID, learned, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
@@ -1244,9 +1497,7 @@ function CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, ava
 end
 
 function CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-	if not CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID) then
-		CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-	end
+	if not CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID) then CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 end
 
 function CooldownManagerUtils:GetCooldownManagerLayoutKey()
@@ -1279,7 +1530,10 @@ function CooldownManagerUtils:GetProfile()
 		if self.activeCooldownManagerSpecKey == specKey then template = self.activeCooldownManagerProfile end
 		if not template and CooldownManagerUtilsDB.profiles then template = CooldownManagerUtilsDB.profiles[specKey] end
 		if not template and activeLayoutData and activeLayoutData.profiles then template = activeLayoutData.profiles[specKey] end
-		profile = template and CopyTable(template) or {selected = {}}
+		profile = template and CopyTable(template) or {
+			selected = {}
+		}
+
 		profiles[specKey][layoutKey] = profile
 	end
 
@@ -1391,6 +1645,7 @@ function CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBu
 									if not IsSecret(linkedSpellID) then AddCandidate(candidates, seenCandidates, linkedSpellID) end
 								end
 							end
+
 							local entry = {
 								spellID = spellID,
 								name = spellInfo.name,
@@ -1400,6 +1655,7 @@ function CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBu
 								isLearned = IsSecret(info.isKnown) or info.isKnown ~= false,
 								candidates = candidates
 							}
+
 							availableBuffsBySpellID[spellID] = entry
 							if overrideSpellID then availableBuffsBySpellID[overrideSpellID] = entry end
 							table.insert(availableBuffs, entry)
@@ -1435,11 +1691,11 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	for skillLineIndex = 1, numSkillLines do
 		if skillLineIndex ~= generalLine then AddSpellBookSkillLine(skillLineIndex, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
 	end
+
 	CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
-
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
 	self.availableBuffs = availableBuffs
 	self.availableBuffsBySpellID = availableBuffsBySpellID
@@ -1475,6 +1731,7 @@ local function GetLayoutStore(layoutType)
 		CooldownManagerUtilsGlobalDB = CooldownManagerUtilsGlobalDB or {}
 		root = CooldownManagerUtilsGlobalDB
 	end
+
 	root.editModeLayouts = root.editModeLayouts or {}
 	return root.editModeLayouts
 end
@@ -1486,13 +1743,18 @@ local function ResolveActiveLayoutData()
 		key = "default"
 		layoutType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Character or 2
 	end
+
 	local store = GetLayoutStore(layoutType)
 	local data = store[key]
 	if type(data) ~= "table" then
 		local template = activeLayoutData
 		if not template and (CooldownManagerUtilsDB.position or CooldownManagerUtilsDB.reminderSettings) then
-			template = {position = CooldownManagerUtilsDB.position, settings = CooldownManagerUtilsDB.reminderSettings}
+			template = {
+				position = CooldownManagerUtilsDB.position,
+				settings = CooldownManagerUtilsDB.reminderSettings
+			}
 		end
+
 		data = {
 			positions = {
 				buff = template and (template.positions and template.positions.buff or template.position) and CopyTable(template.positions and template.positions.buff or template.position) or nil,
@@ -1503,12 +1765,20 @@ local function ResolveActiveLayoutData()
 				ability = template and template.barSettings and template.barSettings.ability and CopyTable(template.barSettings.ability) or {}
 			}
 		}
+
 		store[key] = data
 		CooldownManagerUtilsDB.position = nil
 		CooldownManagerUtilsDB.reminderSettings = nil
 	end
-	data.positions = type(data.positions) == "table" and data.positions or {buff = data.position}
-	data.barSettings = type(data.barSettings) == "table" and data.barSettings or {buff = type(data.settings) == "table" and data.settings or {}}
+
+	data.positions = type(data.positions) == "table" and data.positions or {
+		buff = data.position
+	}
+
+	data.barSettings = type(data.barSettings) == "table" and data.barSettings or {
+		buff = type(data.settings) == "table" and data.settings or {}
+	}
+
 	data.barSettings.buff = type(data.barSettings.buff) == "table" and data.barSettings.buff or {}
 	data.barSettings.ability = type(data.barSettings.ability) == "table" and data.barSettings.ability or {}
 	data.barSettings.expiring = type(data.barSettings.expiring) == "table" and data.barSettings.expiring or {}
@@ -1534,6 +1804,7 @@ local function RestorePosition(frame)
 			frame.snapTarget = relativeTo
 			relativeTo = relativeTo.Selection
 		end
+
 		frame:SetPoint(position.point or "CENTER", relativeTo, position.relativePoint or "CENTER", position.x or DEFAULT_REMINDER_X, position.y or defaultY)
 	else
 		frame:SetPoint("CENTER", UIParent, "CENTER", DEFAULT_REMINDER_X, defaultY)
@@ -1548,6 +1819,7 @@ local function SavePosition(frame)
 		relativeName = frame.snapTarget:GetName()
 		relativeSelection = relativeName and true or nil
 	end
+
 	if relativeTo and relativeTo ~= UIParent and not relativeName then
 		local centerX, centerY = frame:GetCenter()
 		local parentCenterX, parentCenterY = UIParent:GetCenter()
@@ -1556,6 +1828,7 @@ local function SavePosition(frame)
 		x = centerX - parentCenterX
 		y = centerY - parentCenterY
 	end
+
 	GetActiveLayoutData().positions[frame.reminderType] = {
 		point = point,
 		relativeTo = relativeName,
@@ -1571,6 +1844,7 @@ local function GetReminderSettings(reminderType)
 	for key, value in pairs(reminderSettingDefaults) do
 		if settings[key] == nil then settings[key] = value end
 	end
+
 	settings.hideWhenInactive = nil
 	settings.iconSize = math.min(math.max(settings.iconSize, ICON_SCALE_MIN), ICON_SCALE_MAX)
 	return settings
@@ -1610,6 +1884,7 @@ local function GetScaledSelectionSides(frame)
 		sides = {}
 		snapSidesCache[frame] = sides
 	end
+
 	sides.left = left * factor
 	sides.right = (left + width) * factor
 	sides.bottom = bottom * factor
@@ -1664,30 +1939,18 @@ local function FindClosestGridLine(sides, verticalLines)
 	local parent = topLevelParent
 	local checkPoints
 	if verticalLines then
-		checkPoints = {
-			{"LEFT", "LEFT", sides.left, parent.left},
-			{"RIGHT", "RIGHT", sides.right, parent.right},
-			{"CENTER", "CENTER", sides.centerX, parent.centerX},
-			{"LEFT", "CENTER", sides.left, parent.centerX},
-			{"RIGHT", "CENTER", sides.right, parent.centerX}
-		}
+		checkPoints = {{"LEFT", "LEFT", sides.left, parent.left}, {"RIGHT", "RIGHT", sides.right, parent.right}, {"CENTER", "CENTER", sides.centerX, parent.centerX}, {"LEFT", "CENTER", sides.left, parent.centerX}, {"RIGHT", "CENTER", sides.right, parent.centerX}}
 	else
-		checkPoints = {
-			{"TOP", "TOP", sides.top, parent.top},
-			{"BOTTOM", "BOTTOM", sides.bottom, parent.bottom},
-			{"CENTER", "CENTER", sides.centerY, parent.centerY},
-			{"TOP", "CENTER", sides.top, parent.centerY},
-			{"BOTTOM", "CENTER", sides.bottom, parent.centerY}
-		}
+		checkPoints = {{"TOP", "TOP", sides.top, parent.top}, {"BOTTOM", "BOTTOM", sides.bottom, parent.bottom}, {"CENTER", "CENTER", sides.centerY, parent.centerY}, {"TOP", "CENTER", sides.top, parent.centerY}, {"BOTTOM", "CENTER", sides.bottom, parent.centerY}}
 	end
+
 	local closestDistance, closestPoint, closestRelativePoint
 	local closestOffset = 0
 	for _, checkPoint in ipairs(checkPoints) do
 		local distance = math.abs(checkPoint[4] - checkPoint[3])
-		if not closestDistance or distance < closestDistance then
-			closestDistance, closestPoint, closestRelativePoint = distance, checkPoint[1], checkPoint[2]
-		end
+		if not closestDistance or distance < closestDistance then closestDistance, closestPoint, closestRelativePoint = distance, checkPoint[1], checkPoint[2] end
 	end
+
 	local gridLines = GetGridLines(verticalLines)
 	if gridLines then
 		for _, gridLineOffset in pairs(gridLines) do
@@ -1718,7 +1981,15 @@ local function CheckReplaceMagneticFrameInfo(current, target, sides, point, rela
 	local scaledDistance = distance * UIParent:GetEffectiveScale()
 	if scaledDistance > SNAP_DISTANCE then return current end
 	if not current or scaledDistance < current.distance then
-		return {target = target, sides = sides, point = point, relativePoint = relativePoint, distance = scaledDistance, offset = offset, isHorizontal = isHorizontal}
+		return {
+			target = target,
+			sides = sides,
+			point = point,
+			relativePoint = relativePoint,
+			distance = scaledDistance,
+			offset = offset,
+			isHorizontal = isHorizontal
+		}
 	end
 	return current
 end
@@ -1739,14 +2010,22 @@ local function GetCornerMagneticFrameInfo(sides, relativeInfo)
 			if SNAP_DIAGONAL_CORNERS[point] ~= relativePoint then
 				local relativeX, relativeY = GetCornerPosition(relativeSides, relativePoint)
 				local sqrDistance = (x - relativeX) * (x - relativeX) + (y - relativeY) * (y - relativeY)
-				if sqrDistance <= SNAP_CORNER_DISTANCE_SQ and (not closestSqrDistance or sqrDistance < closestSqrDistance) then
-					closestPoint, closestRelativePoint, closestSqrDistance = point, relativePoint, sqrDistance
-				end
+				if sqrDistance <= SNAP_CORNER_DISTANCE_SQ and (not closestSqrDistance or sqrDistance < closestSqrDistance) then closestPoint, closestRelativePoint, closestSqrDistance = point, relativePoint, sqrDistance end
 			end
 		end
 	end
+
 	if not closestSqrDistance then return end
-	return {target = relativeInfo.target, sides = relativeSides, point = closestPoint, relativePoint = closestRelativePoint, distance = math.sqrt(closestSqrDistance), offset = 0, isHorizontal = relativeInfo.isHorizontal, isCornerSnap = true}
+	return {
+		target = relativeInfo.target,
+		sides = relativeSides,
+		point = closestPoint,
+		relativePoint = closestRelativePoint,
+		distance = math.sqrt(closestSqrDistance),
+		offset = 0,
+		isHorizontal = relativeInfo.isHorizontal,
+		isCornerSnap = true
+	}
 end
 
 local function GetMagneticFrameInfos(frame)
@@ -1770,21 +2049,25 @@ local function GetMagneticFrameInfos(frame)
 					else
 						distance, point, relativePoint = targetSides.left - sides.right, "RIGHT", "LEFT"
 					end
+
 					horizontalInfo = CheckReplaceMagneticFrameInfo(horizontalInfo, target, targetSides, point, relativePoint, distance, 0, true)
 					horizontalCornerInfo = CheckReplaceMagneticFrameInfo(horizontalCornerInfo, target, targetSides, point, relativePoint, distance, 0, true)
 				end
+
 				if horizontallyAligned and (sides.bottom > targetSides.top or sides.top < targetSides.bottom) then
 					if targetSides.bottom > sides.top then
 						distance, point, relativePoint = targetSides.bottom - sides.top, "TOP", "BOTTOM"
 					else
 						distance, point, relativePoint = sides.bottom - targetSides.top, "BOTTOM", "TOP"
 					end
+
 					verticalInfo = CheckReplaceMagneticFrameInfo(verticalInfo, target, targetSides, point, relativePoint, distance, 0, false)
 					verticalCornerInfo = CheckReplaceMagneticFrameInfo(verticalCornerInfo, target, targetSides, point, relativePoint, distance, 0, false)
 				end
 			end
 		end
 	end
+
 	local horizontalCorner = GetCornerMagneticFrameInfo(sides, horizontalCornerInfo)
 	local verticalCorner = GetCornerMagneticFrameInfo(sides, verticalCornerInfo)
 	if horizontalCorner and (not verticalCorner or horizontalCorner.distance < verticalCorner.distance) then
@@ -1802,9 +2085,7 @@ end
 
 local function GetPreviewLineAnchors(info)
 	local relativePoint = info.relativePoint
-	if relativePoint:find("CENTER") then
-		return {info.isHorizontal and "CenterVertical" or "CenterHorizontal"}
-	end
+	if relativePoint:find("CENTER") then return {info.isHorizontal and "CenterVertical" or "CenterHorizontal"} end
 	local anchors = {}
 	if relativePoint:find("TOP") then table.insert(anchors, "Top") end
 	if relativePoint:find("BOTTOM") then table.insert(anchors, "Bottom") end
@@ -1846,6 +2127,7 @@ local function SetupPreviewLine(line, info, lineAnchor)
 			offsetX = sides.centerX - parent.centerX
 		end
 	end
+
 	line:ClearAllPoints()
 	if lineAnchor == "Top" or lineAnchor == "Bottom" or lineAnchor == "CenterHorizontal" then
 		line:SetStartPoint("LEFT", UIParent, offsetX, offsetY)
@@ -1854,6 +2136,7 @@ local function SetupPreviewLine(line, info, lineAnchor)
 		line:SetStartPoint("TOP", UIParent, offsetX, offsetY)
 		line:SetEndPoint("BOTTOM", UIParent, offsetX, offsetY)
 	end
+
 	line:SetThickness(PixelUtil.GetNearestPixelSize(SNAP_LINE_WIDTH, line:GetEffectiveScale(), SNAP_LINE_WIDTH))
 	line:Show()
 end
@@ -1885,13 +2168,16 @@ local function UpdateSnapPreview(frame)
 					line:SetColorTexture(1, 0, 0, 1)
 					preview.Lines[count] = line
 				end
+
 				SetupPreviewLine(line, info, lineAnchor)
 			end
 		end
 	end
+
 	for index = count + 1, #preview.Lines do
 		preview.Lines[index]:Hide()
 	end
+
 	preview:SetShown(count > 0)
 end
 
@@ -1913,9 +2199,7 @@ end
 local function GetCombinedSelectionOffset(frame, info, forYOffset)
 	local factor = GetUIParentScaleFactor(frame)
 	local offset = info.offset - GetSelectionPadding(info.point, forYOffset, factor)
-	if info.target ~= UIParent then
-		offset = offset + GetSelectionPadding(info.relativePoint, forYOffset, GetUIParentScaleFactor(info.target.Selection))
-	end
+	if info.target ~= UIParent then offset = offset + GetSelectionPadding(info.relativePoint, forYOffset, GetUIParentScaleFactor(info.target.Selection)) end
 	return offset / factor
 end
 
@@ -1941,6 +2225,7 @@ local function SnapToMagneticFrame(frame, info)
 			offsetY = GetCombinedSelectionOffset(frame, info, true)
 		end
 	end
+
 	frame:ClearAllPoints()
 	frame:SetPoint(info.point, relativeRegion, info.relativePoint, offsetX, offsetY)
 	frame.snapTarget = info.target ~= UIParent and info.target or nil
@@ -1973,7 +2258,10 @@ local function RefreshSnapTargets()
 	wipe(snapTargets)
 	wipe(snapTargetLookup)
 	local children = {UIParent:GetChildren()}
-	for _, target in ipairs(children) do AddSnapTarget(target) end
+	for _, target in ipairs(children) do
+		AddSnapTarget(target)
+	end
+
 	if type(EnumerateFrames) ~= "function" then return end
 	if not snapScanFrame then snapScanFrame = CreateFrame("Frame") end
 	snapScanCursor = nil
@@ -1985,15 +2273,18 @@ local function RefreshSnapTargets()
 				self:SetScript("OnUpdate", nil)
 				return
 			end
+
 			AddSnapTarget(snapScanCursor)
 		until debugprofilestop() - started >= 1.5
 	end)
+
 	for _ = 1, 50 do
 		snapScanCursor = EnumerateFrames(snapScanCursor)
 		if not snapScanCursor then
 			StopSnapTargetScan()
 			break
 		end
+
 		AddSnapTarget(snapScanCursor)
 	end
 end
@@ -2028,6 +2319,7 @@ local function CreateDropdownSetting(parent, layoutIndex, labelText, key, values
 			end, value)
 		end
 	end)
+
 	row.Refresh = function(self) self.Dropdown:GenerateMenu() end
 	row:Show()
 	return row
@@ -2047,6 +2339,7 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 	local formatters = {
 		[MinimalSliderWithSteppersMixin.Label.Right] = CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
 	}
+
 	local steps = (maximum - minimum) / step
 	row.Slider:Init(reminderSettingDefaults[key], minimum, maximum, steps, formatters)
 	row.cbrHandles = EventUtil.CreateCallbackHandleContainer()
@@ -2057,12 +2350,14 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 		if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
 		ApplyReminderSettings(panel.owner)
 	end, row)
+
 	row.Refresh = function(self)
 		self.refreshing = true
 		local owner = parent:GetParent().owner
 		self.Slider:SetValue(GetReminderSettings(owner.reminderType)[key])
 		self.refreshing = nil
 	end
+
 	row:Show()
 	return row
 end
@@ -2092,10 +2387,12 @@ local function CreateCheckboxSetting(parent, layoutIndex, labelText, key)
 		if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
 		ApplyReminderSettings(panel.owner)
 	end)
+
 	row.Refresh = function(self)
 		local owner = parent:GetParent().owner
 		self.Button:SetChecked(GetReminderSettings(owner.reminderType)[key] == 1)
 	end
+
 	row:Show()
 	return row
 end
@@ -2105,6 +2402,7 @@ local function CreateReminderOptionsFrame(owner)
 		reminderOptionsFrame.owner = owner
 		return reminderOptionsFrame
 	end
+
 	local panel = CreateFrame("Frame", "CooldownManagerUtilsReminderOptions", UIParent, "ResizeLayoutFrame")
 	panel:SetSize(300, 350)
 	panel:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -250, 250)
@@ -2138,16 +2436,19 @@ local function CreateReminderOptionsFrame(owner)
 	local function OrientationText(value)
 		return value == 0 and (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ORIENTATION_HORIZONTAL or HORIZONTAL or "Horizontal") or (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ORIENTATION_VERTICAL or VERTICAL or "Vertical")
 	end
+
 	local function DirectionText(value)
 		local vertical = GetReminderSettings(panel.owner.reminderType).orientation == 1
 		if vertical then return value == 0 and (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_DOWN or "Down") or (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_UP or "Up") end
 		return value == 0 and (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_LEFT or "Left") or (_G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION_RIGHT or "Right")
 	end
+
 	local function VisibilityText(value)
 		if value == 1 then return _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_VISIBLE_SETTING_IN_COMBAT or "In combat" end
 		if value == 2 then return _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_VISIBLE_SETTING_HIDDEN or HIDDEN or "Hidden" end
 		return _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_VISIBLE_SETTING_ALWAYS or ALWAYS or "Always"
 	end
+
 	local labels = {
 		orientation = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ORIENTATION or "Orientation",
 		direction = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_ICON_DIRECTION or "Icon direction",
@@ -2158,6 +2459,7 @@ local function CreateReminderOptionsFrame(owner)
 		showTimer = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_SHOW_TIMER or "Show timer",
 		showTooltips = _G.HUD_EDIT_MODE_SETTING_COOLDOWN_VIEWER_SHOW_TOOLTIPS or "Show tooltips"
 	}
+
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 1, labels.orientation, "orientation", orientationValues, OrientationText))
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 2, labels.direction, "iconDirection", directionValues, DirectionText))
 	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 3, labels.size, "iconSize", ICON_SCALE_MIN, ICON_SCALE_MAX, 10, "%"))
@@ -2177,10 +2479,14 @@ local function CreateReminderOptionsFrame(owner)
 	panel.RevertChanges:SetScript("OnClick", function(self)
 		if not panel.originalSettings then return end
 		local settings = GetReminderSettings(panel.owner.reminderType)
-		for key, value in pairs(panel.originalSettings) do settings[key] = value end
+		for key, value in pairs(panel.originalSettings) do
+			settings[key] = value
+		end
+
 		self:SetEnabled(false)
 		ApplyReminderSettings(panel.owner)
 	end)
+
 	panel.Divider = panel.Buttons:CreateTexture(nil, "ARTWORK")
 	panel.Divider:SetSize(330, 16)
 	panel.Divider:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-OnlineDivider")
@@ -2194,6 +2500,7 @@ local function CreateReminderOptionsFrame(owner)
 		GetActiveLayoutData().positions[frame.reminderType] = nil
 		RestorePosition(frame)
 	end)
+
 	panel.EditModeClose = CreateFrame("Button", "CooldownManagerUtilsEditModeClose", UIParent, "InsecureActionButtonTemplate")
 	panel.EditModeClose:Hide()
 	panel.EditModeClose:SetAttribute("useOnKeyDown", false)
@@ -2210,26 +2517,34 @@ local function CreateReminderOptionsFrame(owner)
 	else
 		panel.CooldownSettings:SetEnabled(false)
 	end
+
 	panel.CooldownSettings:SetScript("PostClick", function()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		CooldownManagerUtils:ShowReminderSettingsTab(panel.owner.reminderType)
 	end)
+
 	panel.Refresh = function(self)
-		for _, control in ipairs(self.controls) do control:Refresh() end
+		for _, control in ipairs(self.controls) do
+			control:Refresh()
+		end
+
 		if self:IsShown() then self:Layout() end
 	end
+
 	panel:SetScript("OnShow", function(self)
 		self.Title:SetText(CooldownManagerUtils:Trans(self.owner.labelKey))
 		self.originalSettings = {}
-		for key, value in pairs(GetReminderSettings(self.owner.reminderType)) do self.originalSettings[key] = value end
+		for key, value in pairs(GetReminderSettings(self.owner.reminderType)) do
+			self.originalSettings[key] = value
+		end
+
 		self.RevertChanges:SetEnabled(false)
 		self:Refresh()
 		self:Layout()
 	end)
+
 	panel:Hide()
-	panel:SetScript("OnHide", function()
-		if editModeActive and panel.owner and panel.owner.Selection then panel.owner:HighlightSystem() end
-	end)
+	panel:SetScript("OnHide", function() if editModeActive and panel.owner and panel.owner.Selection then panel.owner:HighlightSystem() end end)
 	panel:SetScript("OnUpdate", function(self)
 		local dialog = EditModeSystemSettingsDialog
 		local attached = dialog and dialog:IsShown() and dialog.attachedToSystem or nil
@@ -2237,8 +2552,10 @@ local function CreateReminderOptionsFrame(owner)
 			self:Hide()
 			return
 		end
+
 		self.blizzardDialogSystem = attached
 	end)
+
 	panel.AvoidBlizzardDialog = function(self)
 		local dialog = EditModeSystemSettingsDialog
 		if not dialog or not dialog:IsShown() then return end
@@ -2256,12 +2573,14 @@ local function CreateReminderOptionsFrame(owner)
 			self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", dLeft, dBottom)
 		end
 	end
+
 	panel.ShowFor = function(self)
 		local dialog = EditModeSystemSettingsDialog
 		self.blizzardDialogSystem = dialog and dialog:IsShown() and dialog.attachedToSystem or nil
 		if not self:IsShown() then self:Show() end
 		if InCombatLockdown() then self:AvoidBlizzardDialog() end
 	end
+
 	reminderOptionsFrame = panel
 	return panel
 end
@@ -2281,16 +2600,19 @@ local function SetupAddonEditModeFrame(frame)
 		self.Selection:ShowHighlighted()
 		self.isSelected = false
 	end
+
 	frame.SelectSystem = function(self)
 		if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.owner ~= self then reminderOptionsFrame:Hide() end
 		self.Selection:ShowSelected()
 		self.isSelected = true
 		CreateReminderOptionsFrame(self):ShowFor()
 	end
+
 	frame.ClearHighlight = function(self)
 		self.Selection:Hide()
 		self.isSelected = false
 	end
+
 	frame.OnDragStart = function(self)
 		if not self.isSelected then return end
 		self.snapTarget = nil
@@ -2299,6 +2621,7 @@ local function SetupAddonEditModeFrame(frame)
 		self.isDragging = true
 		self:SetScript("OnUpdate", UpdateSnapPreview)
 	end
+
 	frame.OnDragStop = function(self)
 		if not self.isDragging then return end
 		self:SetScript("OnUpdate", nil)
@@ -2308,9 +2631,8 @@ local function SetupAddonEditModeFrame(frame)
 		ApplyMagnetism(self)
 		SavePosition(self)
 	end
-	frame.Selection:SetScript("OnMouseDown", function(_, button)
-		if button == "LeftButton" then frame:SelectSystem() end
-	end)
+
+	frame.Selection:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then frame:SelectSystem() end end)
 	if EditModeSystemSettingsDialog and EditModeSystemSettingsDialog.CloseButton then
 		local clicker = CreateFrame("Button", nil, frame.Selection, "InsecureActionButtonTemplate")
 		clicker:SetAllPoints()
@@ -2319,15 +2641,14 @@ local function SetupAddonEditModeFrame(frame)
 		clicker:SetAttribute("useOnKeyDown", false)
 		clicker:SetAttribute("type", "click")
 		clicker:SetAttribute("clickbutton", EditModeSystemSettingsDialog.CloseButton)
-		clicker:SetScript("OnMouseDown", function(_, button)
-			if button == "LeftButton" then frame:SelectSystem() end
-		end)
+		clicker:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then frame:SelectSystem() end end)
 		clicker:SetScript("OnDragStart", function() frame:OnDragStart() end)
 		clicker:SetScript("OnDragStop", function() frame:OnDragStop() end)
 		clicker:SetScript("OnEnter", function() frame.Selection:OnEnter() end)
 		clicker:SetScript("OnLeave", function() frame.Selection:OnLeave() end)
 		frame.Selection.Clicker = clicker
 	end
+
 	RestorePosition(frame)
 	ApplyReminderSettings(frame)
 end
@@ -2398,6 +2719,7 @@ function CooldownManagerUtils:CreateReminderBar(reminderType)
 			edgeFile = "Interface\\Buttons\\WHITE8X8",
 			edgeSize = 2
 		})
+
 		frame:SetBackdropColor(0, 0, 0, 0)
 		frame:SetBackdropBorderColor(0.2, 0.6, 1, 0)
 		frame.Label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -2409,6 +2731,7 @@ function CooldownManagerUtils:CreateReminderBar(reminderType)
 			mover:StopMovingOrSizing()
 			SavePosition(mover)
 		end)
+
 		RestorePosition(frame)
 	end
 	return frame
@@ -2435,7 +2758,10 @@ local function GetSavedEntry(spellID)
 end
 
 local function GetTrackedWeaponEnchantEntries(entry)
-	local trackedEntries = {[entry.spellID] = entry}
+	local trackedEntries = {
+		[entry.spellID] = entry
+	}
+
 	for spellID in pairs(CooldownManagerUtils:GetProfile().selected) do
 		local trackedEntry = GetSavedEntry(spellID)
 		if trackedEntry and trackedEntry.weaponEnchant then trackedEntries[trackedEntry.spellID] = trackedEntry end
@@ -2455,6 +2781,7 @@ local function GetWeaponEnchantState(entry)
 		entryKinds[spellID] = IsShieldWeaponEnchantEntry(trackedEntry) and "shield" or "weapon"
 		tracksShield = tracksShield or entryKinds[spellID] == "shield"
 	end
+
 	local knownEnchantIDs = GetKnownWeaponEnchantIDs()
 	local activeEntries = {}
 	local imbuedSlots = {}
@@ -2466,14 +2793,17 @@ local function GetWeaponEnchantState(entry)
 				counts = true
 			end
 		end
+
 		if counts then imbuedSlots[enchant.slot] = true end
 	end
+
 	local missingKinds = {}
 	for slotName, inventorySlot in pairs(WEAPON_ENCHANT_REQUIRED_SLOTS) do
 		local kind = GetEquippedWeaponEnchantSlotKind(inventorySlot)
 		if kind == "shield" and not tracksShield then kind = nil end
 		if kind and not imbuedSlots[slotName] then missingKinds[kind] = true end
 	end
+
 	local kind = entryKinds[entry.spellID]
 	if not missingKinds[kind] then return true end
 	if not activeEntries[entry.spellID] then return false end
@@ -2523,6 +2853,7 @@ local function GetPaladinSealState()
 			end
 		end
 	end
+
 	if unknown then
 		if paladinSealExpiration and GetTime() >= paladinSealExpiration then
 			paladinSealPresent = false
@@ -2530,6 +2861,7 @@ local function GetPaladinSealState()
 		end
 		return paladinSealPresent
 	end
+
 	paladinSealPresent = false
 	SetPaladinSealExpiration(nil)
 	return false
@@ -2567,6 +2899,7 @@ local function GetHunterAspectState()
 			end
 		end
 	end
+
 	if unknown then
 		if hunterAspectExpiration and GetTime() >= hunterAspectExpiration then
 			hunterAspectPresent = false
@@ -2574,6 +2907,7 @@ local function GetHunterAspectState()
 		end
 		return hunterAspectPresent
 	end
+
 	hunterAspectPresent = false
 	SetHunterAspectExpiration(nil)
 	return false
@@ -2596,6 +2930,7 @@ local function GetHitChargeAura(entry)
 			end
 		end
 	end
+
 	local definition = hitChargeAuraBySpell[entry.spellID]
 	for _, candidateSpellID in ipairs(entry.candidates) do
 		definition = definition or hitChargeAuraBySpell[candidateSpellID]
@@ -2633,9 +2968,16 @@ local function TrackAuraCharges(entry, aura)
 		auraChargeCache[entry.spellID] = nil
 		return
 	end
+
 	local learnedCharges = GetLearnedAuras().charges
 	learnedCharges[entry.spellID] = math.max(learnedCharges[entry.spellID] or 0, charges)
-	state = state or {lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask}
+	state = state or {
+		lockout = definition.lockout,
+		lockoutUntil = 0,
+		schoolMask = definition.schoolMask,
+		healCrit = definition.healCrit
+	}
+
 	state.charges = charges
 	auraChargeCache[entry.spellID] = state
 end
@@ -2644,7 +2986,14 @@ local function ResetAuraCharges(entry)
 	local definition = GetHitChargeAura(entry)
 	local charges = definition and (definition.castCharges or GetLearnedAuras().charges[entry.spellID])
 	if definition then CooldownManagerUtils:TraceAuraCharges(entry.spellID, "cast reset", charges) end
-	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = GetTime() + 0.5, schoolMask = definition.schoolMask, refreshPendingUntil = GetTime() + 0.5} or nil
+	auraChargeCache[entry.spellID] = charges and {
+		charges = charges,
+		lockout = definition.lockout,
+		lockoutUntil = GetTime() + 0.5,
+		schoolMask = definition.schoolMask,
+		healCrit = definition.healCrit,
+		refreshPendingUntil = GetTime() + 0.5
+	} or nil
 end
 
 local function TrackAuraExpiration(entry, aura)
@@ -2677,6 +3026,7 @@ local function GetMinimapTrackingState()
 			end
 		end
 	end
+
 	if found and not unknown then return false end
 end
 
@@ -2695,6 +3045,7 @@ function CooldownManagerUtils.GetReactiveAbilityState(entry)
 				if active == true then return true end
 			end
 		end
+
 		if isSpellUsable then
 			local ok, usable = pcall(isSpellUsable, spellID)
 			if ok and not IsSecret(usable) then
@@ -2703,6 +3054,7 @@ function CooldownManagerUtils.GetReactiveAbilityState(entry)
 			end
 		end
 	end
+
 	if resolved then return false end
 end
 
@@ -2749,6 +3101,7 @@ local function GetAuraState(entry)
 		SetAuraExpiration(entry.spellID, nil)
 		return false
 	end
+
 	local expirationTime = auraExpirationCache[entry.spellID]
 	if not expirationTime or GetTime() < expirationTime then return nil end
 	SetAuraExpiration(entry.spellID, nil)
@@ -2758,12 +3111,17 @@ end
 local function GetGroupUnits()
 	if IsInRaid() then
 		local units = {}
-		for index = 1, GetNumGroupMembers() do table.insert(units, "raid" .. index) end
+		for index = 1, GetNumGroupMembers() do
+			table.insert(units, "raid" .. index)
+		end
 		return units
 	end
+
 	if not IsInGroup() then return end
 	local units = {"player"}
-	for index = 1, GetNumSubgroupMembers() do table.insert(units, "party" .. index) end
+	for index = 1, GetNumSubgroupMembers() do
+		table.insert(units, "party" .. index)
+	end
 	return units
 end
 
@@ -2811,6 +3169,7 @@ function CooldownManagerUtils.GetUnitSpecializationID(unit)
 			if ok and not IsSecret(specializationID) and type(specializationID) == "number" then return specializationID end
 		end
 	end
+
 	local specializationInfo = C_SpecializationInfo
 	if specializationInfo and type(specializationInfo.GetInspectSpecialization) == "function" then
 		local ok, specializationID = pcall(specializationInfo.GetInspectSpecialization, unit)
@@ -2830,10 +3189,9 @@ function CooldownManagerUtils.IsUnitInForeverBattleShoutRange(unit)
 	if unit == "player" then return true end
 	if type(UnitDistanceSquared) == "function" then
 		local ok, distanceSquared, checkedDistance = pcall(UnitDistanceSquared, unit)
-		if ok and not IsSecret(distanceSquared) and not IsSecret(checkedDistance) and checkedDistance == true and type(distanceSquared) == "number" then
-			return distanceSquared <= 529
-		end
+		if ok and not IsSecret(distanceSquared) and not IsSecret(checkedDistance) and checkedDistance == true and type(distanceSquared) == "number" then return distanceSquared <= 529 end
 	end
+
 	if type(CheckInteractDistance) == "function" and (type(InCombatLockdown) ~= "function" or not InCombatLockdown()) then
 		local ok, inRange = pcall(CheckInteractDistance, unit, 4)
 		if ok and not IsSecret(inRange) then return inRange == true end
@@ -2849,6 +3207,7 @@ local function IsUnitInBuffRange(unit, entry)
 	for _, spellID in ipairs(entry.candidates) do
 		if spellID ~= entry.spellID then table.insert(spellIDs, spellID) end
 	end
+
 	for _, spellID in ipairs(spellIDs) do
 		local ok, inRange = pcall(C_Spell.IsSpellInRange, spellID, unit)
 		if ok and not IsSecret(inRange) and type(inRange) == "boolean" then
@@ -2904,7 +3263,6 @@ function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, entry.name, "HELPFUL")
 		if ok and not IsSecret(aura) and aura then return "present" end
 	end
-
 	return unknown and "unknown" or "missing"
 end
 
@@ -2913,6 +3271,7 @@ function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
 		groupBuffCache[entry.spellID] = sharedPaladinState.state
 		return
 	end
+
 	local units = entry.groupBuff and C_UnitAuras and type(C_UnitAuras.GetUnitAuraBySpellID) == "function" and GetGroupUnits()
 	if not units then
 		groupBuffCache[entry.spellID] = nil
@@ -2922,6 +3281,7 @@ function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
 		end
 		return
 	end
+
 	local total, have, missing, unknown = 0, 0, 0, false
 	for _, unit in ipairs(units) do
 		if GetUnitFlag(UnitExists, unit) then
@@ -2943,13 +3303,20 @@ function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
 			cached.total = total
 			cached.have = math.min(cached.have, total)
 		end
+
 		if entry.paladinBlessing and sharedPaladinState then
 			sharedPaladinState.resolved = true
 			sharedPaladinState.state = cached
 		end
 		return
 	end
-	local state = {total = total, have = have, missing = missing}
+
+	local state = {
+		total = total,
+		have = have,
+		missing = missing
+	}
+
 	groupBuffCache[entry.spellID] = state
 	if entry.paladinBlessing and sharedPaladinState then
 		sharedPaladinState.resolved = true
@@ -2980,9 +3347,11 @@ function CooldownManagerUtils.GetSpellCooldownState(spellID)
 				if isZero then return false end
 				return true, duration
 			end
+
 			if zeroOK then return false, duration, nil, nil, nil, true, isZero end
 		end
 	end
+
 	if not C_Spell.GetSpellCooldown then return false end
 	local ok, info = pcall(C_Spell.GetSpellCooldown, spellID)
 	if not ok or type(info) ~= "table" or info.isOnGCD == true or info.isEnabled == false then return false end
@@ -3013,6 +3382,7 @@ function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer)
 	else
 		cooldown:Clear()
 	end
+
 	cooldown.updating = nil
 	return onCooldown, isSecret, secretIsZero
 end
@@ -3022,11 +3392,13 @@ function CooldownManagerUtils.SetIconDesaturation(texture, desaturated, isSecret
 		texture:SetDesaturated(desaturated == true)
 		return
 	end
+
 	local evaluate = C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean
 	if type(evaluate) ~= "function" then
 		texture:SetDesaturated(false)
 		return
 	end
+
 	local ok, value = pcall(evaluate, secretIsZero, 0, 1)
 	if not ok or not pcall(texture.SetDesaturation, texture, value) then texture:SetDesaturated(false) end
 end
@@ -3041,21 +3413,22 @@ function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
 		end
 		return
 	end
+
 	if not alert then
 		alert = CreateFrame("Frame", nil, icon, "ActionButtonSpellAlertTemplate")
 		alert:SetSize(ICON_SIZE * 1.4, ICON_SIZE * 1.4)
 		alert:SetPoint("CENTER")
 		alert:SetFrameLevel(icon.Cooldown:GetFrameLevel() + 1)
-		alert:HookScript("OnShow", function(self)
-			if not self.ProcStartAnim:IsPlaying() and not self.ProcLoop:IsPlaying() then self.ProcLoop:Play() end
-		end)
+		alert:HookScript("OnShow", function(self) if not self.ProcStartAnim:IsPlaying() and not self.ProcLoop:IsPlaying() then self.ProcLoop:Play() end end)
 		icon.SpellAlert = alert
 		birth = true
 	end
+
 	if not alert:IsShown() then
 		alert:Show()
 		birth = true
 	end
+
 	if not alert:IsVisible() then return end
 	if birth then
 		alert.ProcLoop:Stop()
@@ -3086,6 +3459,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 			visibilityAllowed = false
 		end
 	end
+
 	if not editModeActive and not visibilityAllowed then frame:Hide() end
 	local selected = self:GetProfile().selected
 	local entries = {}
@@ -3113,28 +3487,35 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 				else
 					show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
 				end
+
 				if entry.paladinBlessing and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
 				if entry.paladinSeal then
 					if not sharedPaladinSealState.resolved then
 						sharedPaladinSealState.present = GetPaladinSealState()
 						sharedPaladinSealState.resolved = true
 					end
+
 					if sharedPaladinSealState.present ~= nil then show = not sharedPaladinSealState.present end
 				end
+
 				if entry.hunterAspect then
 					if not sharedHunterAspectState.resolved then
 						sharedHunterAspectState.present = GetHunterAspectState()
 						sharedHunterAspectState.resolved = true
 					end
+
 					if sharedHunterAspectState.present ~= nil then show = not sharedHunterAspectState.present end
 				end
+
 				if entry.minimapTracking then
 					if not sharedMinimapTrackingState.resolved then
 						sharedMinimapTrackingState.present = GetMinimapTrackingState()
 						sharedMinimapTrackingState.resolved = true
 					end
+
 					if sharedMinimapTrackingState.present ~= nil then show = not sharedMinimapTrackingState.present end
 				end
+
 				if not show and warningTime and not entry.reactiveAbility then
 					local expirationTime, duration
 					if entry.paladinSeal then
@@ -3144,17 +3525,22 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					elseif not entry.minimapTracking and not entry.weaponEnchant and presenceCache[entry.spellID] == true then
 						expirationTime, duration = auraExpirationCache[entry.spellID], GetLearnedAuras().durations[entry.spellID]
 					end
+
 					local remaining = expirationTime and expirationTime - GetTime()
 					if remaining and remaining > 0 then
 						if remaining <= warningTime then
 							show = true
 							if not duration or duration < remaining then duration = remaining end
-							expiringEntries[entry] = {expirationTime = expirationTime, duration = duration}
+							expiringEntries[entry] = {
+								expirationTime = expirationTime,
+								duration = duration
+							}
 						else
 							CooldownManagerUtils.ScheduleExpiryWarning(expirationTime - warningTime)
 						end
 					end
 				end
+
 				if editModeActive or show then table.insert(entries, entry) end
 			end
 		end
@@ -3185,6 +3571,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	else
 		forward = Enum and Enum.CooldownViewerIconDirection and frame.iconDirection == Enum.CooldownViewerIconDirection.Left
 	end
+
 	local glowingSpells = {}
 	local previousGlowingSpells = frame.glowingSpells or {}
 	for index, entry in ipairs(entries) do
@@ -3197,6 +3584,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		else
 			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
 		end
+
 		local expiring = expiringEntries[entry]
 		local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
 		local onCooldown, cooldownSecret, cooldownSecretIsZero
@@ -3206,6 +3594,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		else
 			onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false)
 		end
+
 		icon.Texture:SetTexture(entry.iconID)
 		CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(entry.spellID), cooldownSecret, cooldownSecretIsZero)
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
@@ -3220,8 +3609,8 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		if glow then glowingSpells[entry.spellID] = true end
 		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end
-	frame.glowingSpells = glowingSpells
 
+	frame.glowingSpells = glowingSpells
 	for index = #entries + 1, #frame.icons do
 		CooldownManagerUtils.UpdateIconGlow(frame.icons[index], false)
 		frame.icons[index]:Hide()
@@ -3269,7 +3658,14 @@ end
 function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if IsSecret(spellID) or type(spellID) ~= "number" then return end
 	local spellName = GetSpellNameSafe(spellID)
-	if GetWeaponEnchantCatalogFamily(spellID, spellName) then table.insert(recentPlayerCasts, {spellID = spellID, name = spellName, time = GetTime()}) end
+	if GetWeaponEnchantCatalogFamily(spellID, spellName) then
+		table.insert(recentPlayerCasts, {
+			spellID = spellID,
+			name = spellName,
+			time = GetTime()
+		})
+	end
+
 	if MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
 	C_Timer.After(0.3, function() CooldownManagerUtils:OnWeaponEnchantUpdate() end)
 	local changed = false
@@ -3279,11 +3675,13 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 		SetPaladinSealExpiration(paladinSealDuration and castTime + paladinSealDuration or nil)
 		changed = true
 	end
+
 	if IsHunterAspectSpell(spellID) then
 		hunterAspectPresent = true
 		SetHunterAspectExpiration(hunterAspectDuration and castTime + hunterAspectDuration or nil)
 		changed = true
 	end
+
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
 		if entry and CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName) and (GetReadableAuraState(entry) == nil or (GetHitChargeAura(entry) and GetHitChargeAura(entry).castCharges)) then
@@ -3294,6 +3692,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 				groupState.have = groupState.total
 				groupState.missing = 0
 			end
+
 			if not entry.weaponEnchant then
 				local duration = GetLearnedAuras().durations[entry.spellID]
 				SetAuraExpiration(entry.spellID, duration and castTime + duration or nil)
@@ -3301,24 +3700,37 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 			end
 		end
 	end
+
 	if changed then self:ScheduleReminderUpdate() end
 end
 
 function CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
-	if IsSecret(action) or action ~= "WOUND" then return end
+	if IsSecret(action) or (action ~= "WOUND" and action ~= "HEAL_CRIT") then return end
 	local now = GetTime()
 	local changed = false
 	for spellID, state in pairs(auraChargeCache) do
-		if state.charges > 0 and now >= state.lockoutUntil and (not state.schoolMask or not IsSecret(schoolMask) and schoolMask == state.schoolMask) then
+		if (action == "WOUND" or state.healCrit) and state.charges > 0 and now >= state.lockoutUntil and (not state.schoolMask or not IsSecret(schoolMask) and schoolMask == state.schoolMask) then
 			state.charges = state.charges - 1
-			self:TraceAuraCharges(spellID, "WOUND counted", state.charges, "school=" .. (IsSecret(schoolMask) and "secret" or tostring(schoolMask)))
+			self:TraceAuraCharges(spellID, action .. " counted", state.charges, "school=" .. (IsSecret(schoolMask) and "secret" or tostring(schoolMask)))
 			state.lockoutUntil = now + state.lockout
 			changed = true
-		elseif state.charges > 0 then
-			self:TraceAuraCharges(spellID, "WOUND ignored", state.charges, string.format("lockout=%.2f", math.max(state.lockoutUntil - now, 0)))
+		elseif (action == "WOUND" or state.healCrit) and state.charges > 0 then
+			self:TraceAuraCharges(spellID, action .. " ignored", state.charges, string.format("lockout=%.2f", math.max(state.lockoutUntil - now, 0)))
 		end
 	end
+
 	if changed then self:ScheduleReminderUpdate() end
+end
+
+function CooldownManagerUtils:OnCriticalHealCombatLog()
+	if not self:IsForever() or type(CombatLogGetCurrentEventInfo) ~= "function" then return end
+	if C_CombatLog and C_CombatLog.IsCombatLogRestricted and C_CombatLog.IsCombatLogRestricted() then return end
+	local ok, _, subevent, _, sourceGUID, _, _, _, _, _, _, _, _, _, _, _, _, _, critical = pcall(CombatLogGetCurrentEventInfo)
+	if not ok or IsSecret(subevent) or (subevent ~= "SPELL_HEAL" and subevent ~= "SPELL_PERIODIC_HEAL") then return end
+	if IsSecret(sourceGUID) or IsSecret(critical) or critical ~= true then return end
+	local playerGUID = UnitGUID("player")
+	if IsSecret(playerGUID) or not playerGUID or sourceGUID ~= playerGUID then return end
+	self:OnPlayerCombatEvent("HEAL_CRIT")
 end
 
 function CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
@@ -3334,6 +3746,7 @@ function CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
 			end
 		end
 	end
+
 	if learnedNew then self:RefreshAvailableBuffs() end
 	self:ScheduleReminderUpdate()
 end
@@ -3353,6 +3766,7 @@ function CooldownManagerUtils.SetEditModeActive(active)
 			end
 		end
 	end
+
 	if not active then
 		StopSnapTargetScan()
 		wipe(snapTargets)
@@ -3394,9 +3808,7 @@ function CooldownManagerUtils:Initialize()
 	self:RefreshAvailableBuffs()
 	self:UpdateReminderBar()
 	self:ScheduleCooldownManagerLayoutCheck()
-	C_Timer.NewTicker(TIMING.GROUP_BUFF_REFRESH_INTERVAL, function()
-		if IsInGroup() then CooldownManagerUtils:ScheduleGroupBuffUpdate() end
-	end)
+	C_Timer.NewTicker(TIMING.GROUP_BUFF_REFRESH_INTERVAL, function() if IsInGroup() then CooldownManagerUtils:ScheduleGroupBuffUpdate() end end)
 	self.playerFlying = self.IsPlayerFlying()
 	C_Timer.NewTicker(0.25, self.CheckFlyingState)
 end
@@ -3420,6 +3832,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 	pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_COMBAT", "player")
+	if CooldownManagerUtils:IsForever() and type(CombatLogGetCurrentEventInfo) == "function" and (not C_CombatLog or not C_CombatLog.IsCombatLogRestricted or not C_CombatLog.IsCombatLogRestricted()) then pcall(eventFrame.RegisterEvent, eventFrame, "COMBAT_LOG_EVENT_UNFILTERED") end
 	eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_CONNECTION")
@@ -3453,6 +3866,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)
+	elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
+		CooldownManagerUtils:OnCriticalHealCombatLog()
 	elseif event == "UNIT_COMBAT" then
 		local _, action, _, _, schoolMask = ...
 		CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
