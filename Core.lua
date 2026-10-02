@@ -1261,8 +1261,8 @@ end
 
 function CooldownManagerUtils.PruneObsoleteReminderSpells(profile)
 	for spellID in pairs(OBSOLETE_REMINDER_SPELLS) do
-		profile.selected[spellID] = nil
-		profile.layout[spellID] = nil
+		if profile.selected[spellID] ~= nil then profile.selected[spellID] = nil end
+		if profile.layout[spellID] ~= nil then profile.layout[spellID] = nil end
 	end
 end
 
