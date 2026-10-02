@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("itIT", "LID_GENERAL", "Generale")
 CooldownManagerUtils:AddTrans("itIT", "LID_MMBTN", "Mostra pulsante della minimappa")
 CooldownManagerUtils:AddTrans("itIT", "LID_OPENCOOLDOWNMANAGER", "Apri gestore dei tempi di recupero")
+CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Controlla i benefici del gruppo")

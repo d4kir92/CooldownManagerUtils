@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "�
 CooldownManagerUtils:AddTrans("ruRU", "LID_GENERAL", "Общие")
 CooldownManagerUtils:AddTrans("ruRU", "LID_MMBTN", "Показывать кнопку у миникарты")
 CooldownManagerUtils:AddTrans("ruRU", "LID_OPENCOOLDOWNMANAGER", "Открыть менеджер восстановления")
+CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Проверять усиления группы")

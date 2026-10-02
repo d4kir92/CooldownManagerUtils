@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("enUS", "LID_GENERAL", "General")
 CooldownManagerUtils:AddTrans("enUS", "LID_MMBTN", "Show Minimap Button")
 CooldownManagerUtils:AddTrans("enUS", "LID_OPENCOOLDOWNMANAGER", "Open Cooldown Manager")
+CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Check buffs on the group")

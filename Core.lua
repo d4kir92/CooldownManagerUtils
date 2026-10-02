@@ -501,7 +501,8 @@ local reminderSettingDefaults = {
 	visibleSetting = 0,
 	showTimer = 1,
 	showTooltips = 1,
-	showGlow = 1
+	showGlow = 1,
+	checkGroupBuffs = 1
 }
 
 local function IsSupportedClient()
@@ -1860,6 +1861,7 @@ local function ApplyReminderSettings(frame)
 	frame.showTimer = settings.showTimer == 1
 	frame.showTooltips = settings.showTooltips == 1
 	frame.showGlow = settings.showGlow == 1
+	frame.checkGroupBuffs = settings.checkGroupBuffs == 1
 	frame:SetAlpha(settings.opacity / 100)
 	CooldownManagerUtils:UpdateReminderBar()
 	if reminderOptionsFrame and reminderOptionsFrame:IsShown() and reminderOptionsFrame.owner == frame and reminderOptionsFrame.Refresh then reminderOptionsFrame:Refresh() end
@@ -2325,7 +2327,7 @@ local function CreateDropdownSetting(parent, layoutIndex, labelText, key, values
 	return row
 end
 
-local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum, maximum, step, suffix)
+local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum, maximum, step, suffix, optionKey)
 	local row = CreateFrame("Frame", nil, parent)
 	row:SetSize(343, 32)
 	row.layoutIndex = layoutIndex
@@ -2341,12 +2343,17 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 	}
 
 	local steps = (maximum - minimum) / step
-	row.Slider:Init(reminderSettingDefaults[key], minimum, maximum, steps, formatters)
+	row.Slider:Init(optionKey and CooldownManagerUtils:GetOption(optionKey) or reminderSettingDefaults[key], minimum, maximum, steps, formatters)
 	row.cbrHandles = EventUtil.CreateCallbackHandleContainer()
 	row.cbrHandles:RegisterCallback(row.Slider, MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(self, value)
 		if self.refreshing then return end
 		local panel = parent:GetParent()
-		GetReminderSettings(panel.owner.reminderType)[key] = math.floor(value / step + 0.5) * step
+		local rounded = math.floor(value / step + 0.5) * step
+		if optionKey then
+			CooldownManagerUtils:GetOptions()[optionKey] = rounded
+		else
+			GetReminderSettings(panel.owner.reminderType)[key] = rounded
+		end
 		if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
 		ApplyReminderSettings(panel.owner)
 	end, row)
@@ -2354,7 +2361,8 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 	row.Refresh = function(self)
 		self.refreshing = true
 		local owner = parent:GetParent().owner
-		self.Slider:SetValue(GetReminderSettings(owner.reminderType)[key])
+		self:SetShown(not optionKey or owner.reminderType == "expiring")
+		self.Slider:SetValue(optionKey and CooldownManagerUtils:GetOption(optionKey) or GetReminderSettings(owner.reminderType)[key])
 		self.refreshing = nil
 	end
 
@@ -2469,6 +2477,8 @@ local function CreateReminderOptionsFrame(owner)
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 7, labels.showTimer, "showTimer"))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 8, labels.showTooltips, "showTooltips"))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 9, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_SHOW_GLOW"), "showGlow"))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 10, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_CHECK_GROUP_BUFFS"), "checkGroupBuffs"))
+	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 11, CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME"), "expiryWarningTime", 1, 60, 1, "", "EXPIRYWARNINGTIME"))
 	panel.Buttons = CreateFrame("Frame", nil, panel, "VerticalLayoutFrame")
 	panel.Buttons:SetPoint("TOP", panel.Settings, "BOTTOM", 0, -12)
 	panel.Buttons.spacing = 2
@@ -2483,6 +2493,7 @@ local function CreateReminderOptionsFrame(owner)
 			settings[key] = value
 		end
 
+		if panel.owner.reminderType == "expiring" then CooldownManagerUtils:GetOptions().EXPIRYWARNINGTIME = panel.originalExpiryWarningTime end
 		self:SetEnabled(false)
 		ApplyReminderSettings(panel.owner)
 	end)
@@ -2538,6 +2549,7 @@ local function CreateReminderOptionsFrame(owner)
 			self.originalSettings[key] = value
 		end
 
+		self.originalExpiryWarningTime = CooldownManagerUtils:GetOption("EXPIRYWARNINGTIME")
 		self.RevertChanges:SetEnabled(false)
 		self:Refresh()
 		self:Layout()
@@ -3266,13 +3278,13 @@ function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 	return unknown and "unknown" or "missing"
 end
 
-function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
+function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState, checkGroupBuffs)
 	if entry.paladinBlessing and sharedPaladinState and sharedPaladinState.resolved then
 		groupBuffCache[entry.spellID] = sharedPaladinState.state
 		return
 	end
 
-	local units = entry.groupBuff and C_UnitAuras and type(C_UnitAuras.GetUnitAuraBySpellID) == "function" and GetGroupUnits()
+	local units = checkGroupBuffs ~= false and entry.groupBuff and C_UnitAuras and type(C_UnitAuras.GetUnitAuraBySpellID) == "function" and GetGroupUnits()
 	if not units then
 		groupBuffCache[entry.spellID] = nil
 		if entry.paladinBlessing and sharedPaladinState then
@@ -3360,6 +3372,19 @@ function CooldownManagerUtils.GetSpellCooldownState(spellID)
 	if type(startTime) ~= "number" or type(duration) ~= "number" or startTime <= 0 or duration <= 1.5 then return false end
 	if startTime + duration <= GetTime() then return false end
 	return true, nil, startTime, duration, not IsSecret(info.modRate) and info.modRate or 1
+end
+
+function CooldownManagerUtils.CanGlowReactiveAbility(entry)
+	local isSpellUsable = C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell
+	if type(isSpellUsable) ~= "function" then return false end
+	for _, spellID in ipairs(entry.candidates) do
+		local ok, usable, insufficientPower = pcall(isSpellUsable, spellID)
+		if ok and not IsSecret(usable) and usable == true and not IsSecret(insufficientPower) and insufficientPower ~= true then
+			local onCooldown, _, _, _, _, secret = CooldownManagerUtils.GetSpellCooldownState(spellID)
+			if not onCooldown and not secret then return true end
+		end
+	end
+	return false
 end
 
 function CooldownManagerUtils.HasInsufficientPower(spellID)
@@ -3480,7 +3505,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 				seenEntries[entry] = true
 				local present = GetAuraState(entry)
 				if present ~= nil then presenceCache[entry.spellID] = present end
-				CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState)
+				CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState, frame.checkGroupBuffs)
 				local show
 				if entry.reactiveAbility then
 					show = presenceCache[entry.spellID] == true
@@ -3488,7 +3513,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
 				end
 
-				if entry.paladinBlessing and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
+				if entry.paladinBlessing and frame.checkGroupBuffs and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
 				if entry.paladinSeal then
 					if not sharedPaladinSealState.resolved then
 						sharedPaladinSealState.present = GetPaladinSealState()
@@ -3606,6 +3631,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		icon.GroupCount:SetShown(groupState ~= nil)
 		icon:Show()
 		local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
+		if entry.reactiveAbility and not editModeActive then glow = glow and not cooldownSecret and CooldownManagerUtils.CanGlowReactiveAbility(entry) end
 		if glow then glowingSpells[entry.spellID] = true end
 		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end

@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("ptBR", "LID_GENERAL", "Geral")
 CooldownManagerUtils:AddTrans("ptBR", "LID_MMBTN", "Mostrar botão do minimapa")
 CooldownManagerUtils:AddTrans("ptBR", "LID_OPENCOOLDOWNMANAGER", "Abrir gerenciador de recargas")
+CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Verificar benefícios do grupo")

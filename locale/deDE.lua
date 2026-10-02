@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("deDE", "LID_GENERAL", "Allgemein")
 CooldownManagerUtils:AddTrans("deDE", "LID_MMBTN", "Minimapknopf anzeigen")
 CooldownManagerUtils:AddTrans("deDE", "LID_OPENCOOLDOWNMANAGER", "Cooldown-Manager öffnen")
+CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Buffs auch in der Gruppe prüfen")

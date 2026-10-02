@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("zhTW", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "�
 CooldownManagerUtils:AddTrans("zhTW", "LID_GENERAL", "一般")
 CooldownManagerUtils:AddTrans("zhTW", "LID_MMBTN", "顯示小地圖按鈕")
 CooldownManagerUtils:AddTrans("zhTW", "LID_OPENCOOLDOWNMANAGER", "開啟冷卻管理器")
+CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "檢查隊伍增益")

@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("frFR", "LID_GENERAL", "Général")
 CooldownManagerUtils:AddTrans("frFR", "LID_MMBTN", "Afficher le bouton de la minicarte")
 CooldownManagerUtils:AddTrans("frFR", "LID_OPENCOOLDOWNMANAGER", "Ouvrir le gestionnaire de temps de recharge")
+CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Vérifier les améliorations du groupe")

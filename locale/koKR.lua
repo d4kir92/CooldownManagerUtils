@@ -22,3 +22,4 @@ CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "�
 CooldownManagerUtils:AddTrans("koKR", "LID_GENERAL", "일반")
 CooldownManagerUtils:AddTrans("koKR", "LID_MMBTN", "미니맵 버튼 표시")
 CooldownManagerUtils:AddTrans("koKR", "LID_OPENCOOLDOWNMANAGER", "재사용 대기시간 관리자 열기")
+CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "그룹 강화 효과 확인")
