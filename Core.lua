@@ -503,7 +503,7 @@ local reminderSettingDefaults = {
 	showTooltips = 1,
 	showGlow = 1,
 	checkGroupBuffs = 1,
-	cooldownDisplayTime = 0
+	cooldownDisplayTime = 5
 }
 
 local function IsSupportedClient()
@@ -2329,7 +2329,7 @@ local function CreateDropdownSetting(parent, layoutIndex, labelText, key, values
 	return row
 end
 
-local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum, maximum, step, suffix, optionKey)
+local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum, maximum, step, suffix, optionKey, tooltipText)
 	local row = CreateFrame("Frame", nil, parent)
 	row:SetSize(343, 32)
 	row.layoutIndex = layoutIndex
@@ -2339,6 +2339,23 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 	row.Slider:SetSize(200, 32)
 	row.Slider.MinText:Hide()
 	row.Slider.MaxText:Hide()
+	if tooltipText then
+		local function ShowTooltip(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(labelText)
+			GameTooltip:AddLine(tooltipText, 1, 1, 1, true)
+			GameTooltip:Show()
+		end
+		row:EnableMouse(true)
+		row:HookScript("OnEnter", ShowTooltip)
+		row:HookScript("OnLeave", function() GameTooltip:Hide() end)
+		row.Slider:HookScript("OnEnter", ShowTooltip)
+		row.Slider:HookScript("OnLeave", function() GameTooltip:Hide() end)
+		if row.Slider.Slider then
+			row.Slider.Slider:HookScript("OnEnter", ShowTooltip)
+			row.Slider.Slider:HookScript("OnLeave", function() GameTooltip:Hide() end)
+		end
+	end
 	local formatter = function(value) return value .. suffix end
 	local formatters = {
 		[MinimalSliderWithSteppersMixin.Label.Right] = CreateMinimalSliderFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
@@ -2477,11 +2494,11 @@ local function CreateReminderOptionsFrame(owner)
 	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 5, labels.opacity, "opacity", 50, 100, 1, "%"))
 	table.insert(panel.controls, CreateDropdownSetting(panel.Settings, 6, labels.visibility, "visibleSetting", visibilityValues, VisibilityText))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 7, labels.showTimer, "showTimer"))
-	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 8, labels.showTooltips, "showTooltips"))
-	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 9, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_SHOW_GLOW"), "showGlow"))
-	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 10, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_CHECK_GROUP_BUFFS"), "checkGroupBuffs"))
-	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 11, CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME"), "expiryWarningTime", 1, 60, 1, "", "EXPIRYWARNINGTIME"))
-	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 12, CooldownManagerUtils:Trans("LID_COOLDOWN_DISPLAY_TIME"), "cooldownDisplayTime", 0, 60, 1, ""))
+	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 8, CooldownManagerUtils:Trans("LID_COOLDOWN_DISPLAY_TIME"), "cooldownDisplayTime", 0, 60, 1, "", nil, CooldownManagerUtils:Trans("LID_COOLDOWN_DISPLAY_TIME_TOOLTIP")))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 9, labels.showTooltips, "showTooltips"))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 10, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_SHOW_GLOW"), "showGlow"))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 11, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_CHECK_GROUP_BUFFS"), "checkGroupBuffs"))
+	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 12, CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME"), "expiryWarningTime", 1, 60, 1, "", "EXPIRYWARNINGTIME", CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME_TOOLTIP")))
 	panel.Buttons = CreateFrame("Frame", nil, panel, "VerticalLayoutFrame")
 	panel.Buttons:SetPoint("TOP", panel.Settings, "BOTTOM", 0, -12)
 	panel.Buttons.spacing = 2
@@ -3405,9 +3422,37 @@ function CooldownManagerUtils.HasInsufficientPower(spellID)
 	return insufficientPower == true
 end
 
+function CooldownManagerUtils.IsCooldownAboveDisplayTime(spellID, threshold)
+	if not threshold or threshold <= 0 then return false end
+	local onCooldown, durationObject, startTime, duration, modRate = CooldownManagerUtils.GetSpellCooldownState(spellID)
+	local remaining
+	if durationObject and durationObject.GetRemainingDuration then
+		local ok, value = pcall(durationObject.GetRemainingDuration, durationObject)
+		if ok and not IsSecret(value) and type(value) == "number" then remaining = value end
+	elseif onCooldown and startTime and duration then
+		remaining = startTime + duration / (modRate or 1) - GetTime()
+	end
+	if not remaining or remaining <= threshold then return false end
+	local at = GetTime() + remaining - threshold
+	local addon = CooldownManagerUtils
+	addon.cooldownDisplayUpdates = addon.cooldownDisplayUpdates or {}
+	local pending = addon.cooldownDisplayUpdates[spellID]
+	if not pending or at < pending - 0.05 then
+		addon.cooldownDisplayUpdates[spellID] = at
+		C_Timer.After(math.max(at - GetTime(), 0) + 0.01, function()
+			if CooldownManagerUtils.cooldownDisplayUpdates[spellID] ~= at then return end
+			CooldownManagerUtils.cooldownDisplayUpdates[spellID] = nil
+			CooldownManagerUtils:ScheduleReminderUpdate()
+		end)
+	end
+	return true
+end
+
 function CooldownManagerUtils.UpdateCooldownDisplayAlpha(cooldown)
 	local threshold = cooldown.displayTime or 0
-	if threshold <= 0 then cooldown:SetAlpha(1) return end
+	local target = cooldown:GetParent()
+	cooldown:SetAlpha(threshold > 0 and 1 or 0)
+	if threshold <= 0 or not cooldown.filterIcon or not cooldown.displayDuration and not cooldown.displayEndTime then target:SetAlpha(1) return end
 	local durationObject = cooldown.displayDuration
 	if durationObject and durationObject.EvaluateRemainingDuration and C_CurveUtil and C_CurveUtil.CreateCurve then
 		if cooldown.displayCurveThreshold ~= threshold then
@@ -3419,7 +3464,7 @@ function CooldownManagerUtils.UpdateCooldownDisplayAlpha(cooldown)
 			cooldown.displayCurveThreshold = threshold
 		end
 		local ok, alpha = pcall(durationObject.EvaluateRemainingDuration, durationObject, cooldown.displayCurve)
-		if ok and pcall(cooldown.SetAlpha, cooldown, alpha) then return end
+		if ok and pcall(target.SetAlpha, target, alpha) then return end
 	end
 	local remaining
 	if durationObject and durationObject.GetRemainingDuration then
@@ -3428,7 +3473,7 @@ function CooldownManagerUtils.UpdateCooldownDisplayAlpha(cooldown)
 	elseif cooldown.displayEndTime then
 		remaining = cooldown.displayEndTime - GetTime()
 	end
-	cooldown:SetAlpha(remaining and remaining > 0 and remaining <= threshold and 1 or 0)
+	target:SetAlpha(remaining and remaining <= threshold and 1 or 0)
 end
 
 function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer, displayTime)
@@ -3437,6 +3482,7 @@ function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer, displ
 	cooldown:SetHideCountdownNumbers(not showTimer)
 	local onCooldown, durationObject, startTime, duration, modRate, isSecret, secretIsZero = CooldownManagerUtils.GetSpellCooldownState(spellID)
 	cooldown.displayTime = displayTime or 0
+	cooldown.filterIcon = showTimer and not editModeActive
 	cooldown.displayDuration = durationObject
 	cooldown.displayEndTime = startTime and duration and startTime + duration / (modRate or 1) or nil
 	cooldown.displayElapsed = 0
@@ -3607,6 +3653,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					end
 				end
 
+				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and CooldownManagerUtils.IsCooldownAboveDisplayTime(entry.spellID, frame.cooldownDisplayTime) then show = false end
 				if editModeActive or show then table.insert(entries, entry) end
 			end
 		end
@@ -3656,6 +3703,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		local onCooldown, cooldownSecret, cooldownSecretIsZero
 		if expiring then
 			icon.Cooldown.displayTime = 0
+			icon:SetAlpha(1)
 			icon.Cooldown:SetAlpha(1)
 			icon.Cooldown:SetHideCountdownNumbers(false)
 			icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
