@@ -2603,6 +2603,16 @@ local function GetHitChargeAura(entry)
 	return definition
 end
 
+function CooldownManagerUtils:TraceAuraCharges(spellID, reason, charges, detail)
+	if not self.traceAuraCharges then return end
+	print(string.format("CMU %.2f spell=%s %s charges=%s %s", GetTime(), tostring(spellID), reason, tostring(charges), detail or ""))
+end
+
+CooldownManagerUtils:AddSlash("cmucharges", function()
+	CooldownManagerUtils.traceAuraCharges = not CooldownManagerUtils.traceAuraCharges
+	print("CMU charge trace: " .. (CooldownManagerUtils.traceAuraCharges and "ON" or "OFF"))
+end)
+
 local function GetAuraChargeCount(aura)
 	local count = 0
 	for _, key in ipairs({"charges", "applications"}) do
@@ -2618,6 +2628,7 @@ local function TrackAuraCharges(entry, aura)
 	local state = auraChargeCache[entry.spellID]
 	if state and state.refreshPendingUntil and GetTime() < state.refreshPendingUntil then return end
 	local charges = GetAuraChargeCount(aura)
+	if not state or state.charges ~= charges then CooldownManagerUtils:TraceAuraCharges(entry.spellID, "read", charges) end
 	if charges <= 0 then
 		auraChargeCache[entry.spellID] = nil
 		return
@@ -2632,7 +2643,8 @@ end
 local function ResetAuraCharges(entry)
 	local definition = GetHitChargeAura(entry)
 	local charges = definition and (definition.castCharges or GetLearnedAuras().charges[entry.spellID])
-	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask, refreshPendingUntil = GetTime() + 0.5} or nil
+	if definition then CooldownManagerUtils:TraceAuraCharges(entry.spellID, "cast reset", charges) end
+	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = GetTime() + 0.5, schoolMask = definition.schoolMask, refreshPendingUntil = GetTime() + 0.5} or nil
 end
 
 local function TrackAuraExpiration(entry, aura)
@@ -3296,11 +3308,14 @@ function CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
 	if IsSecret(action) or action ~= "WOUND" then return end
 	local now = GetTime()
 	local changed = false
-	for _, state in pairs(auraChargeCache) do
+	for spellID, state in pairs(auraChargeCache) do
 		if state.charges > 0 and now >= state.lockoutUntil and (not state.schoolMask or not IsSecret(schoolMask) and schoolMask == state.schoolMask) then
 			state.charges = state.charges - 1
+			self:TraceAuraCharges(spellID, "WOUND counted", state.charges, "school=" .. (IsSecret(schoolMask) and "secret" or tostring(schoolMask)))
 			state.lockoutUntil = now + state.lockout
 			changed = true
+		elseif state.charges > 0 then
+			self:TraceAuraCharges(spellID, "WOUND ignored", state.charges, string.format("lockout=%.2f", math.max(state.lockoutUntil - now, 0)))
 		end
 	end
 	if changed then self:ScheduleReminderUpdate() end
