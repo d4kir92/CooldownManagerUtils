@@ -11,14 +11,15 @@ Cooldown Manager Utils adds missing-buff and reactive-proc reminders to World of
 - Also covers temporary weapon enchants cast by you, such as the Shaman weapon imbues (Rockbiter, Flametongue, Frostbrand, Windfury, Earthliving) and the Paladin rites. Tracked weapon enchants are checked together against every equipped weapon (main hand and, when dual wielding, off hand; shields only if a shield imbue is tracked): they stay hidden while every weapon carries one of them, otherwise the tracked enchants that are not active on any weapon are shown (or all of them, if each one is already active on another weapon).
 - Sorts available entries into **Tracked Buffs/Abilities**, **Not Displayed**, and **Not Learned**. Learned entries can be moved by drag and drop; unlearned or currently unselected talent spells are shown disabled but retain their spell tooltip.
 - The **Buff Reminder** bar shows an icon for every tracked buff that is currently missing on your character. The bar is hidden while nothing is missing.
-- Group buffs (Blizzard's Group Buffs list, plus Mark of the Wild, Blessing of the Bronze, Arcane Intellect, Power Word: Fortitude, Skyfury, and Battle Shout) are also checked on every eligible party or raid member. Their reminder appears as soon as one living, connected, visible member in range is missing the buff, and the icon shows how many eligible members have it, for example `2/5` or `3/40`. Offline, dead, invisible, and out-of-range members are excluded from both numbers.
+- The separate **Expiring Buffs** bar shows selected buffs when they are missing or approaching expiration. **Seconds before expiry** controls the warning window (1–60 seconds) and is available in both the add-on options and the bar's Edit Mode settings. Both controls use the same value.
+- Group buffs (Blizzard's Group Buffs list, plus Mark of the Wild, Blessing of the Bronze, Arcane Intellect, Power Word: Fortitude, Skyfury, and Battle Shout) are also checked on every eligible party or raid member. Their reminder appears as soon as one living, connected, visible member in range is missing the buff, and the icon shows how many eligible members have it, for example `2/5` or `3/40`. Offline, dead, invisible, and out-of-range members are excluded from both numbers. Disable **Check buffs on the group** in a bar's Edit Mode settings to check only your own buffs instead. Group checking is enabled by default.
 - Paladin Blessing reminders work as one group: every eligible party or raid member needs any recognized Blessing cast by you. If one member is missing your Blessing, all selected Blessing reminders are shown; Blessings from another Paladin do not count.
 - On WoW Forever, Paladin Seal reminders also work as one group. Any active recognized Seal hides all selected Seal reminders; when no Seal is active, they are all shown.
-- Shows the remaining cooldown on a reminder icon (greyed out, with swipe and optional timer) while the buff spell is still on cooldown.
+- Shows spell cooldowns with a swipe and optional countdown. Each bar has a **CD threshold** slider directly below **Show timer** in Edit Mode. With Show timer enabled, reminders with longer cooldowns stay hidden and appear when the remaining cooldown reaches the threshold. The default is **5 seconds**; **0 disables the cooldown display**. This setting is separate from the buff expiration warning.
 - Shows the spell tooltip when hovering a reminder icon.
 - Hides live reminders while your character is dead, a ghost, flying, or on a flight path. The Edit Mode preview remains available.
-- Adds independently movable **Buff Reminder** and **Proc Reminder** bars to Edit Mode. Both snap to other Edit Mode elements, screen edges, the grid, and each other like Blizzard's own frames.
-- Clicking either bar in Edit Mode opens its independent settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, tooltips, and Blizzard's proc glow on the reminder icons (on by default). A button in that dialog leaves Edit Mode and opens the matching Cooldown Manager tab.
+- Adds independently movable **Buff Reminder**, **Expiring Buffs**, and **Proc Reminder** bars to Edit Mode. The bars snap to other Edit Mode elements, screen edges, the grid, and each other like Blizzard's own frames.
+- Clicking a bar in Edit Mode opens its independent settings: orientation, icon direction, icon size (50–400%), icon padding, opacity, visibility, timer, cooldown threshold, tooltips, group buff checks, and Blizzard's proc glow (on by default). The Expiring Buffs bar also includes the expiration warning slider. Both timing sliders have explanatory tooltips. A button in that dialog leaves Edit Mode and opens the matching Cooldown Manager tab.
 - Keeps a separate reminder selection for each Cooldown Manager layout and specialization.
 - Keeps Blizzard's Cooldown Manager layout dropdown visible on both reminder tabs and provides a matching add-on-owned Revert Changes button for reminder edits made since opening the window or selecting the layout.
 
@@ -47,9 +48,13 @@ WoW Forever Warriors can use the adjacent **Proc Reminders** tab in the same way
 
 On Retail, the **Proc Reminders** tab lists your specialization's Essential and Utility Cooldown Manager spells. A tracked spell appears on the Proc Reminder bar while Blizzard shows its proc glow. Spells that are already Buff Reminder entries stay in the Buff Reminders tab.
 
+For advance expiration warnings, move a buff into **Expiring Buffs** on the Buff Reminders tab. Set **Seconds before expiry** to 10 to show it during its final 10 seconds. For a spell cooldown reminder, enable **Show timer** and set **CD threshold** to 10 to show the reminder from 10 seconds remaining until the cooldown finishes. To maintain Arcane Intellect only on yourself, disable **Check buffs on the group** for its reminder bar.
+
+Proc reminder glow appears only when the ability is usable, sufficient resources are available, and the cooldown is confirmed ready. If cooldown readiness is hidden by the client, the glow is suppressed.
+
 The Cooldown Manager search box filters the currently open Buff Reminders or Proc Reminders tab by spell name. Each group can be collapsed by clicking its header.
 
-To move a reminder bar, open Edit Mode. **Buff Reminder** shows tracked buffs, with active buffs greyed out, while **Proc Reminder** shows tracked reactive abilities. Each bar can be dragged and configured independently; its position is saved as soon as you release it.
+To move a reminder bar, open Edit Mode. **Buff Reminder** shows tracked buffs, with active buffs greyed out, **Expiring Buffs** previews buffs assigned to that category, and **Proc Reminder** shows tracked reactive abilities. Each bar can be dragged and configured independently; its position is saved as soon as you release it.
 
 ## Notes
 
@@ -64,7 +69,7 @@ To move a reminder bar, open Edit Mode. **Buff Reminder** shows tracked buffs, w
 - The same applies to group members: while their auras are hidden, the last known count is kept. Casting the group buff yourself during that time counts every member as buffed.
 - A buff that is cancelled or dispelled while it is hidden cannot be detected; its reminder appears once the game reveals the aura again, usually when combat ends.
 - Reminder selections and their order are saved per Cooldown Manager layout and specialization. Switching between layouts such as Starter Layout and a custom layout switches the reminder contents too. A layout the add-on has not seen yet starts with a copy of the previously active reminder setup.
-- Both bar positions and each bar's settings are saved separately per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. A new Edit Mode layout starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
+- All bar positions and each bar's settings are saved separately per Edit Mode layout in the add-on's own saved variables: account layouts and presets account-wide, character layouts per character. A new Edit Mode layout starts with a copy of the previous layout's bar settings. Changes are saved immediately and are not affected by Blizzard's "Revert Changes".
 
 ## Localization
 
