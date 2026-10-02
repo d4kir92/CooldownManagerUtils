@@ -3643,6 +3643,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 						if remaining <= warningTime then
 							show = true
 							if not duration or duration < remaining then duration = remaining end
+							if duration > warningTime then duration = warningTime end
 							expiringEntries[entry] = {
 								expirationTime = expirationTime,
 								duration = duration
