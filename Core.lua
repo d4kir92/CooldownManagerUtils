@@ -2354,7 +2354,7 @@ local function CreateReminderIcon(parent, index)
 	icon.Cooldown:SetDrawSwipe(true)
 	icon.Cooldown:SetDrawEdge(false)
 	if _G[ICON_COUNTDOWN_FONT] and icon.Cooldown.SetCountdownFont then icon.Cooldown:SetCountdownFont(ICON_COUNTDOWN_FONT) end
-	icon.Cooldown:SetScript("OnCooldownDone", function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+	icon.Cooldown:SetScript("OnCooldownDone", function(cooldown) if not cooldown.updating then CooldownManagerUtils:ScheduleReminderUpdate() end end)
 	icon.CountFrame = CreateFrame("Frame", nil, icon)
 	icon.CountFrame:SetAllPoints()
 	icon.CountFrame:SetFrameLevel(icon.Cooldown:GetFrameLevel() + 2)
@@ -2615,6 +2615,8 @@ end
 local function TrackAuraCharges(entry, aura)
 	local definition = GetHitChargeAura(entry)
 	if not definition then return end
+	local state = auraChargeCache[entry.spellID]
+	if state and state.refreshPendingUntil and GetTime() < state.refreshPendingUntil then return end
 	local charges = GetAuraChargeCount(aura)
 	if charges <= 0 then
 		auraChargeCache[entry.spellID] = nil
@@ -2622,7 +2624,7 @@ local function TrackAuraCharges(entry, aura)
 	end
 	local learnedCharges = GetLearnedAuras().charges
 	learnedCharges[entry.spellID] = math.max(learnedCharges[entry.spellID] or 0, charges)
-	local state = auraChargeCache[entry.spellID] or {lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask}
+	state = state or {lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask}
 	state.charges = charges
 	auraChargeCache[entry.spellID] = state
 end
@@ -2630,7 +2632,7 @@ end
 local function ResetAuraCharges(entry)
 	local definition = GetHitChargeAura(entry)
 	local charges = definition and (definition.castCharges or GetLearnedAuras().charges[entry.spellID])
-	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask} or nil
+	auraChargeCache[entry.spellID] = charges and {charges = charges, lockout = definition.lockout, lockoutUntil = 0, schoolMask = definition.schoolMask, refreshPendingUntil = GetTime() + 0.5} or nil
 end
 
 local function TrackAuraExpiration(entry, aura)
@@ -2989,6 +2991,7 @@ end
 
 function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer)
 	local cooldown = icon.Cooldown
+	cooldown.updating = true
 	cooldown:SetHideCountdownNumbers(not showTimer)
 	local onCooldown, durationObject, startTime, duration, modRate, isSecret, secretIsZero = CooldownManagerUtils.GetSpellCooldownState(spellID)
 	if (onCooldown or isSecret) and durationObject and cooldown.SetCooldownFromDurationObject then
@@ -2998,6 +3001,7 @@ function CooldownManagerUtils.UpdateIconCooldown(icon, spellID, showTimer)
 	else
 		cooldown:Clear()
 	end
+	cooldown.updating = nil
 	return onCooldown, isSecret, secretIsZero
 end
 
@@ -3040,6 +3044,7 @@ function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
 		alert:Show()
 		birth = true
 	end
+	if not alert:IsVisible() then return end
 	if birth then
 		alert.ProcLoop:Stop()
 		alert.ProcStartAnim:Play()
@@ -3060,6 +3065,16 @@ end
 
 function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local frame = self:CreateReminderBar(reminderType)
+	local visibleSetting = frame.visibleSetting
+	local visibilityAllowed = true
+	if Enum and Enum.CooldownViewerVisibleSetting then
+		if visibleSetting == Enum.CooldownViewerVisibleSetting.InCombat then
+			visibilityAllowed = InCombatLockdown() and true or false
+		elseif visibleSetting == Enum.CooldownViewerVisibleSetting.Hidden then
+			visibilityAllowed = false
+		end
+	end
+	if not editModeActive and not visibilityAllowed then frame:Hide() end
 	local selected = self:GetProfile().selected
 	local entries = {}
 	local seenEntries = {}
@@ -3189,7 +3204,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		icon.GroupCount:SetText(groupState and (groupState.have .. "/" .. groupState.total) or "")
 		icon.GroupCount:SetShown(groupState ~= nil)
 		icon:Show()
-		local glow = frame.showGlow and not previewPresent and not onCooldown and not expiring
+		local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
 		if glow then glowingSpells[entry.spellID] = true end
 		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
 	end
@@ -3206,14 +3221,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	if frame.SetBackdropColor then frame:SetBackdropColor(0.05, 0.15, 0.25, editModeActive and 0.65 or 0) end
 	if frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(0.2, 0.65, 1, editModeActive and 1 or 0) end
 	if not frame.Selection then frame:EnableMouse(editModeActive) end
-	local visibleSetting = frame.visibleSetting
-	local visible = #entries > 0
-	if Enum and Enum.CooldownViewerVisibleSetting and visibleSetting == Enum.CooldownViewerVisibleSetting.InCombat then
-		visible = visible and InCombatLockdown()
-	elseif Enum and Enum.CooldownViewerVisibleSetting and visibleSetting == Enum.CooldownViewerVisibleSetting.Hidden then
-		visible = false
-	end
-	frame:SetShown(editModeActive or visible)
+	frame:SetShown(editModeActive or (#entries > 0 and visibilityAllowed))
 end
 
 function CooldownManagerUtils:UpdateReminderBar()
