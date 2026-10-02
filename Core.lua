@@ -145,7 +145,7 @@ local HIT_CHARGE_AURAS = {
 	},
 	SHAMAN = {
 		{spells = {324, 325, 905, 945, 8134, 10431, 10432, 25469, 25472, 49280, 49281}, lockout = 3.5, castCharges = 3},
-		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960}, lockout = 3.5, castCharges = 3}
+		{spells = {52127, 52129, 52131, 52134, 52136, 52138, 24398, 33736, 57960, 408510}, lockout = 3.5, castCharges = 3}
 	}
 }
 CooldownManagerUtils.foreverReactiveAbilityFamilies = {
