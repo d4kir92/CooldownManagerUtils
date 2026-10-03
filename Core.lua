@@ -3305,7 +3305,60 @@ function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 	return unknown and "unknown" or "missing"
 end
 
+function CooldownManagerUtils.GetTankShieldNames()
+	local names = {}
+	for _, spellID in ipairs({467, 2947, 8316}) do
+		local info = GetReminderSpellInfo(spellID)
+		if info and info.name then names[info.name] = true end
+	end
+	return names
+end
+
+function CooldownManagerUtils.UpdateTankShieldState(entry)
+	entry.tankOnly = false
+	local names = CooldownManagerUtils.GetTankShieldNames()
+	if not names[entry.name] or not C_UnitAuras or type(C_UnitAuras.GetAuraDataBySpellName) ~= "function" or type(UnitGroupRolesAssigned) ~= "function" then return false end
+	local units = GetGroupUnits() or {"player"}
+	local tanks = {}
+	for _, unit in ipairs(units) do
+		local ok, role = pcall(UnitGroupRolesAssigned, unit)
+		if ok and not IsSecret(role) and role == "TANK" and GetUnitFlag(UnitExists, unit) then table.insert(tanks, unit) end
+	end
+	if #tanks == 0 then return false end
+	entry.tankOnly = true
+	local total, have, missing, unknown = 0, 0, 0, false
+	for _, unit in ipairs(tanks) do
+		if GetUnitFlag(UnitIsConnected, unit) ~= false and GetUnitFlag(UnitIsDeadOrGhost, unit) ~= true and GetUnitFlag(UnitIsVisible, unit) ~= false and IsUnitInBuffRange(unit, entry) then
+			total = total + 1
+			local present, unreadable = false, false
+			for name in pairs(names) do
+				local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, "HELPFUL")
+				if not ok or IsSecret(aura) then
+					unreadable = true
+				elseif aura then
+					present = true
+				end
+			end
+			if present then
+				have = have + 1
+			elseif unreadable then
+				unknown = true
+			else
+				missing = missing + 1
+			end
+		end
+	end
+	local cached = groupBuffCache[entry.spellID]
+	if not unknown or missing > 0 then
+		groupBuffCache[entry.spellID] = {total = total, have = have, missing = missing, tankOnly = true}
+	elseif not cached or not cached.tankOnly then
+		groupBuffCache[entry.spellID] = nil
+	end
+	return true
+end
+
 function CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState, checkGroupBuffs)
+	if CooldownManagerUtils.UpdateTankShieldState(entry) then return end
 	if entry.paladinBlessing and sharedPaladinState and sharedPaladinState.resolved then
 		groupBuffCache[entry.spellID] = sharedPaladinState.state
 		return
@@ -3600,7 +3653,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
 				end
 
-				if entry.paladinBlessing and frame.checkGroupBuffs and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
+				if entry.tankOnly or entry.paladinBlessing and frame.checkGroupBuffs and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
 				if entry.paladinSeal then
 					if not sharedPaladinSealState.resolved then
 						sharedPaladinSealState.present = GetPaladinSealState()
@@ -3634,7 +3687,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 						expirationTime, duration = sharedPaladinSealState.present and paladinSealExpiration, paladinSealDuration
 					elseif entry.hunterAspect then
 						expirationTime, duration = sharedHunterAspectState.present and hunterAspectExpiration, hunterAspectDuration
-					elseif not entry.minimapTracking and not entry.weaponEnchant and presenceCache[entry.spellID] == true then
+					elseif not entry.tankOnly and not entry.minimapTracking and not entry.weaponEnchant and presenceCache[entry.spellID] == true then
 						expirationTime, duration = auraExpirationCache[entry.spellID], GetLearnedAuras().durations[entry.spellID]
 					end
 
@@ -3719,8 +3772,8 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 		icon.spellID = entry.spellID
 		local groupState = groupBuffCache[entry.spellID]
-		icon.GroupCount:SetText(groupState and (groupState.have .. "/" .. groupState.total) or "")
-		icon.GroupCount:SetShown(groupState ~= nil)
+		icon.GroupCount:SetText(entry.tankOnly and "Tank" or groupState and (groupState.have .. "/" .. groupState.total) or "")
+		icon.GroupCount:SetShown(entry.tankOnly or groupState ~= nil)
 		icon:Show()
 		local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
 		if entry.reactiveAbility and not editModeActive then glow = glow and not cooldownSecret and CooldownManagerUtils.CanGlowReactiveAbility(entry) end
@@ -3806,7 +3859,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 			presenceCache[entry.spellID] = true
 			changed = true
 			local groupState = groupBuffCache[entry.spellID]
-			if groupState and not entry.paladinBlessing then
+			if groupState and not entry.tankOnly and not entry.paladinBlessing then
 				groupState.have = groupState.total
 				groupState.missing = 0
 			end
