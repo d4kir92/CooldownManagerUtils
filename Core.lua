@@ -3708,6 +3708,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 				end
 
 				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and CooldownManagerUtils.IsCooldownAboveDisplayTime(entry.spellID, frame.cooldownDisplayTime) then show = false end
+				if entry.tankOnly and InCombatLockdown() then show = false end
 				if editModeActive or show then table.insert(entries, entry) end
 			end
 		end
