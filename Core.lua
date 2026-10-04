@@ -3568,7 +3568,7 @@ function CooldownManagerUtils.SetIconDesaturation(texture, desaturated, isSecret
 	if not ok or not pcall(texture.SetDesaturation, texture, value) then texture:SetDesaturated(false) end
 end
 
-function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
+function CooldownManagerUtils.UpdateIconGlow(icon, show, birth, cooldownSecret, secretIsZero)
 	local alert = icon.SpellAlert
 	if not show then
 		if alert then
@@ -3594,6 +3594,17 @@ function CooldownManagerUtils.UpdateIconGlow(icon, show, birth)
 		birth = true
 	end
 
+	local alpha = 1
+	if cooldownSecret then
+		alpha = 0
+		local evaluate = C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean
+		if type(evaluate) == "function" then
+			local ok, value = pcall(evaluate, secretIsZero, 1, 0)
+			if ok then alpha = value end
+		end
+	end
+
+	if not pcall(alert.SetAlpha, alert, alpha) then alert:SetAlpha(0) end
 	if not alert:IsVisible() then return end
 	if birth then
 		alert.ProcLoop:Stop()
@@ -3779,7 +3790,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
 		if entry.reactiveAbility and not editModeActive then glow = glow and not cooldownSecret and CooldownManagerUtils.CanGlowReactiveAbility(entry) end
 		if glow then glowingSpells[entry.spellID] = true end
-		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID])
+		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID], cooldownSecret, cooldownSecretIsZero)
 	end
 
 	frame.glowingSpells = glowingSpells
