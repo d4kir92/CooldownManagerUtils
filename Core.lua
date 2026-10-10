@@ -301,8 +301,16 @@ CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 		{
 			spells = {19306, 20909, 20910, 27067, 48998, 48999}
 		}
+	},
+	SHAMAN = {
+		{
+			spells = {17364},
+			cooldownReset = true
+		}
 	}
 }
+
+CooldownManagerUtils.cooldownResetState = {}
 
 local MINIMAP_TRACKING_SPELLS = {
 	[2481] = true,
@@ -3069,7 +3077,71 @@ local function GetMinimapTrackingState()
 	if found and not unknown then return false end
 end
 
+function CooldownManagerUtils.GetSpellCooldownEnd(spellID)
+	local startTime, duration
+	if C_Spell and type(C_Spell.GetSpellCooldown) == "function" then
+		local ok, info = pcall(C_Spell.GetSpellCooldown, spellID)
+		if not ok or type(info) ~= "table" then return end
+		if info.isOnGCD == true then return 0 end
+		startTime, duration = info.startTime, info.duration
+	elseif type(_G.GetSpellCooldown) == "function" then
+		local ok, start, length = pcall(_G.GetSpellCooldown, spellID)
+		if not ok then return end
+		startTime, duration = start, length
+	else
+		return
+	end
+
+	if IsSecret(startTime) or IsSecret(duration) or type(startTime) ~= "number" or type(duration) ~= "number" then return end
+	if startTime <= 0 or duration <= 1.5 then return 0 end
+	return startTime + duration
+end
+
+function CooldownManagerUtils:UpdateCooldownResetFamilies()
+	if not self:IsForever() then return end
+	local _, class = UnitClass("player")
+	local now = GetTime()
+	for _, family in ipairs(self.foreverReactiveAbilityFamilies[class] or {}) do
+		if family.cooldownReset then
+			for _, spellID in ipairs(family.spells) do
+				local endTime = self.GetSpellCooldownEnd(spellID)
+				if endTime then
+					local state = self.cooldownResetState[spellID]
+					if not state then
+						state = {}
+						self.cooldownResetState[spellID] = state
+					end
+
+					if endTime > now then
+						if state.activeUntil then
+							state.activeUntil = nil
+							self:ScheduleReminderUpdate()
+						end
+					elseif state.endTime and state.endTime > now + 0.5 then
+						state.activeUntil = state.endTime
+						C_Timer.After(state.endTime - now + 0.05, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+						self:ScheduleReminderUpdate()
+					end
+
+					state.endTime = endTime
+				end
+			end
+		end
+	end
+end
+
+function CooldownManagerUtils.IsCooldownResetActive(family)
+	local now = GetTime()
+	for _, spellID in ipairs(family.spells) do
+		local state = CooldownManagerUtils.cooldownResetState[spellID]
+		if state and state.activeUntil and state.activeUntil > now then return true end
+	end
+	return false
+end
+
 function CooldownManagerUtils.GetReactiveAbilityState(entry)
+	local family = CooldownManagerUtils.GetForeverReactiveAbilityFamily(entry.spellID)
+	if family and family.cooldownReset then return CooldownManagerUtils.IsCooldownResetActive(family) end
 	local overlay = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed
 	if type(overlay) ~= "function" then overlay = nil end
 	local isSpellUsable = CooldownManagerUtils.GetForeverReactiveAbilityFamily(entry.spellID) and (C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell)
@@ -4078,6 +4150,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		if CooldownManagerUtils.pendingSourceRefresh then CooldownManagerUtils:RefreshAvailableBuffs() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "PLAYER_REGEN_DISABLED" or event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" or event == "SPELL_UPDATE_USABLE" or event == "SPELL_ACTIVATION_OVERLAY_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_HIDE" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" or event == "ADDON_RESTRICTION_STATE_CHANGED" then
+		if event == "SPELL_UPDATE_COOLDOWN" then CooldownManagerUtils:UpdateCooldownResetFamilies() end
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	else
 		CooldownManagerUtils:RefreshAvailableBuffs()
