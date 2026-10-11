@@ -3203,9 +3203,65 @@ local function GetReadableAuraState(entry)
 	return false
 end
 
+CooldownManagerUtils.COOLDOWN_VIEWER_BUFF_FRAMES = {"BuffIconCooldownViewer", "BuffBarCooldownViewer"}
+CooldownManagerUtils.COOLDOWN_VIEWER_SPELL_FIELDS = {"spellID", "overrideSpellID", "overrideTooltipSpellID", "linkedSpellID"}
+CooldownManagerUtils.hookedViewerItems = {}
+
+function CooldownManagerUtils.ViewerSpellMatchesEntry(spellID, entry)
+	return type(spellID) == "number" and not IsSecret(spellID) and CooldownManagerUtils.EntryContainsSpell(entry, spellID)
+end
+
+function CooldownManagerUtils.ViewerItemMatchesEntry(info, entry)
+	if type(info) ~= "table" then return false end
+	for _, field in ipairs(CooldownManagerUtils.COOLDOWN_VIEWER_SPELL_FIELDS) do
+		if CooldownManagerUtils.ViewerSpellMatchesEntry(info[field], entry) then return true end
+	end
+	if type(info.linkedSpellIDs) == "table" then
+		for _, spellID in ipairs(info.linkedSpellIDs) do
+			if CooldownManagerUtils.ViewerSpellMatchesEntry(spellID, entry) then return true end
+		end
+	end
+	return false
+end
+
+function CooldownManagerUtils.HookCooldownViewerItem(item)
+	if CooldownManagerUtils.hookedViewerItems[item] or type(item.OnActiveStateChanged) ~= "function" then return end
+	CooldownManagerUtils.hookedViewerItems[item] = true
+	hooksecurefunc(item, "OnActiveStateChanged", function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+end
+
+function CooldownManagerUtils.GetCooldownViewerAuraState(entry)
+	local state
+	for _, viewerName in ipairs(CooldownManagerUtils.COOLDOWN_VIEWER_BUFF_FRAMES) do
+		local viewer = _G[viewerName]
+		local pool = type(viewer) == "table" and viewer.itemFramePool
+		if type(pool) == "table" and type(pool.EnumerateActive) == "function" then
+			for item in pool:EnumerateActive() do
+				CooldownManagerUtils.HookCooldownViewerItem(item)
+				if item.cooldownID and CooldownManagerUtils.ViewerItemMatchesEntry(item.cooldownInfo, entry) then
+					local active = item.isActive
+					if not IsSecret(active) and type(active) == "boolean" then
+						if active then return true end
+						state = false
+					end
+				end
+			end
+		end
+	end
+	return state
+end
+
 local function GetAuraState(entry)
 	local present = GetReadableAuraState(entry)
-	if present ~= nil or entry.weaponEnchant then return present end
+	if present ~= nil or entry.weaponEnchant or entry.reactiveAbility or entry.minimapTracking then return present end
+	local viewerState = CooldownManagerUtils.GetCooldownViewerAuraState(entry)
+	if viewerState ~= nil then
+		if not viewerState then
+			auraChargeCache[entry.spellID] = nil
+			SetAuraExpiration(entry.spellID, nil)
+		end
+		return viewerState
+	end
 	local chargeState = auraChargeCache[entry.spellID]
 	if chargeState and chargeState.charges <= 0 then
 		auraChargeCache[entry.spellID] = nil
