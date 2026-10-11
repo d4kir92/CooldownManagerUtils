@@ -1677,6 +1677,30 @@ function CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBu
 	end
 end
 
+function CooldownManagerUtils:MigrateReminderSelection(availableBuffsBySpellID)
+	if next(availableBuffsBySpellID) == nil then return end
+	local profile = self:GetProfile()
+	local selected, layout = profile.selected, profile.layout
+	local staleSpellIDs = {}
+	for spellID in pairs(selected) do
+		local spellName = GetSpellNameSafe(spellID)
+		local entry = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
+		if entry and entry.spellID ~= spellID then table.insert(staleSpellIDs, {spellID, entry.spellID}) end
+	end
+
+	for _, pair in ipairs(staleSpellIDs) do
+		local oldSpellID, newSpellID = pair[1], pair[2]
+		if layout[newSpellID] == nil and layout[oldSpellID] ~= nil then
+			layout[newSpellID] = layout[oldSpellID]
+			selected[newSpellID] = true
+		end
+
+		selected[oldSpellID] = nil
+		layout[oldSpellID] = nil
+		presenceCache[oldSpellID] = nil
+	end
+end
+
 function CooldownManagerUtils:RefreshAvailableBuffs()
 	if InCombatLockdown() then
 		self.pendingSourceRefresh = true
@@ -1707,6 +1731,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
+	self:MigrateReminderSelection(availableBuffsBySpellID)
 	self.availableBuffs = availableBuffs
 	self.availableBuffsBySpellID = availableBuffsBySpellID
 	self.pendingSourceRefresh = nil
@@ -3778,6 +3803,8 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	if editModeActive or (GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true and not self.IsPlayerFlying()) then
 		for spellID in pairs(selected) do
 			local entry = GetSavedEntry(spellID)
+			local available = self.availableBuffsBySpellID
+			if entry and available and next(available) ~= nil and available[entry.spellID] ~= entry then entry = nil end
 			local entryLayout = entry and layouts[entry.spellID]
 			local entryBarType = entry and (entry.reactiveAbility and "ability" or entryLayout and entryLayout.category == "expiringBuff" and "expiring" or "buff")
 			if entry and entry.isLearned ~= false and entryBarType == reminderType and not seenEntries[entry] then
