@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("frFR", "LID_GENERAL", "Général")
 CooldownManagerUtils:AddTrans("frFR", "LID_MMBTN", "Afficher le bouton de la minicarte")
 CooldownManagerUtils:AddTrans("frFR", "LID_OPENCOOLDOWNMANAGER", "Ouvrir le gestionnaire de temps de recharge")
+CooldownManagerUtils:AddTrans("frFR", "LID_COOLDOWNMANAGER", "Gestionnaire de temps de recharge")
+CooldownManagerUtils:AddTrans("frFR", "LID_MMBTNCDM", "Afficher le bouton de la minicarte du gestionnaire de temps de recharge")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Vérifier les améliorations du groupe")
 CooldownManagerUtils:AddTrans("frFR", "LID_COOLDOWN_DISPLAY_TIME", "Seuil recharge")
 CooldownManagerUtils:AddTrans("frFR", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Temps de recharge restant en secondes. Si le minuteur est activé, l'icône reste masquée au-dessus de ce seuil et apparaît à ce seuil ou en dessous. 0 désactive l'affichage de la recharge.")

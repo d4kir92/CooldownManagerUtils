@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "�
 CooldownManagerUtils:AddTrans("ruRU", "LID_GENERAL", "Общие")
 CooldownManagerUtils:AddTrans("ruRU", "LID_MMBTN", "Показывать кнопку у миникарты")
 CooldownManagerUtils:AddTrans("ruRU", "LID_OPENCOOLDOWNMANAGER", "Открыть менеджер восстановления")
+CooldownManagerUtils:AddTrans("ruRU", "LID_COOLDOWNMANAGER", "Менеджер восстановления")
+CooldownManagerUtils:AddTrans("ruRU", "LID_MMBTNCDM", "Показывать кнопку менеджера восстановления у миникарты")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Проверять усиления группы")
 CooldownManagerUtils:AddTrans("ruRU", "LID_COOLDOWN_DISPLAY_TIME", "Порог КД")
 CooldownManagerUtils:AddTrans("ruRU", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Оставшееся время перезарядки в секундах. При включённом таймере значок скрыт выше этого порога и появляется, когда время становится равным ему или меньше. 0 отключает отображение перезарядки.")

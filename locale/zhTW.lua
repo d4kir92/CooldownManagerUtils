@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("zhTW", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "�
 CooldownManagerUtils:AddTrans("zhTW", "LID_GENERAL", "一般")
 CooldownManagerUtils:AddTrans("zhTW", "LID_MMBTN", "顯示小地圖按鈕")
 CooldownManagerUtils:AddTrans("zhTW", "LID_OPENCOOLDOWNMANAGER", "開啟冷卻管理器")
+CooldownManagerUtils:AddTrans("zhTW", "LID_COOLDOWNMANAGER", "冷卻管理器")
+CooldownManagerUtils:AddTrans("zhTW", "LID_MMBTNCDM", "顯示冷卻管理器小地圖按鈕")
 CooldownManagerUtils:AddTrans("zhTW", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "檢查隊伍增益")
 CooldownManagerUtils:AddTrans("zhTW", "LID_COOLDOWN_DISPLAY_TIME", "冷卻門檻")
 CooldownManagerUtils:AddTrans("zhTW", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "剩餘冷卻時間（秒）。啟用計時器顯示後，剩餘時間高於此值時隱藏圖示，等於或低於此值時顯示。0 關閉冷卻顯示。")

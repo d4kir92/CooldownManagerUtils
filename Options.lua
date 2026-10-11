@@ -1,5 +1,6 @@
 local _, CooldownManagerUtils = ...
 local optionsWindow = nil
+local cdmButton = nil
 local ICON = 134376
 local DEFAULT_WIDTH = 420
 local DEFAULT_HEIGHT = 320
@@ -83,6 +84,16 @@ function CooldownManagerUtils:InitOptions()
 		end
 	})
 
+	if CooldownViewerSettings then
+		optionsWindow.cdmMinimapCheckbox = optionsWindow:AddCheckbox({
+			["label"] = "LID_MMBTNCDM",
+			["search"] = "MMBTNCDM",
+			["added"] = "2026-10-11",
+			["value"] = self:GV(self:GetCDMMinimapDB(), "MMBTNCDM", true),
+			["func"] = function(value) CooldownManagerUtils:SetCDMMinimapButtonShown(value) end
+		})
+	end
+
 	optionsWindow:AddCategory({
 		["label"] = "LID_BUFFREMINDERS_CATEGORY_EXPIRING",
 		["key"] = "EXPIRINGBUFFS",
@@ -130,6 +141,82 @@ function CooldownManagerUtils:InitMinimapButton()
 		end,
 		["dbkey"] = "MMBTN"
 	})
+
+	self:InitCDMMinimapButton()
+end
+
+function CooldownManagerUtils:GetCDMMinimapDB()
+	local options = self:GetOptions()
+	options.MMBtnCDM = options.MMBtnCDM or {}
+	if options.MMBtnCDM.MMBTNCDM == nil then options.MMBtnCDM.MMBTNCDM = true end
+	return options.MMBtnCDM
+end
+
+function CooldownManagerUtils:UpdateCDMMinimapButton()
+	if not cdmButton then return end
+	if InCombatLockdown() then
+		if not cdmButton.regenFrame then
+			cdmButton.regenFrame = CreateFrame("Frame")
+			cdmButton.regenFrame:SetScript("OnEvent", function(sel)
+				sel:UnregisterEvent("PLAYER_REGEN_ENABLED")
+				CooldownManagerUtils:UpdateCDMMinimapButton()
+			end)
+		end
+
+		cdmButton.regenFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		return
+	end
+
+	if self:GV(self:GetCDMMinimapDB(), "MMBTNCDM", true) then
+		self:ShowMMBtn("CooldownManagerUtilsCDM")
+	else
+		self:HideMMBtn("CooldownManagerUtilsCDM")
+	end
+end
+
+function CooldownManagerUtils:SetCDMMinimapButtonShown(value)
+	self:SV(self:GetCDMMinimapDB(), "MMBTNCDM", value)
+	if optionsWindow and optionsWindow.cdmMinimapCheckbox then optionsWindow.cdmMinimapCheckbox:SetChecked(value) end
+	self:UpdateCDMMinimapButton()
+end
+
+function CooldownManagerUtils:InitCDMMinimapButton()
+	if cdmButton or CooldownViewerSettings == nil then return end
+	cdmButton = self:CreateMinimapButton({
+		["name"] = "CooldownManagerUtilsCDM",
+		["atlas"] = "QuestLog-icon-setting",
+		["dbtab"] = self:GetCDMMinimapDB(),
+		["vTT"] = {{self:Trans("LID_COOLDOWNMANAGER"), format("|T%d:16:16:0:0|t Cooldown Manager Utils", ICON)}, {self:Trans("LID_LEFTCLICK"), self:Trans("LID_OPENCOOLDOWNMANAGER")}, {self:Trans("LID_RIGHTCLICK"), self:Trans("LID_HIDEMINIMAPBUTTON")}},
+		["funcR"] = function() CooldownManagerUtils:SetCDMMinimapButtonShown(false) end,
+		["addoncomp"] = false,
+		["border"] = false,
+		["dbkey"] = "MMBTNCDM"
+	})
+
+	if not cdmButton then return end
+	local secure = CreateFrame("Button", "CooldownManagerUtilsCDMSecureButton", cdmButton, "SecureActionButtonTemplate")
+	secure:SetAllPoints(cdmButton)
+	secure:SetHighlightTexture(136477)
+	secure:RegisterForClicks("AnyUp", "AnyDown")
+	secure:RegisterForDrag("LeftButton")
+	secure:SetAttribute("type1", "macro")
+	secure:SetAttribute("macrotext1", "/cdm")
+	secure:HookScript("OnClick", function(sel, btnName, down)
+		if btnName == "LeftButton" or down then return end
+		local onClick = cdmButton:GetScript("OnClick")
+		if onClick then onClick(cdmButton, btnName) end
+	end)
+
+	for _, scriptName in ipairs({"OnEnter", "OnLeave", "OnDragStart", "OnDragStop"}) do
+		secure:SetScript(scriptName, function()
+			if ExecuteFrameScript then
+				ExecuteFrameScript(cdmButton, scriptName)
+			else
+				local func = cdmButton:GetScript(scriptName)
+				if func then func(cdmButton) end
+			end
+		end)
+	end
 end
 
 CooldownManagerUtils:AddSlash("cmu", function() CooldownManagerUtils:ToggleOptions() end)

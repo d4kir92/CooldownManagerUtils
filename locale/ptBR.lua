@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("ptBR", "LID_GENERAL", "Geral")
 CooldownManagerUtils:AddTrans("ptBR", "LID_MMBTN", "Mostrar botão do minimapa")
 CooldownManagerUtils:AddTrans("ptBR", "LID_OPENCOOLDOWNMANAGER", "Abrir gerenciador de recargas")
+CooldownManagerUtils:AddTrans("ptBR", "LID_COOLDOWNMANAGER", "Gerenciador de recargas")
+CooldownManagerUtils:AddTrans("ptBR", "LID_MMBTNCDM", "Mostrar botão do minimapa do gerenciador de recargas")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Verificar benefícios do grupo")
 CooldownManagerUtils:AddTrans("ptBR", "LID_COOLDOWN_DISPLAY_TIME", "Limite de recarga")
 CooldownManagerUtils:AddTrans("ptBR", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Recarga restante em segundos. Com o temporizador ativado, o ícone fica oculto acima deste valor e aparece ao atingir esse limite ou ficar abaixo dele. 0 desativa a exibição da recarga.")

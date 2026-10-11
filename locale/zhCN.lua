@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "�
 CooldownManagerUtils:AddTrans("zhCN", "LID_GENERAL", "常规")
 CooldownManagerUtils:AddTrans("zhCN", "LID_MMBTN", "显示小地图按钮")
 CooldownManagerUtils:AddTrans("zhCN", "LID_OPENCOOLDOWNMANAGER", "打开冷却管理器")
+CooldownManagerUtils:AddTrans("zhCN", "LID_COOLDOWNMANAGER", "冷却管理器")
+CooldownManagerUtils:AddTrans("zhCN", "LID_MMBTNCDM", "显示冷却管理器小地图按钮")
 CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "检查队伍增益")
 CooldownManagerUtils:AddTrans("zhCN", "LID_COOLDOWN_DISPLAY_TIME", "冷却阈值")
 CooldownManagerUtils:AddTrans("zhCN", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "剩余冷却时间（秒）。启用计时器显示后，剩余时间高于此值时隐藏图标，等于或低于此值时显示。0 关闭冷却显示。")

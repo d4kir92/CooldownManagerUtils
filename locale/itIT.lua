@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("itIT", "LID_GENERAL", "Generale")
 CooldownManagerUtils:AddTrans("itIT", "LID_MMBTN", "Mostra pulsante della minimappa")
 CooldownManagerUtils:AddTrans("itIT", "LID_OPENCOOLDOWNMANAGER", "Apri gestore dei tempi di recupero")
+CooldownManagerUtils:AddTrans("itIT", "LID_COOLDOWNMANAGER", "Gestore dei tempi di recupero")
+CooldownManagerUtils:AddTrans("itIT", "LID_MMBTNCDM", "Mostra pulsante della minimappa del gestore dei tempi di recupero")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Controlla i benefici del gruppo")
 CooldownManagerUtils:AddTrans("itIT", "LID_COOLDOWN_DISPLAY_TIME", "Soglia recupero")
 CooldownManagerUtils:AddTrans("itIT", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Tempo di recupero rimanente in secondi. Con il timer attivo, l'icona resta nascosta sopra questa soglia e appare quando il tempo è pari o inferiore. 0 disattiva la visualizzazione del recupero.")

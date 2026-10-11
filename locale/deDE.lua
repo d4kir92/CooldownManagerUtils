@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("deDE", "LID_GENERAL", "Allgemein")
 CooldownManagerUtils:AddTrans("deDE", "LID_MMBTN", "Minimapknopf anzeigen")
 CooldownManagerUtils:AddTrans("deDE", "LID_OPENCOOLDOWNMANAGER", "Cooldown-Manager öffnen")
+CooldownManagerUtils:AddTrans("deDE", "LID_COOLDOWNMANAGER", "Cooldown-Manager")
+CooldownManagerUtils:AddTrans("deDE", "LID_MMBTNCDM", "Cooldown-Manager-Minimapknopf anzeigen")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Buffs auch in der Gruppe prüfen")
 CooldownManagerUtils:AddTrans("deDE", "LID_COOLDOWN_DISPLAY_TIME", "CD-Grenze")
 CooldownManagerUtils:AddTrans("deDE", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Verbleibende Abklingzeit in Sekunden. Bei aktiviertem Timer bleibt das Symbol oberhalb dieses Werts verborgen und erscheint ab dieser Restzeit. 0 schaltet die CD-Anzeige aus.")

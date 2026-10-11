@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("enUS", "LID_GENERAL", "General")
 CooldownManagerUtils:AddTrans("enUS", "LID_MMBTN", "Show Minimap Button")
 CooldownManagerUtils:AddTrans("enUS", "LID_OPENCOOLDOWNMANAGER", "Open Cooldown Manager")
+CooldownManagerUtils:AddTrans("enUS", "LID_COOLDOWNMANAGER", "Cooldown Manager")
+CooldownManagerUtils:AddTrans("enUS", "LID_MMBTNCDM", "Show Cooldown Manager Minimap Button")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Check buffs on the group")
 CooldownManagerUtils:AddTrans("enUS", "LID_COOLDOWN_DISPLAY_TIME", "CD threshold")
 CooldownManagerUtils:AddTrans("enUS", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Remaining cooldown in seconds. With Show timer enabled, the icon stays hidden above this value and appears at or below it. 0 disables the cooldown display.")

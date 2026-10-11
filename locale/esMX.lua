@@ -22,6 +22,8 @@ CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CATEGORY_HIDDEN", "N
 CooldownManagerUtils:AddTrans("esMX", "LID_GENERAL", "General")
 CooldownManagerUtils:AddTrans("esMX", "LID_MMBTN", "Mostrar botón del minimapa")
 CooldownManagerUtils:AddTrans("esMX", "LID_OPENCOOLDOWNMANAGER", "Abrir administrador de tiempos de reutilización")
+CooldownManagerUtils:AddTrans("esMX", "LID_COOLDOWNMANAGER", "Administrador de tiempos de reutilización")
+CooldownManagerUtils:AddTrans("esMX", "LID_MMBTNCDM", "Mostrar botón del minimapa del administrador de tiempos de reutilización")
 CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_CHECK_GROUP_BUFFS", "Comprobar beneficios del grupo")
 CooldownManagerUtils:AddTrans("esMX", "LID_COOLDOWN_DISPLAY_TIME", "Umbral de CD")
 CooldownManagerUtils:AddTrans("esMX", "LID_COOLDOWN_DISPLAY_TIME_TOOLTIP", "Reutilización restante en segundos. Con el temporizador activado, el icono se oculta por encima de este valor y aparece al alcanzarlo o bajar de él. 0 desactiva la visualización de reutilización.")
