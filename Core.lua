@@ -3194,6 +3194,21 @@ function CooldownManagerUtils.GetReactiveAbilityState(entry)
 	if resolved then return false end
 end
 
+function CooldownManagerUtils.FindReadableBuffByName(unit, name)
+	if not name or not C_UnitAuras then return end
+	if type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, "HELPFUL")
+		if ok and not IsSecret(aura) and aura then return aura end
+	end
+
+	if type(C_UnitAuras.GetAuraDataByIndex) ~= "function" then return end
+	for index = 1, 255 do
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, "HELPFUL")
+		if not ok or (not IsSecret(aura) and aura == nil) then return end
+		if not IsSecret(aura) and not IsSecret(aura.name) and aura.name == name then return aura end
+	end
+end
+
 local function GetReadableAuraState(entry)
 	if entry.reactiveAbility then return CooldownManagerUtils.GetReactiveAbilityState(entry) end
 	if entry.minimapTracking then return GetMinimapTrackingState() end
@@ -3214,12 +3229,10 @@ local function GetReadableAuraState(entry)
 		end
 	end
 
-	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
-		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", entry.name, "HELPFUL")
-		if ok and not IsSecret(aura) and aura then
-			TrackAuraExpiration(entry, aura)
-			return true
-		end
+	local aura = CooldownManagerUtils.FindReadableBuffByName("player", entry.name)
+	if aura then
+		TrackAuraExpiration(entry, aura)
+		return true
 	end
 
 	if unknown then return nil end
@@ -3451,10 +3464,7 @@ function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 		end
 	end
 
-	if entry.name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
-		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, entry.name, "HELPFUL")
-		if ok and not IsSecret(aura) and aura then return "present" end
-	end
+	if CooldownManagerUtils.FindReadableBuffByName(unit, entry.name) then return "present" end
 	return unknown and "unknown" or "missing"
 end
 
