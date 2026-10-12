@@ -394,6 +394,49 @@ local PALADIN_SEAL_FAMILIES = {
 	}
 }
 
+CooldownManagerUtils.PALADIN_AURA_FAMILIES = {
+	{
+		spells = {465, 10290, 643, 10291, 1032, 10292, 10293, 27149, 48941, 48942}
+	},
+	{
+		spells = {7294, 10298, 10299, 10300, 10301, 27150, 54043}
+	},
+	{
+		spells = {19746}
+	},
+	{
+		spells = {19876, 19895, 19896, 27151, 48943}
+	},
+	{
+		spells = {19888, 19897, 19898, 27152, 48945}
+	},
+	{
+		spells = {19891, 19899, 19900, 27153, 48947}
+	},
+	{
+		spells = {20218}
+	},
+	{
+		spells = {32223}
+	}
+}
+
+function CooldownManagerUtils.IsPaladinAuraSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	local lookup = CooldownManagerUtils.paladinAuraSpellLookup
+	if not lookup then
+		lookup = {}
+		for _, family in ipairs(CooldownManagerUtils.PALADIN_AURA_FAMILIES) do
+			for _, familySpellID in ipairs(family.spells) do
+				lookup[familySpellID] = true
+			end
+		end
+
+		CooldownManagerUtils.paladinAuraSpellLookup = lookup
+	end
+	return lookup[spellID] == true
+end
+
 local HUNTER_ASPECT_FAMILIES = {
 	{
 		spells = {13165, 14318, 14319, 14320, 14321, 14322, 25296, 27044}
@@ -1167,6 +1210,21 @@ local function AddPaladinSealMappings(knownAuraSpells, knownAuraSources, unlearn
 			unlearnedAuraSources[spellID] = true
 		end
 	end
+
+	for _, family in ipairs(CooldownManagerUtils.PALADIN_AURA_FAMILIES) do
+		local mapping = {
+			candidates = {},
+			seen = {},
+			paladinAura = true
+		}
+
+		for _, spellID in ipairs(family.spells) do
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			knownAuraSpells[spellID] = mapping
+			knownAuraSources[spellID] = family.spells[1]
+			unlearnedAuraSources[spellID] = true
+		end
+	end
 end
 
 local function AddHunterAspectMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
@@ -1288,6 +1346,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	local groupBuff = IsGroupBuffMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinBlessing = IsPaladinBlessingMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinSeal = IsPaladinSealMapping(knownAuraSpells, spellID, baseSpellID)
+	local paladinAura = CooldownManagerUtils.IsPaladinAuraSpell(spellID) or CooldownManagerUtils.IsPaladinAuraSpell(baseSpellID)
 	local hunterAspect = IsHunterAspectMapping(knownAuraSpells, spellID, baseSpellID)
 	local reactiveFamily = CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID) or CooldownManagerUtils.GetForeverReactiveAbilityFamily(baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
@@ -1335,6 +1394,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.groupBuff = existing.groupBuff or groupBuff
 		existing.paladinBlessing = existing.paladinBlessing or paladinBlessing
 		existing.paladinSeal = existing.paladinSeal or paladinSeal
+		existing.paladinAura = existing.paladinAura or paladinAura
 		existing.hunterAspect = existing.hunterAspect or hunterAspect
 		existing.reactiveAbility = existing.reactiveAbility or reactiveFamily ~= nil
 		existing.isLearned = existing.isLearned or isLearned
@@ -1361,6 +1421,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		groupBuff = groupBuff,
 		paladinBlessing = paladinBlessing,
 		paladinSeal = paladinSeal,
+		paladinAura = paladinAura,
 		hunterAspect = hunterAspect,
 		reactiveAbility = reactiveFamily ~= nil,
 		isLearned = isLearned,
@@ -2822,6 +2883,7 @@ local function GetSavedEntry(spellID)
 		minimapTracking = MINIMAP_TRACKING_SPELLS[spellID] == true,
 		paladinBlessing = IsPaladinBlessingSpell(spellID),
 		paladinSeal = IsPaladinSealSpell(spellID),
+		paladinAura = CooldownManagerUtils.IsPaladinAuraSpell(spellID),
 		hunterAspect = IsHunterAspectSpell(spellID),
 		reactiveAbility = CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID) ~= nil,
 		groupBuff = IsPaladinBlessingSpell(spellID),
@@ -3445,6 +3507,52 @@ local function GetUnitPaladinBlessingState(unit)
 	return unknown and "unknown" or "missing"
 end
 
+function CooldownManagerUtils.GetPlayerPaladinBlessingState()
+	local state = GetUnitPaladinBlessingState("player")
+	if state ~= "unknown" then CooldownManagerUtils.paladinBlessingPresent = state == "present" end
+	return CooldownManagerUtils.paladinBlessingPresent
+end
+
+function CooldownManagerUtils.GetPaladinAuraState()
+	if not C_UnitAuras or type(C_UnitAuras.GetPlayerAuraBySpellID) ~= "function" then return end
+	local unknown = false
+	for _, family in ipairs(CooldownManagerUtils.PALADIN_AURA_FAMILIES) do
+		for _, spellID in ipairs(family.spells) do
+			if IsAuraSecretNow(spellID) then
+				unknown = true
+			else
+				local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+				if not ok or IsSecret(aura) then
+					unknown = true
+				elseif aura then
+					local sourceUnit = aura.sourceUnit
+					if IsSecret(sourceUnit) then
+						unknown = true
+					elseif sourceUnit == "player" then
+						CooldownManagerUtils.paladinAuraPresent = true
+						return true
+					end
+				end
+			end
+		end
+
+		local name = GetSpellNameSafe(family.spells[1])
+		if name and type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
+			local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", name, "HELPFUL|PLAYER")
+			if not ok or IsSecret(aura) then
+				unknown = true
+			elseif aura then
+				CooldownManagerUtils.paladinAuraPresent = true
+				return true
+			end
+		end
+	end
+
+	if unknown then return CooldownManagerUtils.paladinAuraPresent end
+	CooldownManagerUtils.paladinAuraPresent = false
+	return false
+end
+
 function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 	if GetUnitFlag(UnitIsConnected, unit) == false or GetUnitFlag(UnitIsDeadOrGhost, unit) == true or GetUnitFlag(UnitIsVisible, unit) == false then return "unchecked" end
 	if not CooldownManagerUtils.IsForeverBattleShoutUnitEligible(unit, entry) then return "unchecked" end
@@ -3829,7 +3937,26 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
 				end
 
-				if entry.tankOnly or entry.paladinBlessing and frame.checkGroupBuffs and IsInGroup() then show = CooldownManagerUtils.IsGroupBuffMissing(entry) end
+				if entry.tankOnly or entry.paladinBlessing and frame.checkGroupBuffs and IsInGroup() then
+					show = CooldownManagerUtils.IsGroupBuffMissing(entry)
+				elseif entry.paladinBlessing then
+					if not sharedPaladinState.selfResolved then
+						sharedPaladinState.selfPresent = CooldownManagerUtils.GetPlayerPaladinBlessingState()
+						sharedPaladinState.selfResolved = true
+					end
+
+					if sharedPaladinState.selfPresent ~= nil then show = not sharedPaladinState.selfPresent end
+				end
+
+				if entry.paladinAura then
+					if not sharedPaladinSealState.auraResolved then
+						sharedPaladinSealState.auraPresent = CooldownManagerUtils.GetPaladinAuraState()
+						sharedPaladinSealState.auraResolved = true
+					end
+
+					if sharedPaladinSealState.auraPresent ~= nil then show = not sharedPaladinSealState.auraPresent end
+				end
+
 				if entry.paladinSeal then
 					if not sharedPaladinSealState.resolved then
 						sharedPaladinSealState.present = GetPaladinSealState()
@@ -4021,6 +4148,11 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if IsPaladinSealSpell(spellID) then
 		paladinSealPresent = true
 		SetPaladinSealExpiration(paladinSealDuration and castTime + paladinSealDuration or nil)
+		changed = true
+	end
+
+	if self.IsPaladinAuraSpell(spellID) then
+		self.paladinAuraPresent = true
 		changed = true
 	end
 
