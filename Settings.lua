@@ -5,6 +5,12 @@ local ITEM_SIZE = 38
 local ITEM_SPACING = 8
 local CATEGORY_WIDTH = 344
 local TAB_ICON_SIZE = 32
+local ADD_BUTTON_WIDTH = 200
+local ADD_BUTTON_HEIGHT = 26
+local INFO_SPACING = 6
+local ADD_BUFF_MAX_RESULTS = 50
+local CUSTOM_ALERT_TEXTURE = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
+local CUSTOM_ALERT_ICON = "|T" .. CUSTOM_ALERT_TEXTURE .. ":14:14:0:0:64:64:0:64:0:64:255:51:51|t"
 local CATEGORY_DEFINITIONS = {
 	{key = "expiringBuff", localeKey = "LID_BUFFREMINDERS_CATEGORY_EXPIRING", buffOnly = true},
 	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
@@ -28,6 +34,7 @@ local draggedButton
 local dropCategory
 local dropEntry
 local dragPreview
+local addBuffWindow
 
 local function IsValidCategory(key)
 	for _, definition in ipairs(CATEGORY_DEFINITIONS) do
@@ -128,10 +135,24 @@ local function BeginDrag(button)
 	GameTooltip:Hide()
 end
 
+local function AddCustomBuffTooltip(tooltip)
+	tooltip:AddLine(" ")
+	tooltip:AddLine(CUSTOM_ALERT_ICON .. " " .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF"), 1, 0.2, 0.2)
+	tooltip:AddLine(CooldownManagerUtils:Trans("LID_CUSTOMBUFF_WARNING"), 1, 0.82, 0, true)
+	tooltip:AddLine(CooldownManagerUtils:Trans("LID_CUSTOMBUFF_CONTACT"), 0.8, 0.8, 0.8, true)
+	tooltip:AddLine(CooldownManagerUtils:Trans("LID_CUSTOMBUFF_REMOVE_HINT"), 0.5, 0.8, 1, true)
+end
+
+local function ShowRemoveCustomBuffDialog(entry)
+	GameTooltip:Hide()
+	StaticPopup_Show("COOLDOWN_MANAGER_UTILS_REMOVE_CUSTOM_BUFF", entry.name, nil, entry)
+end
+
 local function CreateItemButton(parent, index)
 	local button = CreateFrame("Button", nil, parent)
 	button:SetSize(ITEM_SIZE, ITEM_SIZE)
 	button:RegisterForDrag("LeftButton")
+	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	button.Icon = button:CreateTexture(nil, "ARTWORK")
 	button.Icon:SetAllPoints()
 	button.Highlight = button:CreateTexture(nil, "HIGHLIGHT")
@@ -141,8 +162,17 @@ local function CreateItemButton(parent, index)
 	button.Filter = button:CreateTexture(nil, "OVERLAY")
 	button.Filter:SetAllPoints(button.Icon)
 	button.Filter:SetColorTexture(0, 0, 0, 0.72)
+	button.Alert = button:CreateTexture(nil, "OVERLAY", nil, 7)
+	button.Alert:SetTexture(CUSTOM_ALERT_TEXTURE)
+	button.Alert:SetVertexColor(1, 0.2, 0.2, 1)
+	button.Alert:SetSize(14, 14)
+	button.Alert:SetPoint("TOPRIGHT", button, "TOPRIGHT", 3, 3)
+	button.Alert:Hide()
 	button:SetScript("OnDragStart", BeginDrag)
 	button:SetScript("OnDragStop", FinishDrag)
+	button:SetScript("OnClick", function(self, mouseButton)
+		if mouseButton == "RightButton" and not draggedButton and self.entry and self.entry.custom then ShowRemoveCustomBuffDialog(self.entry) end
+	end)
 	button:SetScript("OnEnter", function(self)
 		if not self.entry then return end
 		dropCategory = not self.category.readOnly and self.category or nil
@@ -156,6 +186,7 @@ local function CreateItemButton(parent, index)
 			GameTooltip:AddLine(CooldownManagerUtils:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_TOOLTIP" or "LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
 			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_DRAG"), 0.5, 0.8, 1, true)
 		end
+		if self.entry.custom then AddCustomBuffTooltip(GameTooltip) end
 		GameTooltip:Show()
 	end)
 	button:SetScript("OnLeave", GameTooltip_Hide)
@@ -258,7 +289,21 @@ function CooldownManagerUtils:RefreshReminderSettings()
 	BuildCategoryModels()
 	reminderContent.Empty:SetText(self:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_EMPTY" or "LID_BUFFREMINDERS_EMPTY"))
 	local filter = settingsFrame and settingsFrame.filterText or ""
-	local yOffset = 0
+	local info = reminderContent.Info
+	local isBuffMode = customMode ~= "ability"
+	info.AddButton:SetShown(isBuffMode)
+	info.Text:ClearAllPoints()
+	if isBuffMode then
+		info.Text:SetPoint("TOP", info.AddButton, "BOTTOM", 0, -INFO_SPACING)
+	else
+		info.Text:SetPoint("TOP", info, "TOP", 0, 0)
+	end
+	info.Text:SetText(self:Trans(isBuffMode and "LID_BUFFREMINDERS_CONTACT" or "LID_ABILITYREMINDERS_CONTACT"))
+	local infoHeight = math.ceil(info.Text:GetStringHeight()) + (isBuffMode and ADD_BUTTON_HEIGHT + INFO_SPACING or 0)
+	info:ClearAllPoints()
+	info:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, 0)
+	info:SetHeight(math.max(1, infoHeight))
+	local yOffset = infoHeight + 18
 	for index, definition in ipairs(CATEGORY_DEFINITIONS) do
 		local model = categoryModels[index]
 		local frame = categoryFrames[index]
@@ -284,6 +329,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 				button.Icon:SetTexture(entry.iconID)
 				button.Icon:SetDesaturated(entry.isLearned == false)
 				button:SetAlpha(entry.isLearned == false and 0.45 or 1)
+				button.Alert:SetShown(entry.custom == true)
 				button.Filter:SetShown(filter ~= "" and not entry.name:lower():find(filter, 1, true))
 				button:Show()
 			end
@@ -340,6 +386,20 @@ local function CreateReminderContent(parent)
 	content.Empty = content:CreateFontString(nil, "ARTWORK", "GameFontDisable")
 	content.Empty:SetPoint("CENTER", content.Scroll, "CENTER", 0, 20)
 	content.Empty:SetText(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_EMPTY"))
+	content.Info = CreateFrame("Frame", nil, content.ScrollChild)
+	content.Info:SetWidth(CATEGORY_WIDTH)
+	content.Info.AddButton = CooldownManagerUtils:CreateButton("CooldownManagerUtilsAddBuffButton", content.Info)
+	content.Info.AddButton:SetSize(ADD_BUTTON_WIDTH, ADD_BUTTON_HEIGHT)
+	content.Info.AddButton:SetPoint("TOP", content.Info, "TOP", 0, 0)
+	content.Info.AddButton:SetText(CooldownManagerUtils:Trans("LID_ADDBUFF"))
+	content.Info.AddButton:SetScript("OnClick", function()
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		CooldownManagerUtils:ToggleAddBuffWindow()
+	end)
+	content.Info.Text = content.Info:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	content.Info.Text:SetWidth(CATEGORY_WIDTH - 20)
+	content.Info.Text:SetJustifyH("CENTER")
+	content.Info.Text:SetTextColor(0.8, 0.8, 0.8)
 	for index, definition in ipairs(CATEGORY_DEFINITIONS) do CreateCategoryFrame(content.ScrollChild, definition, index) end
 	content:Hide()
 	return content
@@ -399,6 +459,144 @@ local function CreateOptionsButton(parent)
 	return button
 end
 
+local function GetAddBuffStatusText(row)
+	if row.listing == "custom" then return "|cffff3333" .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF") .. "|r" end
+	if row.listing == "listed" then return "|cff808080" .. CooldownManagerUtils:Trans("LID_ADDBUFF_LISTED") .. "|r" end
+	return "|cff33ff33" .. CooldownManagerUtils:Trans("LID_ADDBUFF_CLICK") .. "|r"
+end
+
+local function ShowAddBuffRowTooltip(tooltip, row)
+	tooltip:SetSpellByID(row.spellID)
+	if row.listing == "custom" then
+		AddCustomBuffTooltip(tooltip)
+	elseif row.listing == "listed" then
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ADDBUFF_LISTED"), 0.5, 0.5, 0.5)
+	else
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ADDBUFF_CLICK"), 0.2, 1, 0.2)
+	end
+end
+
+local function UpdateAddBuffResults()
+	if not addBuffWindow or not addBuffWindow.results then return end
+	local query = addBuffWindow.query or ""
+	local rows = {}
+	for _, spell in ipairs(CooldownManagerUtils:FindClassSpells(query)) do
+		if #rows >= ADD_BUFF_MAX_RESULTS then break end
+		table.insert(rows, {
+			spellID = spell.spellID,
+			name = spell.name,
+			iconID = spell.iconID,
+			listing = CooldownManagerUtils:GetBuffSpellListing(spell.spellID, spell.name)
+		})
+	end
+
+	addBuffWindow.results.emptyText = strtrim(query) == "" and "LID_ADDBUFF_HINT" or "LID_ADDBUFF_EMPTY"
+	addBuffWindow.results:SetRows(rows)
+end
+
+local function AddWindowText(win, text)
+	local holder = CreateFrame("Frame", nil, win.content)
+	holder:SetSize(math.max(1, win.contentWidth - 8), 1)
+	holder.Text = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	holder.Text:SetPoint("TOPLEFT")
+	holder.Text:SetPoint("TOPRIGHT")
+	holder.Text:SetJustifyH("LEFT")
+	holder.Text:SetText(text)
+	local element = CooldownManagerUtils.UI:Add(win, holder, 1, nil, true)
+	local function UpdateHeight()
+		local height = math.max(1, math.ceil(holder.Text:GetStringHeight()))
+		if element.height == height then return end
+		element.height = height
+		holder:SetHeight(height)
+		win:Layout()
+	end
+
+	holder:SetScript("OnSizeChanged", UpdateHeight)
+	holder:SetScript("OnShow", UpdateHeight)
+	UpdateHeight()
+	return holder
+end
+
+local function OnAddBuffRowClick(row, mouseButton)
+	if mouseButton == "RightButton" then
+		if row.listing == "custom" then ShowRemoveCustomBuffDialog({spellID = row.spellID, name = row.name}) end
+		return
+	end
+
+	if row.listing ~= nil or not CooldownManagerUtils:AddCustomBuff(row.spellID) then return end
+	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+	UpdateAddBuffResults()
+end
+
+local function CreateAddBuffWindow()
+	local win = CooldownManagerUtils:CreateUIWindow({
+		["name"] = "CooldownManagerUtilsAddBuff",
+		["title"] = format("|T%d:16:16:0:0|t %s", 134376, CooldownManagerUtils:Trans("LID_ADDBUFF")),
+		["pTab"] = settingsFrame and {"TOPLEFT", settingsFrame, "TOPRIGHT", 4, 0} or {"CENTER"},
+		["width"] = 420,
+		["height"] = 440,
+		["minWidth"] = 360,
+		["minHeight"] = 300
+	})
+
+	win:SuspendLayout()
+	AddWindowText(win, CooldownManagerUtils:Trans("LID_ADDBUFF_INFO") .. "\n\n|cffff3333" .. CUSTOM_ALERT_ICON .. " " .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_WARNING") .. "|r\n" .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_CONTACT"))
+	win.searchBox = win:AddEditbox({
+		["label"] = "LID_ADDBUFF_SEARCH",
+		["func"] = function(value)
+			win.query = value
+			UpdateAddBuffResults()
+		end
+	})
+
+	win.results = win:AddList({
+		["stickyHeader"] = false,
+		["sortKey"] = "name",
+		["ascending"] = true,
+		["emptyText"] = "LID_ADDBUFF_HINT",
+		["onClick"] = OnAddBuffRowClick,
+		["columns"] = {
+			{
+				["key"] = "name",
+				["label"] = NAME,
+				["width"] = 150,
+				["flex"] = true,
+				["text"] = function(row) return format("|T%s:16:16:0:0|t %s", tostring(row.iconID or 134400), row.name) end,
+				["value"] = function(row) return row.name end,
+				["tooltip"] = ShowAddBuffRowTooltip
+			},
+			{
+				["key"] = "spellID",
+				["label"] = "ID",
+				["width"] = 60,
+				["align"] = "RIGHT",
+				["tooltip"] = ShowAddBuffRowTooltip
+			},
+			{
+				["key"] = "status",
+				["label"] = "LID_ADDBUFF_STATUS",
+				["width"] = 120,
+				["text"] = GetAddBuffStatusText,
+				["value"] = function(row) return row.listing or "" end,
+				["tooltip"] = ShowAddBuffRowTooltip
+			}
+		}
+	})
+
+	win:ResumeLayout()
+	return win
+end
+
+function CooldownManagerUtils:ToggleAddBuffWindow()
+	if not addBuffWindow then addBuffWindow = CreateAddBuffWindow() end
+	addBuffWindow:Toggle()
+	if addBuffWindow:IsShown() then
+		addBuffWindow:Raise()
+		addBuffWindow.searchBox.control:SetFocus()
+		UpdateAddBuffResults()
+	end
+end
+
 function CooldownManagerUtils:InitializeReminderSettings()
 	if settingsFrame then return end
 	if not C_AddOns or not C_AddOns.LoadAddOn then return end
@@ -424,6 +622,18 @@ function CooldownManagerUtils:InitializeReminderSettings()
 		whileDead = 1,
 		hideOnEscape = 1
 	}
+	StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REMOVE_CUSTOM_BUFF"] = {
+		text = self:Trans("LID_CUSTOMBUFF_REMOVE_CONFIRM"),
+		button1 = REMOVE or YES,
+		button2 = CANCEL or NO,
+		OnAccept = function(_, entry)
+			CooldownManagerUtils:RemoveCustomBuff(entry)
+			UpdateAddBuffResults()
+		end,
+		timeout = 0,
+		whileDead = 1,
+		hideOnEscape = 1
+	}
 	hooksecurefunc(frame, "SetDisplayMode", function() SetCustomMode(false) end)
 	hooksecurefunc(frame, "SetFilterText", function()
 		if customMode then CooldownManagerUtils:RefreshReminderSettings() end
@@ -436,6 +646,7 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	frame:HookScript("OnHide", function()
 		reminderRestorePoint = nil
 		reminderUndoButton:Disable()
+		if addBuffWindow then addBuffWindow:Hide() end
 	end)
 	if EventRegistry then
 		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()

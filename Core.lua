@@ -1362,6 +1362,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	local paladinSeal = IsPaladinSealMapping(knownAuraSpells, spellID, baseSpellID)
 	local paladinAura = CooldownManagerUtils.IsPaladinAuraSpell(spellID) or CooldownManagerUtils.IsPaladinAuraSpell(baseSpellID)
 	local hunterAspect = IsHunterAspectMapping(knownAuraSpells, spellID, baseSpellID)
+	local custom = CooldownManagerUtils.IsCustomMapping(knownAuraSpells, spellID, baseSpellID)
 	local reactiveFamily = CooldownManagerUtils.GetForeverReactiveAbilityFamily(spellID) or CooldownManagerUtils.GetForeverReactiveAbilityFamily(baseSpellID)
 	local family = GetWeaponEnchantFamily(spellID) or GetWeaponEnchantFamily(baseSpellID)
 	if family then
@@ -1411,6 +1412,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.paladinAura = existing.paladinAura or paladinAura
 		existing.hunterAspect = existing.hunterAspect or hunterAspect
 		existing.reactiveAbility = existing.reactiveAbility or reactiveFamily ~= nil
+		existing.custom = existing.custom and custom
 		existing.isLearned = existing.isLearned or isLearned
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
@@ -1438,6 +1440,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		paladinAura = paladinAura,
 		hunterAspect = hunterAspect,
 		reactiveAbility = reactiveFamily ~= nil,
+		custom = custom,
 		isLearned = isLearned,
 		candidates = candidates
 	}
@@ -1520,7 +1523,7 @@ function CooldownManagerUtils.AddTalentSpell(spellID, learned, knownAuraSpells, 
 	AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, CooldownManagerUtils.GetTalentSpellLearnedState(spellID, learned))
 end
 
-function CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+function CooldownManagerUtils.ForEachTraitTalentSpell(callback)
 	if not C_ClassTalents or type(C_ClassTalents.GetActiveConfigID) ~= "function" or not C_Traits or type(C_Traits.GetConfigInfo) ~= "function" or type(C_Traits.GetTreeNodes) ~= "function" or type(C_Traits.GetNodeInfo) ~= "function" or type(C_Traits.GetEntryInfo) ~= "function" or type(C_Traits.GetDefinitionInfo) ~= "function" then return false end
 	local configOK, configID = pcall(C_ClassTalents.GetActiveConfigID)
 	if not configOK or IsSecret(configID) or type(configID) ~= "number" then return false end
@@ -1540,7 +1543,7 @@ function CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuf
 							local definitionOK, definitionInfo = pcall(C_Traits.GetDefinitionInfo, definitionID)
 							local spellID = definitionOK and type(definitionInfo) == "table" and definitionInfo.spellID
 							if type(spellID) == "number" then
-								CooldownManagerUtils.AddTalentSpell(spellID, nil, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+								callback(spellID, nil)
 								found = true
 							end
 						end
@@ -1552,7 +1555,7 @@ function CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuf
 	return found
 end
 
-function CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+function CooldownManagerUtils.ForEachSpecializationTalentSpell(callback)
 	local getTalentInfo = C_SpecializationInfo and C_SpecializationInfo.GetTalentInfo
 	if type(getTalentInfo) ~= "function" then return end
 	local _, _, classID = UnitClass("player")
@@ -1573,7 +1576,7 @@ function CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, ava
 
 			if talentOK and type(talentInfo) == "table" then
 				local learned = type(talentInfo.known) == "boolean" and talentInfo.known or type(talentInfo.rank) == "number" and talentInfo.rank > 0
-				CooldownManagerUtils.AddTalentSpell(talentInfo.spellID, learned, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+				callback(talentInfo.spellID, learned)
 			elseif type(GetNumTalents) ~= "function" then
 				break
 			end
@@ -1581,8 +1584,182 @@ function CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, ava
 	end
 end
 
+function CooldownManagerUtils.ForEachTalentSpell(callback)
+	if not CooldownManagerUtils.ForEachTraitTalentSpell(callback) then CooldownManagerUtils.ForEachSpecializationTalentSpell(callback) end
+end
+
 function CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
-	if not CooldownManagerUtils.AddTraitTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID) then CooldownManagerUtils.AddSpecializationTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID) end
+	CooldownManagerUtils.ForEachTalentSpell(function(spellID, learned) CooldownManagerUtils.AddTalentSpell(spellID, learned, knownAuraSpells, availableBuffs, availableBuffsBySpellID) end)
+end
+
+function CooldownManagerUtils:GetCustomBuffs()
+	CooldownManagerUtilsGlobalDB = CooldownManagerUtilsGlobalDB or {}
+	CooldownManagerUtilsGlobalDB.customBuffs = CooldownManagerUtilsGlobalDB.customBuffs or {}
+	local _, class = UnitClass("player")
+	class = class or "DEFAULT"
+	CooldownManagerUtilsGlobalDB.customBuffs[class] = CooldownManagerUtilsGlobalDB.customBuffs[class] or {}
+	return CooldownManagerUtilsGlobalDB.customBuffs[class]
+end
+
+function CooldownManagerUtils.IsCustomMapping(knownAuraSpells, ...)
+	for index = 1, select("#", ...) do
+		local mapping = knownAuraSpells[select(index, ...)]
+		if mapping and mapping.custom then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils.AddClassCatalogSpell(catalog, spellID)
+	if IsSecret(spellID) or type(spellID) ~= "number" or spellID <= 0 or catalog.byID[spellID] then return end
+	if GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return end
+	local spellName = GetSpellNameSafe(spellID)
+	if not spellName then return end
+	local spellInfo = GetReminderSpellInfo(spellID)
+	local spell = {
+		spellID = spellID,
+		name = spellName,
+		iconID = spellInfo and spellInfo.iconID
+	}
+
+	catalog.byID[spellID] = spell
+	catalog.ranks[spellName] = catalog.ranks[spellName] or {}
+	table.insert(catalog.ranks[spellName], spellID)
+	table.insert(catalog.spells, spell)
+end
+
+function CooldownManagerUtils:GetClassSpellCatalog()
+	if self.classSpellCatalog then return self.classSpellCatalog end
+	local catalog = {
+		spells = {},
+		byID = {},
+		ranks = {}
+	}
+
+	if not C_Spell or not C_SpellBook or not C_SpellBook.GetSpellBookSkillLineInfo or not C_SpellBook.GetSpellBookItemInfo or not Enum or not Enum.SpellBookSpellBank or not Enum.SpellBookItemType then return catalog end
+	local itemTypes = Enum.SpellBookItemType
+	local playerBank = Enum.SpellBookSpellBank.Player
+	local generalLine = Enum.SpellBookSkillLineIndex and Enum.SpellBookSkillLineIndex.General or 1
+	local numSkillLines = type(C_SpellBook.GetNumSpellBookSkillLines) == "function" and C_SpellBook.GetNumSpellBookSkillLines() or 3
+	for skillLineIndex = 1, numSkillLines do
+		local skillLineInfo = skillLineIndex ~= generalLine and C_SpellBook.GetSpellBookSkillLineInfo(skillLineIndex)
+		if skillLineInfo and not skillLineInfo.isGuild then
+			local firstItem = skillLineInfo.itemIndexOffset + 1
+			for itemIndex = firstItem, firstItem + skillLineInfo.numSpellBookItems - 1 do
+				local itemInfo = C_SpellBook.GetSpellBookItemInfo(itemIndex, playerBank)
+				if itemInfo and (itemInfo.itemType == itemTypes.Spell or itemInfo.itemType == itemTypes.FutureSpell) then
+					self.AddClassCatalogSpell(catalog, itemInfo.spellID)
+					self.AddClassCatalogSpell(catalog, itemInfo.actionID)
+				elseif itemInfo and itemInfo.itemType == itemTypes.Flyout and type(GetFlyoutInfo) == "function" and type(GetFlyoutSlotInfo) == "function" then
+					local _, _, numSlots = GetFlyoutInfo(itemInfo.actionID)
+					for slotIndex = 1, type(numSlots) == "number" and numSlots or 0 do
+						local baseSpellID, overrideSpellID = GetFlyoutSlotInfo(itemInfo.actionID, slotIndex)
+						self.AddClassCatalogSpell(catalog, overrideSpellID or baseSpellID)
+					end
+				end
+			end
+		end
+	end
+
+	self.ForEachTalentSpell(function(spellID) CooldownManagerUtils.AddClassCatalogSpell(catalog, spellID) end)
+	self.classSpellCatalog = catalog
+	return catalog
+end
+
+function CooldownManagerUtils:FindClassSpells(query)
+	local results = {}
+	query = strtrim(query or "")
+	if query == "" then return results end
+	local catalog = self:GetClassSpellCatalog()
+	local spellID = tonumber(query)
+	if spellID then
+		local spell = catalog.byID[spellID]
+		local spellName = GetSpellNameSafe(spellID)
+		if not spell and spellName and catalog.ranks[spellName] and not GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then
+			local spellInfo = GetReminderSpellInfo(spellID)
+			spell = {
+				spellID = spellID,
+				name = spellName,
+				iconID = spellInfo and spellInfo.iconID
+			}
+		end
+
+		if spell then table.insert(results, spell) end
+		return results
+	end
+
+	local needle = query:lower()
+	local seenNames = {}
+	for _, spell in ipairs(catalog.spells) do
+		if not seenNames[spell.name] and spell.name:lower():find(needle, 1, true) then
+			seenNames[spell.name] = true
+			table.insert(results, spell)
+		end
+	end
+
+	table.sort(results, function(left, right) return left.name < right.name end)
+	return results
+end
+
+function CooldownManagerUtils:GetBuffSpellListing(spellID, spellName)
+	local entry = self.availableBuffsBySpellID and self.availableBuffsBySpellID[spellID] or spellName and availableBuffsByName[spellName]
+	if entry and entry.custom then return "custom" end
+	if entry then return "listed" end
+	if self:GetCustomBuffs()[spellID] then return "custom" end
+end
+
+function CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local catalog = CooldownManagerUtils:GetClassSpellCatalog()
+	for spellID in pairs(CooldownManagerUtils:GetCustomBuffs()) do
+		local spellName = GetSpellNameSafe(spellID)
+		if spellName and not availableBuffsBySpellID[spellID] and not availableBuffsByName[spellName] and not GetSpellPredicate(C_Spell and C_Spell.IsSpellPassive, spellID) then
+			local mapping = {
+				candidates = {},
+				seen = {},
+				custom = true
+			}
+
+			AddCandidate(mapping.candidates, mapping.seen, spellID)
+			for _, rankSpellID in ipairs(catalog.ranks[spellName] or {}) do
+				AddCandidate(mapping.candidates, mapping.seen, rankSpellID)
+			end
+
+			knownAuraSpells[spellID] = mapping
+			AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, CooldownManagerUtils.GetTalentSpellLearnedState(spellID))
+		end
+	end
+end
+
+function CooldownManagerUtils:AddCustomBuff(spellID)
+	if type(spellID) ~= "number" or not GetSpellNameSafe(spellID) then return false end
+	self:GetCustomBuffs()[spellID] = true
+	self:RefreshAvailableBuffs()
+	return true
+end
+
+function CooldownManagerUtils:RemoveCustomBuff(entry)
+	if type(entry) ~= "table" then return end
+	local customBuffs = self:GetCustomBuffs()
+	local removed = {}
+	for spellID in pairs(customBuffs) do
+		if spellID == entry.spellID or GetSpellNameSafe(spellID) == entry.name then table.insert(removed, spellID) end
+	end
+
+	table.insert(removed, entry.spellID)
+	for _, profiles in pairs(CooldownManagerUtilsDB and CooldownManagerUtilsDB.cooldownManagerProfiles or {}) do
+		for _, profile in pairs(profiles) do
+			for _, spellID in ipairs(removed) do
+				if type(profile) == "table" and profile.selected then profile.selected[spellID] = nil end
+				if type(profile) == "table" and profile.layout then profile.layout[spellID] = nil end
+			end
+		end
+	end
+
+	for _, spellID in ipairs(removed) do
+		customBuffs[spellID] = nil
+		presenceCache[spellID] = nil
+	end
+
+	self:RefreshAvailableBuffs()
 end
 
 function CooldownManagerUtils:GetCooldownManagerLayoutKey()
@@ -1792,6 +1969,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	local availableBuffsBySpellID = {}
 	wipe(availableBuffsByName)
 	weaponEnchantFallbackNames = nil
+	self.classSpellCatalog = nil
 	LearnCurrentPlayerAuras()
 	local knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
@@ -1805,6 +1983,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
+	CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	table.sort(availableBuffs, function(left, right) return left.name < right.name end)
 	self:MigrateReminderSelection(availableBuffsBySpellID)
 	self.availableBuffs = availableBuffs
