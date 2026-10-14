@@ -4,9 +4,45 @@ local cdmButton = nil
 local ICON = 134376
 local DEFAULT_WIDTH = 420
 local DEFAULT_HEIGHT = 320
+local MIN_WIDTH = 400
 local OPTION_DEFAULTS = {
 	EXPIRYWARNINGTIME = 5
 }
+
+CooldownManagerUtils.LANGUAGES = {{"English", "enUS"}, {"Deutsch", "deDE"}, {"Español (España)", "esES"}, {"Español (México)", "esMX"}, {"Français", "frFR"}, {"Italiano", "itIT"}, {"한국어", "koKR"}, {"Português (Brasil)", "ptBR"}, {"Русский", "ruRU"}, {"简体中文", "zhCN"}, {"繁體中文", "zhTW"}}
+local languageNames = {}
+for _, info in ipairs(CooldownManagerUtils.LANGUAGES) do
+	languageNames[info[2]] = info[1]
+end
+
+local languageCallbacks = {}
+function CooldownManagerUtils:GetLanguage()
+	local lang = type(CooldownManagerUtilsGlobalDB) == "table" and CooldownManagerUtilsGlobalDB.LANGUAGE or nil
+	if languageNames[lang] then return lang end
+	return languageNames[GetLocale()] and GetLocale() or "enUS"
+end
+
+function CooldownManagerUtils:GetLanguageName()
+	return languageNames[self:GetLanguage()]
+end
+
+local LibTrans = CooldownManagerUtils.Trans
+function CooldownManagerUtils:Trans(key, lang, ...)
+	return LibTrans(self, key, lang or CooldownManagerUtils:GetLanguage(), ...)
+end
+
+function CooldownManagerUtils:OnLanguage(callback)
+	table.insert(languageCallbacks, callback)
+end
+
+function CooldownManagerUtils:SetLanguage(lang)
+	if not languageNames[lang] or lang == self:GetLanguage() then return end
+	CooldownManagerUtilsGlobalDB = CooldownManagerUtilsGlobalDB or {}
+	CooldownManagerUtilsGlobalDB.LANGUAGE = lang ~= GetLocale() and lang or nil
+	for _, callback in ipairs(languageCallbacks) do
+		callback()
+	end
+end
 
 function CooldownManagerUtils:GetOptions()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
@@ -44,15 +80,103 @@ local function SetOption(key, value)
 	CooldownManagerUtils:ScheduleReminderUpdate()
 end
 
+local function AddLanguageSelector(window)
+	window.languageRefresh = {}
+	for _, method in ipairs({"AddCategory", "AddCheckbox", "AddSlider"}) do
+		local add = window[method]
+		window[method] = function(self, tab)
+			local key = tab.label
+			local widget = add(self, tab)
+			local element = self.elements[#self.elements]
+			local function Refresh()
+				local text = CooldownManagerUtils:Trans(key)
+				if method == "AddSlider" then
+					widget.Label:SetText(text .. ": " .. tostring(widget.value))
+				else
+					widget.Label:SetText(text)
+				end
+
+				CooldownManagerUtils.UI:SetLabel(element, text)
+				CooldownManagerUtils.UI:RefreshNewBadge(widget)
+				CooldownManagerUtils.UI:RefreshNewBadge(widget:GetParent())
+			end
+
+			if method == "AddSlider" then widget.slider:HookScript("OnValueChanged", Refresh) end
+			table.insert(self.languageRefresh, Refresh)
+			return widget
+		end
+	end
+
+	function window.LanguageMenu(_, root)
+		root:CreateTitle(CooldownManagerUtils:Trans("LID_LANGUAGE"))
+		for _, info in ipairs(CooldownManagerUtils.LANGUAGES) do
+			local lang = info[2]
+			root:CreateRadio(format("%s (%s)", info[1], lang), function() return CooldownManagerUtils:GetLanguage() == lang end, function() CooldownManagerUtils:SetLanguage(lang) end)
+		end
+	end
+
+	if CooldownManagerUtils:CheckTemplates("WowStyle1DropdownTemplate") then
+		window.Language = CreateFrame("DropdownButton", "CooldownManagerUtilsOptions_Language", window.titleBar or window, "WowStyle1DropdownTemplate")
+		window.Language:SetScale(0.8)
+		window.Language:SetSize(130, 25)
+		window.Language:SetPoint("TOPLEFT", window.titleBar or window, "TOPLEFT", 10, -1.25)
+		window.Language:SetSelectionText(function() return CooldownManagerUtils:GetLanguageName() end)
+		window.Language:SetTooltip(function(tooltip) tooltip:SetText(CooldownManagerUtils:Trans("LID_LANGUAGE")) end)
+		window.Language:SetupMenu(window.LanguageMenu)
+	else
+		window.Language = CooldownManagerUtils:CreateButton("CooldownManagerUtilsOptions_Language", window.titleBar or window)
+		window.Language:SetSize(104, 20)
+		window.Language:SetPoint("TOPLEFT", window.titleBar or window, "TOPLEFT", 7, -2)
+		window.Language.Arrow = window.Language:CreateTexture(nil, "OVERLAY")
+		window.Language.Arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+		window.Language.Arrow:SetSize(16, 16)
+		window.Language.Arrow:SetPoint("RIGHT", window.Language, "RIGHT", -2, 0)
+		window.Language:SetScript("OnClick", function(button)
+			if MenuUtil and MenuUtil.CreateContextMenu then
+				MenuUtil.CreateContextMenu(button, window.LanguageMenu)
+			else
+				local current = 1
+				for index, info in ipairs(CooldownManagerUtils.LANGUAGES) do
+					if info[2] == CooldownManagerUtils:GetLanguage() then current = index end
+				end
+
+				CooldownManagerUtils:SetLanguage(CooldownManagerUtils.LANGUAGES[current % #CooldownManagerUtils.LANGUAGES + 1][2])
+			end
+		end)
+
+		window.Language:SetScript("OnEnter", function(button)
+			GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+			GameTooltip:SetText(CooldownManagerUtils:Trans("LID_LANGUAGE"))
+			GameTooltip:Show()
+		end)
+
+		window.Language:SetScript("OnLeave", GameTooltip_Hide)
+	end
+
+	window.Language:SetText(CooldownManagerUtils:GetLanguageName())
+	CooldownManagerUtils:OnLanguage(function()
+		for _, refresh in ipairs(window.languageRefresh) do
+			refresh()
+		end
+
+		window.Language:SetText(CooldownManagerUtils:GetLanguageName())
+		if window.Language.GenerateMenu then window.Language:GenerateMenu() end
+		if window.search then
+			window.search.Hint:SetText(CooldownManagerUtils:Trans("LID_SEARCH"))
+			window:Filter(window.search:GetText())
+		end
+	end)
+end
+
 function CooldownManagerUtils:InitOptions()
 	if optionsWindow then return end
 	local options = self:GetOptions()
 	optionsWindow = self:CreateUIWindow({
 		["name"] = "CooldownManagerUtilsOptions",
 		["pTab"] = {"CENTER"},
-		["width"] = self:GV(options, "WINDOWWIDTH", DEFAULT_WIDTH),
+		["width"] = math.max(MIN_WIDTH, self:GV(options, "WINDOWWIDTH", DEFAULT_WIDTH)),
 		["height"] = self:GV(options, "WINDOWHEIGHT", DEFAULT_HEIGHT),
-		["minWidth"] = 360,
+		["minWidth"] = MIN_WIDTH,
 		["minHeight"] = 240,
 		["onResize"] = function(width, height)
 			CooldownManagerUtils:SV(options, "WINDOWWIDTH", width)
@@ -61,6 +185,7 @@ function CooldownManagerUtils:InitOptions()
 		["title"] = format("|T%d:16:16:0:0|t Cooldown Manager Utils%s", ICON, GetVersionText())
 	})
 
+	AddLanguageSelector(optionsWindow)
 	optionsWindow:SuspendLayout()
 	optionsWindow:AddSearch()
 	optionsWindow:AddCategory({

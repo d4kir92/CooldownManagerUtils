@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_CUSTOMBUFF_REMOVE_HINT", "Правы�
 CooldownManagerUtils:AddTrans("ruRU", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "Удалить %s из напоминаний об эффектах?")
 CooldownManagerUtils:AddTrans("ruRU", "LID_BUFFREMINDERS_CONTACT", "Не хватает эффекта? Добавьте его сами или свяжитесь с D4KiR, чтобы его добавили правильно и он работал стабильно.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ABILITYREMINDERS_CONTACT", "Не хватает срабатывания? Свяжитесь с D4KiR, чтобы его добавили.")
+CooldownManagerUtils:AddTrans("ruRU", "LID_LANGUAGE", "Язык / Language")
+CooldownManagerUtils:AddTrans("ruRU", "LID_DISCORD_COPY", "Нажмите на ссылку и затем Ctrl+C, чтобы скопировать её.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Оставшееся время усиления в секундах, при котором появляется напоминание об истечении. При значении 10 оно показывается в последние 10 секунд. Настройка относится к длительности усиления, а не к перезарядке заклинания.")

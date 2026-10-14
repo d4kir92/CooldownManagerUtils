@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("esMX", "LID_CUSTOMBUFF_REMOVE_HINT", "Clic derech
 CooldownManagerUtils:AddTrans("esMX", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "¿Quitar %s de los recordatorios de beneficios?")
 CooldownManagerUtils:AddTrans("esMX", "LID_BUFFREMINDERS_CONTACT", "¿Falta un beneficio? Agrégalo tú mismo o contacta a D4KiR para que se agregue correctamente y funcione de forma estable.")
 CooldownManagerUtils:AddTrans("esMX", "LID_ABILITYREMINDERS_CONTACT", "¿Falta una activación? Contacta a D4KiR para que la agregue.")
+CooldownManagerUtils:AddTrans("esMX", "LID_LANGUAGE", "Idioma / Language")
+CooldownManagerUtils:AddTrans("esMX", "LID_DISCORD_COPY", "Haz clic en el enlace y presiona Ctrl+C para copiarlo.")
 CooldownManagerUtils:AddTrans("esMX", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Segundos restantes para que expire un beneficio a partir de los cuales aparece el recordatorio. Con 10, aparece durante los últimos 10 segundos. Afecta a la duración del beneficio, no a la reutilización del hechizo.")

@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("enUS", "LID_CUSTOMBUFF_REMOVE_HINT", "Right-click
 CooldownManagerUtils:AddTrans("enUS", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "Remove %s from the Buff Reminders?")
 CooldownManagerUtils:AddTrans("enUS", "LID_BUFFREMINDERS_CONTACT", "Is a buff missing? Add it yourself or contact D4KiR so it can be added properly and work reliably.")
 CooldownManagerUtils:AddTrans("enUS", "LID_ABILITYREMINDERS_CONTACT", "Is a proc missing? Contact D4KiR so it can be added.")
+CooldownManagerUtils:AddTrans("enUS", "LID_LANGUAGE", "Language")
+CooldownManagerUtils:AddTrans("enUS", "LID_DISCORD_COPY", "Click the link and press Ctrl+C to copy it.")
 CooldownManagerUtils:AddTrans("enUS", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Seconds remaining before a buff expires at which the Expiring Buffs reminder appears. For example, 10 shows the reminder during the final 10 seconds. This controls buff duration, not spell cooldown.")

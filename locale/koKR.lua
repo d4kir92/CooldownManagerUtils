@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("koKR", "LID_CUSTOMBUFF_REMOVE_HINT", "오른쪽 �
 CooldownManagerUtils:AddTrans("koKR", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "%s 주문을 강화 효과 알림에서 제거하시겠습니까?")
 CooldownManagerUtils:AddTrans("koKR", "LID_BUFFREMINDERS_CONTACT", "빠진 강화 효과가 있나요? 직접 추가하거나, 올바르게 추가되어 안정적으로 작동하도록 D4KiR에게 연락하세요.")
 CooldownManagerUtils:AddTrans("koKR", "LID_ABILITYREMINDERS_CONTACT", "빠진 발동 효과가 있나요? 추가될 수 있도록 D4KiR에게 연락하세요.")
+CooldownManagerUtils:AddTrans("koKR", "LID_LANGUAGE", "언어 / Language")
+CooldownManagerUtils:AddTrans("koKR", "LID_DISCORD_COPY", "링크를 클릭한 뒤 Ctrl+C를 눌러 복사하세요.")
 CooldownManagerUtils:AddTrans("koKR", "LID_EXPIRYWARNINGTIME_TOOLTIP", "강화 효과가 만료되기 몇 초 전에 알림을 표시할지 설정합니다. 10이면 마지막 10초 동안 표시됩니다. 주문 재사용 대기시간이 아닌 강화 효과 지속시간에 적용됩니다.")

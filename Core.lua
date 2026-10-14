@@ -1426,7 +1426,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	end
 
 	local spellInfo = GetReminderSpellInfo(spellID)
-	if not spellInfo or not spellInfo.name then return end
+	if not spellInfo or not spellInfo.name or not spellInfo.iconID then return end
 	local entry = {
 		spellID = spellID,
 		name = spellInfo.name,
@@ -1723,8 +1723,16 @@ function CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuff
 				AddCandidate(mapping.candidates, mapping.seen, rankSpellID)
 			end
 
+			local isLearned = false
+			for _, candidateSpellID in ipairs(mapping.candidates) do
+				if CooldownManagerUtils.GetTalentSpellLearnedState(candidateSpellID) then
+					isLearned = true
+					break
+				end
+			end
+
 			knownAuraSpells[spellID] = mapping
-			AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, CooldownManagerUtils.GetTalentSpellLearnedState(spellID))
+			AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, isLearned)
 		end
 	end
 end

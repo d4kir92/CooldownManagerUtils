@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_CUSTOMBUFF_REMOVE_HINT", "Clique com 
 CooldownManagerUtils:AddTrans("ptBR", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "Remover %s dos lembretes de bônus?")
 CooldownManagerUtils:AddTrans("ptBR", "LID_BUFFREMINDERS_CONTACT", "Falta algum bônus? Adicione-o você mesmo ou entre em contato com D4KiR para que ele seja adicionado corretamente e funcione de forma estável.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_ABILITYREMINDERS_CONTACT", "Falta algum proc? Entre em contato com D4KiR para que ele seja adicionado.")
+CooldownManagerUtils:AddTrans("ptBR", "LID_LANGUAGE", "Idioma / Language")
+CooldownManagerUtils:AddTrans("ptBR", "LID_DISCORD_COPY", "Clique no link e pressione Ctrl+C para copiá-lo.")
 CooldownManagerUtils:AddTrans("ptBR", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Segundos restantes antes de um benefício expirar para mostrar o lembrete. Com 10, ele aparece durante os últimos 10 segundos. Esta opção controla a duração do benefício, não a recarga do feitiço.")

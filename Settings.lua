@@ -11,6 +11,9 @@ local INFO_SPACING = 6
 local ADD_BUFF_MAX_RESULTS = 50
 local CUSTOM_ALERT_TEXTURE = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
 local CUSTOM_ALERT_ICON = "|T" .. CUSTOM_ALERT_TEXTURE .. ":14:14:0:0:64:64:0:64:0:64:255:51:51|t"
+local DISCORD_URL = "https://discord.gg/EZUCsBfhgY"
+local DISCORD_BOX_WIDTH = 230
+local DISCORD_BOX_HEIGHT = 22
 local CATEGORY_DEFINITIONS = {
 	{key = "expiringBuff", localeKey = "LID_BUFFREMINDERS_CATEGORY_EXPIRING", buffOnly = true},
 	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
@@ -140,7 +143,36 @@ local function AddCustomBuffTooltip(tooltip)
 	tooltip:AddLine(CUSTOM_ALERT_ICON .. " " .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF"), 1, 0.2, 0.2)
 	tooltip:AddLine(CooldownManagerUtils:Trans("LID_CUSTOMBUFF_WARNING"), 1, 0.82, 0, true)
 	tooltip:AddLine(CooldownManagerUtils:Trans("LID_CUSTOMBUFF_CONTACT"), 0.8, 0.8, 0.8, true)
+	tooltip:AddLine("Discord: " .. DISCORD_URL, 0.45, 0.5, 1, true)
 	tooltip:AddLine(CooldownManagerUtils:Trans("LID_CUSTOMBUFF_REMOVE_HINT"), 0.5, 0.8, 1, true)
+end
+
+local function CreateDiscordBox(parent, name)
+	local box = CreateFrame("EditBox", name, parent, "InputBoxTemplate")
+	box:SetSize(DISCORD_BOX_WIDTH, DISCORD_BOX_HEIGHT)
+	box:SetAutoFocus(false)
+	box:SetText(DISCORD_URL)
+	box:SetCursorPosition(0)
+	box:SetScript("OnTextChanged", function(self, userInput)
+		if not userInput then return end
+		self:SetText(DISCORD_URL)
+		self:HighlightText()
+	end)
+	box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+	box:SetScript("OnEditFocusLost", function(self)
+		self:HighlightText(0, 0)
+		self:SetCursorPosition(0)
+	end)
+	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	box:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText("Discord")
+		GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_DISCORD_COPY"), 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	box:SetScript("OnLeave", GameTooltip_Hide)
+	return box
 end
 
 local function ShowRemoveCustomBuffDialog(entry)
@@ -180,6 +212,8 @@ local function CreateItemButton(parent, index)
 		if draggedButton then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetSpellByID(self.entry.spellID)
+		if GameTooltip:NumLines() == 0 then GameTooltip:SetText(self.entry.name) end
+		GameTooltip:AddLine("ID: " .. tostring(self.entry.spellID), 0.5, 0.5, 0.5)
 		if self.category.readOnly then
 			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_REMINDERS_NOT_LEARNED_TOOLTIP"), 0.6, 0.6, 0.6, true)
 		else
@@ -299,11 +333,10 @@ function CooldownManagerUtils:RefreshReminderSettings()
 		info.Text:SetPoint("TOP", info, "TOP", 0, 0)
 	end
 	info.Text:SetText(self:Trans(isBuffMode and "LID_BUFFREMINDERS_CONTACT" or "LID_ABILITYREMINDERS_CONTACT"))
-	local infoHeight = math.ceil(info.Text:GetStringHeight()) + (isBuffMode and ADD_BUTTON_HEIGHT + INFO_SPACING or 0)
-	info:ClearAllPoints()
-	info:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, 0)
+	info.AddButton:SetText(self:Trans("LID_ADDBUFF"))
+	local infoHeight = math.ceil(info.Text:GetStringHeight()) + INFO_SPACING + DISCORD_BOX_HEIGHT + (isBuffMode and ADD_BUTTON_HEIGHT + INFO_SPACING or 0)
 	info:SetHeight(math.max(1, infoHeight))
-	local yOffset = infoHeight + 18
+	local yOffset = 0
 	for index, definition in ipairs(CATEGORY_DEFINITIONS) do
 		local model = categoryModels[index]
 		local frame = categoryFrames[index]
@@ -346,7 +379,9 @@ function CooldownManagerUtils:RefreshReminderSettings()
 			yOffset = yOffset + frameHeight + 18
 		end
 	end
-	reminderContent.ScrollChild:SetHeight(math.max(1, yOffset))
+	info:ClearAllPoints()
+	info:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
+	reminderContent.ScrollChild:SetHeight(math.max(1, yOffset + infoHeight))
 	reminderContent.Empty:Hide()
 end
 
@@ -400,6 +435,8 @@ local function CreateReminderContent(parent)
 	content.Info.Text:SetWidth(CATEGORY_WIDTH - 20)
 	content.Info.Text:SetJustifyH("CENTER")
 	content.Info.Text:SetTextColor(0.8, 0.8, 0.8)
+	content.Info.Discord = CreateDiscordBox(content.Info, "CooldownManagerUtilsReminderDiscord")
+	content.Info.Discord:SetPoint("TOP", content.Info.Text, "BOTTOM", 0, -INFO_SPACING)
 	for index, definition in ipairs(CATEGORY_DEFINITIONS) do CreateCategoryFrame(content.ScrollChild, definition, index) end
 	content:Hide()
 	return content
@@ -513,8 +550,27 @@ local function AddWindowText(win, text)
 
 	holder:SetScript("OnSizeChanged", UpdateHeight)
 	holder:SetScript("OnShow", UpdateHeight)
+	holder.UpdateHeight = UpdateHeight
 	UpdateHeight()
 	return holder
+end
+
+local function GetAddBuffTitle()
+	return format("|T%d:16:16:0:0|t %s", 134376, CooldownManagerUtils:Trans("LID_ADDBUFF"))
+end
+
+local function GetAddBuffInfoText()
+	return CooldownManagerUtils:Trans("LID_ADDBUFF_INFO") .. "\n\n|cffff3333" .. CUSTOM_ALERT_ICON .. " " .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_WARNING") .. "|r\n" .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_CONTACT")
+end
+
+local function RefreshAddBuffWindowLanguage()
+	if not addBuffWindow then return end
+	if addBuffWindow.titleBar and addBuffWindow.titleBar.Title then addBuffWindow.titleBar.Title:SetText(GetAddBuffTitle()) end
+	addBuffWindow.info.Text:SetText(GetAddBuffInfoText())
+	addBuffWindow.info.UpdateHeight()
+	addBuffWindow.searchBox.Label:SetText(CooldownManagerUtils:Trans("LID_ADDBUFF_SEARCH"))
+	addBuffWindow.results:LayoutColumns()
+	UpdateAddBuffResults()
 end
 
 local function OnAddBuffRowClick(row, mouseButton)
@@ -531,7 +587,7 @@ end
 local function CreateAddBuffWindow()
 	local win = CooldownManagerUtils:CreateUIWindow({
 		["name"] = "CooldownManagerUtilsAddBuff",
-		["title"] = format("|T%d:16:16:0:0|t %s", 134376, CooldownManagerUtils:Trans("LID_ADDBUFF")),
+		["title"] = GetAddBuffTitle(),
 		["pTab"] = settingsFrame and {"TOPLEFT", settingsFrame, "TOPRIGHT", 4, 0} or {"CENTER"},
 		["width"] = 420,
 		["height"] = 440,
@@ -540,7 +596,12 @@ local function CreateAddBuffWindow()
 	})
 
 	win:SuspendLayout()
-	AddWindowText(win, CooldownManagerUtils:Trans("LID_ADDBUFF_INFO") .. "\n\n|cffff3333" .. CUSTOM_ALERT_ICON .. " " .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_WARNING") .. "|r\n" .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_CONTACT"))
+	win.info = AddWindowText(win, GetAddBuffInfoText())
+	win.discord = CreateFrame("Frame", nil, win.content)
+	win.discord:SetSize(math.max(1, win.contentWidth - 8), DISCORD_BOX_HEIGHT)
+	win.discord.Box = CreateDiscordBox(win.discord, "CooldownManagerUtilsAddBuffDiscord")
+	win.discord.Box:SetPoint("LEFT", win.discord, "LEFT", 6, 0)
+	CooldownManagerUtils.UI:Add(win, win.discord, DISCORD_BOX_HEIGHT, nil, true)
 	win.searchBox = win:AddEditbox({
 		["label"] = "LID_ADDBUFF_SEARCH",
 		["func"] = function(value)
@@ -634,6 +695,13 @@ function CooldownManagerUtils:InitializeReminderSettings()
 		whileDead = 1,
 		hideOnEscape = 1
 	}
+	self:OnLanguage(function()
+		reminderTab.tooltipText = CooldownManagerUtils:Trans("LID_BUFFREMINDERS")
+		if abilityReminderTab then abilityReminderTab.tooltipText = CooldownManagerUtils:Trans("LID_ABILITYREMINDERS") end
+		StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REMOVE_CUSTOM_BUFF"].text = CooldownManagerUtils:Trans("LID_CUSTOMBUFF_REMOVE_CONFIRM")
+		RefreshAddBuffWindowLanguage()
+		CooldownManagerUtils:RefreshReminderSettings()
+	end)
 	hooksecurefunc(frame, "SetDisplayMode", function() SetCustomMode(false) end)
 	hooksecurefunc(frame, "SetFilterText", function()
 		if customMode then CooldownManagerUtils:RefreshReminderSettings() end

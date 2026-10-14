@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("frFR", "LID_CUSTOMBUFF_REMOVE_HINT", "Clic droit 
 CooldownManagerUtils:AddTrans("frFR", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "Retirer %s des rappels d'améliorations ?")
 CooldownManagerUtils:AddTrans("frFR", "LID_BUFFREMINDERS_CONTACT", "Il manque une amélioration ? Ajoutez-la vous-même ou contactez D4KiR pour qu'elle soit ajoutée correctement et fonctionne de manière fiable.")
 CooldownManagerUtils:AddTrans("frFR", "LID_ABILITYREMINDERS_CONTACT", "Il manque un proc ? Contactez D4KiR pour qu'il soit ajouté.")
+CooldownManagerUtils:AddTrans("frFR", "LID_LANGUAGE", "Langue / Language")
+CooldownManagerUtils:AddTrans("frFR", "LID_DISCORD_COPY", "Cliquez sur le lien et appuyez sur Ctrl+C pour le copier.")
 CooldownManagerUtils:AddTrans("frFR", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Temps restant en secondes avant la fin d'une amélioration pour afficher le rappel. Avec 10, il apparaît pendant les 10 dernières secondes. Ce réglage concerne la durée de l'amélioration, pas la recharge du sort.")

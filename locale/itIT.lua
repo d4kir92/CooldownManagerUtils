@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("itIT", "LID_CUSTOMBUFF_REMOVE_HINT", "Clic destro
 CooldownManagerUtils:AddTrans("itIT", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "Rimuovere %s dai promemoria benefici?")
 CooldownManagerUtils:AddTrans("itIT", "LID_BUFFREMINDERS_CONTACT", "Manca un beneficio? Aggiungilo tu oppure contatta D4KiR affinché venga aggiunto correttamente e funzioni in modo stabile.")
 CooldownManagerUtils:AddTrans("itIT", "LID_ABILITYREMINDERS_CONTACT", "Manca un proc? Contatta D4KiR affinché venga aggiunto.")
+CooldownManagerUtils:AddTrans("itIT", "LID_LANGUAGE", "Lingua / Language")
+CooldownManagerUtils:AddTrans("itIT", "LID_DISCORD_COPY", "Clicca sul link e premi Ctrl+C per copiarlo.")
 CooldownManagerUtils:AddTrans("itIT", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Secondi rimanenti prima della scadenza di un beneficio per mostrare il promemoria. Con 10, appare negli ultimi 10 secondi. Riguarda la durata del beneficio, non il recupero della magia.")

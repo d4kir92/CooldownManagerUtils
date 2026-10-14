@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("zhCN", "LID_CUSTOMBUFF_REMOVE_HINT", "右键点�
 CooldownManagerUtils:AddTrans("zhCN", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "要从增益提醒中移除%s吗？")
 CooldownManagerUtils:AddTrans("zhCN", "LID_BUFFREMINDERS_CONTACT", "缺少某个增益？你可以自行添加，或联系 D4KiR 以便正确添加并保证其稳定运行。")
 CooldownManagerUtils:AddTrans("zhCN", "LID_ABILITYREMINDERS_CONTACT", "缺少某个触发效果？请联系 D4KiR 进行添加。")
+CooldownManagerUtils:AddTrans("zhCN", "LID_LANGUAGE", "语言 / Language")
+CooldownManagerUtils:AddTrans("zhCN", "LID_DISCORD_COPY", "点击链接后按 Ctrl+C 复制。")
 CooldownManagerUtils:AddTrans("zhCN", "LID_EXPIRYWARNINGTIME_TOOLTIP", "增益效果到期前多少秒显示即将到期提醒。例如，设为 10 时，在最后 10 秒显示提醒。此设置针对增益持续时间，而非技能冷却时间。")

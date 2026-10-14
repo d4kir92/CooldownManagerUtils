@@ -42,4 +42,6 @@ CooldownManagerUtils:AddTrans("deDE", "LID_CUSTOMBUFF_REMOVE_HINT", "Rechtsklick
 CooldownManagerUtils:AddTrans("deDE", "LID_CUSTOMBUFF_REMOVE_CONFIRM", "%s aus den Buff-Erinnerungen entfernen?")
 CooldownManagerUtils:AddTrans("deDE", "LID_BUFFREMINDERS_CONTACT", "Fehlt ein Buff? Füge ihn selbst hinzu oder kontaktiere D4KiR, damit er richtig eingebaut wird und stabil läuft.")
 CooldownManagerUtils:AddTrans("deDE", "LID_ABILITYREMINDERS_CONTACT", "Fehlt ein Proc? Kontaktiere D4KiR, damit er hinzugefügt wird.")
+CooldownManagerUtils:AddTrans("deDE", "LID_LANGUAGE", "Sprache / Language")
+CooldownManagerUtils:AddTrans("deDE", "LID_DISCORD_COPY", "Link anklicken und mit Strg+C kopieren.")
 CooldownManagerUtils:AddTrans("deDE", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Restzeit in Sekunden, ab der die Erinnerung für ablaufende Buffs erscheint. Bei 10 erscheint sie während der letzten 10 Sekunden. Dies betrifft die Buffdauer, nicht die Abklingzeit des Zaubers.")
