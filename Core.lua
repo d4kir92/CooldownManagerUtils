@@ -52,6 +52,20 @@ local CLASS_AURA_FALLBACKS = {
 			groupBuff = true
 		}
 	},
+	PALADIN = {
+		{
+			spellID = 1044
+		},
+		{
+			spellID = 1022
+		},
+		{
+			spellID = 5599
+		},
+		{
+			spellID = 10278
+		}
+	},
 	PRIEST = {
 		{
 			spellID = 21562,
