@@ -480,7 +480,7 @@ local function CreateOptionsButton(parent)
 	if parent.CloseButton then button:SetFrameLevel(parent.CloseButton:GetFrameLevel()) end
 	button.Icon = button:CreateTexture(nil, "ARTWORK")
 	button.Icon:SetAllPoints()
-	button.Icon:SetTexture(134376)
+	button.Icon:SetTexture(CooldownManagerUtils:GetAddonIcon())
 	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 	button:SetScript("OnClick", function()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
@@ -556,7 +556,7 @@ local function AddWindowText(win, text)
 end
 
 local function GetAddBuffTitle()
-	return format("|T%d:16:16:0:0|t %s", 134376, CooldownManagerUtils:Trans("LID_ADDBUFF"))
+	return format("|T%s:16:16:0:0|t %s", CooldownManagerUtils:GetAddonIcon(), CooldownManagerUtils:Trans("LID_ADDBUFF"))
 end
 
 local function GetAddBuffInfoText()

@@ -1,7 +1,7 @@
 local _, CooldownManagerUtils = ...
 local optionsWindow = nil
 local cdmButton = nil
-local ICON = 134376
+local ICON = CooldownManagerUtils:GetAddonIcon()
 local DEFAULT_WIDTH = 420
 local DEFAULT_HEIGHT = 320
 local MIN_WIDTH = 400
@@ -70,8 +70,7 @@ function CooldownManagerUtils:ToggleOptions()
 end
 
 local function GetVersionText()
-	local getMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or _G.GetAddOnMetadata
-	local version = getMetadata and getMetadata("CooldownManagerUtils", "Version")
+	local version = CooldownManagerUtils:GetAddonVersion()
 	return version and (" v" .. version) or ""
 end
 

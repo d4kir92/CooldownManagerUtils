@@ -1,5 +1,6 @@
 local _, CooldownManagerUtils = ...
-CooldownManagerUtils:SetAddonOutput("CooldownManagerUtils", 134376)
+CooldownManagerUtils:SetAddonOutput()
+CooldownManagerUtils:SetVersion()
 local ICON_SIZE = 40
 local ICON_SPACING = 4
 local ICON_SCALE_MIN = 50
