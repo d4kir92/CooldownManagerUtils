@@ -1666,6 +1666,74 @@ function CooldownManagerUtils:GetClassSpellCatalog()
 	return catalog
 end
 
+function CooldownManagerUtils.GetSpellRankNumber(spellID)
+	local sources = {C_Spell and C_Spell.GetSpellSubtext, _G.GetSpellSubtext, _G.GetSpellRank}
+	for index = 1, 3 do
+		local source = sources[index]
+		if type(source) == "function" then
+			local ok, result = pcall(source, spellID)
+			local rank = ok and not IsSecret(result) and type(result) == "string" and tonumber(result:match("(%d+)"))
+			if rank then return rank end
+		end
+	end
+
+	if type(_G.GetSpellInfo) == "function" then
+		local ok, _, rankText = pcall(_G.GetSpellInfo, spellID)
+		local rank = ok and not IsSecret(rankText) and type(rankText) == "string" and tonumber(rankText:match("(%d+)"))
+		if rank then return rank end
+	end
+	return 0
+end
+
+function CooldownManagerUtils.IsSpellRankKnown(spellID)
+	if C_SpellBook and C_SpellBook.IsSpellKnownOrInSpellBook and GetSpellPredicate(C_SpellBook.IsSpellKnownOrInSpellBook, spellID) then return true end
+	if type(IsPlayerSpell) == "function" then
+		local ok, result = pcall(IsPlayerSpell, spellID)
+		if ok and result == true then return true end
+	end
+
+	if type(IsSpellKnown) == "function" then
+		local ok, result = pcall(IsSpellKnown, spellID)
+		if ok and result == true then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils:GetDisplaySpellID(entry)
+	if not entry or type(entry.spellID) ~= "number" then return entry and entry.spellID end
+	if entry.displaySpellID then return entry.displaySpellID end
+	local spellName = entry.name or GetSpellNameSafe(entry.spellID)
+	local bestSpellID, bestRank, bestOrder = entry.spellID, -1, -1
+	local catalogRanks = spellName and self:GetClassSpellCatalog().ranks[spellName] or {}
+	local catalogOrder = {}
+	for index, rankSpellID in ipairs(catalogRanks) do
+		catalogOrder[rankSpellID] = index
+	end
+
+	local function Consider(spellID)
+		if type(spellID) ~= "number" or IsSecret(spellID) or GetSpellNameSafe(spellID) ~= spellName or not self.IsSpellRankKnown(spellID) then return end
+		local rank = self.GetSpellRankNumber(spellID)
+		local order = catalogOrder[spellID] or 0
+		if rank > bestRank or rank == bestRank and (order > bestOrder or order == bestOrder and spellID > bestSpellID) then
+			bestSpellID, bestRank, bestOrder = spellID, rank, order
+		end
+	end
+
+	if spellName then
+		Consider(entry.spellID)
+		for _, candidateSpellID in ipairs(entry.candidates or {}) do
+			Consider(candidateSpellID)
+		end
+
+		for _, rankSpellID in ipairs(catalogRanks) do
+			Consider(rankSpellID)
+		end
+	end
+
+	entry.displaySpellID = bestSpellID
+	return bestSpellID
+end
+
 function CooldownManagerUtils:FindClassSpells(query)
 	local results = {}
 	query = strtrim(query or "")
@@ -4261,6 +4329,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		local expiring = expiringEntries[entry]
 		local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
 		local onCooldown, cooldownSecret, cooldownSecretIsZero
+		local displaySpellID = CooldownManagerUtils:GetDisplaySpellID(entry)
 		if expiring then
 			icon.Cooldown.displayTime = 0
 			icon:SetAlpha(1)
@@ -4268,15 +4337,15 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 			icon.Cooldown:SetHideCountdownNumbers(false)
 			icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
 		else
-			onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, entry.spellID, frame.showTimer ~= false, frame.cooldownDisplayTime)
+			onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, displaySpellID, frame.showTimer ~= false, frame.cooldownDisplayTime)
 		end
 
 		icon.Texture:SetTexture(entry.iconID)
-		CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(entry.spellID), cooldownSecret, cooldownSecretIsZero)
+		CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(displaySpellID), cooldownSecret, cooldownSecretIsZero)
 		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
 		icon:SetMouseClickEnabled(false)
 		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
-		icon.spellID = entry.spellID
+		icon.spellID = displaySpellID
 		local groupState = groupBuffCache[entry.spellID]
 		icon.GroupCount:SetText(entry.tankOnly and "Tank" or groupState and (groupState.have .. "/" .. groupState.total) or "")
 		icon.GroupCount:SetShown(entry.tankOnly or groupState ~= nil)

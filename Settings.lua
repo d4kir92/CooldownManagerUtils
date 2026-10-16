@@ -211,9 +211,10 @@ local function CreateItemButton(parent, index)
 		dropEntry = dropCategory and self.entry or nil
 		if draggedButton then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetSpellByID(self.entry.spellID)
+		local displaySpellID = CooldownManagerUtils:GetDisplaySpellID(self.entry)
+		GameTooltip:SetSpellByID(displaySpellID)
 		if GameTooltip:NumLines() == 0 then GameTooltip:SetText(self.entry.name) end
-		GameTooltip:AddLine("ID: " .. tostring(self.entry.spellID), 0.5, 0.5, 0.5)
+		GameTooltip:AddLine("ID: " .. tostring(displaySpellID), 0.5, 0.5, 0.5)
 		if self.category.readOnly then
 			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_REMINDERS_NOT_LEARNED_TOOLTIP"), 0.6, 0.6, 0.6, true)
 		else
