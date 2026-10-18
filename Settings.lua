@@ -470,6 +470,60 @@ local function CreateReminderTab(parent, mode)
 	return tab
 end
 
+local function IsAccessibleFrame(frame)
+	if type(frame) ~= "table" or not frame.IsForbidden or frame:IsForbidden() then return false end
+	if frame.IsAnchoringRestricted and frame:IsAnchoringRestricted() then return false end
+	return true
+end
+
+local function IsAnchoredTo(frame, target, depth)
+	if not frame or depth > 10 then return false end
+	if frame == target then return true end
+	if not IsAccessibleFrame(frame) then return false end
+	for i = 1, frame:GetNumPoints() do
+		local _, relativeTo = frame:GetPoint(i)
+		if relativeTo and IsAnchoredTo(relativeTo, target, depth + 1) then return true end
+	end
+
+	return false
+end
+
+local function IsForeignTab(frame)
+	if frame == reminderTab or frame == abilityReminderTab or not frame:IsShown() then return false end
+	if IsAnchoredTo(frame, reminderTab, 0) then return false end
+	if abilityReminderTab and IsAnchoredTo(frame, abilityReminderTab, 0) then return false end
+	return true
+end
+
+local function FindTabBelow(anchorTab, candidates)
+	for _, frame in ipairs(candidates) do
+		for i = 1, frame:GetNumPoints() do
+			local point, relativeTo, relativePoint = frame:GetPoint(i)
+			if relativeTo == anchorTab and point == "TOP" and relativePoint == "BOTTOM" and IsForeignTab(frame) then return frame end
+		end
+	end
+end
+
+local function AnchorReminderTabs()
+	if not settingsFrame or not reminderTab then return end
+	local candidates = {}
+	for _, parent in ipairs({settingsFrame, UIParent}) do
+		for _, child in ipairs({parent:GetChildren()}) do
+			if IsAccessibleFrame(child) then table.insert(candidates, child) end
+		end
+	end
+
+	local anchorTab = settingsFrame.GroupBuffsTab
+	for _ = 1, 20 do
+		local nextTab = FindTabBelow(anchorTab, candidates)
+		if not nextTab then break end
+		anchorTab = nextTab
+	end
+
+	reminderTab:ClearAllPoints()
+	reminderTab:SetPoint("TOP", anchorTab, "BOTTOM", 0, -3)
+end
+
 local function CreateOptionsButton(parent)
 	local button = CreateFrame("Button", nil, parent)
 	button:SetSize(18, 18)
@@ -708,6 +762,8 @@ function CooldownManagerUtils:InitializeReminderSettings()
 		if customMode then CooldownManagerUtils:RefreshReminderSettings() end
 	end)
 	frame:HookScript("OnShow", function()
+		AnchorReminderTabs()
+		C_Timer.After(0, AnchorReminderTabs)
 		CooldownManagerUtils:OnCooldownManagerLayoutChanged()
 		CooldownManagerUtils:CaptureReminderRestorePoint()
 		if customMode then SetCustomMode(customMode) end
