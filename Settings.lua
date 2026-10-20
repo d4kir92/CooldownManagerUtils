@@ -476,11 +476,18 @@ local function IsAccessibleFrame(frame)
 	return true
 end
 
+local function GetPointCount(frame)
+	if type(frame.GetNumPoints) ~= "function" then return 0 end
+	local ok, count = pcall(frame.GetNumPoints, frame)
+	if not ok or type(count) ~= "number" or (issecretvalue and issecretvalue(count)) then return 0 end
+	return count
+end
+
 local function IsAnchoredTo(frame, target, depth)
 	if not frame or depth > 10 then return false end
 	if frame == target then return true end
 	if not IsAccessibleFrame(frame) then return false end
-	for i = 1, frame:GetNumPoints() do
+	for i = 1, GetPointCount(frame) do
 		local _, relativeTo = frame:GetPoint(i)
 		if relativeTo and IsAnchoredTo(relativeTo, target, depth + 1) then return true end
 	end
@@ -497,7 +504,7 @@ end
 
 local function FindTabBelow(anchorTab, candidates)
 	for _, frame in ipairs(candidates) do
-		for i = 1, frame:GetNumPoints() do
+		for i = 1, GetPointCount(frame) do
 			local point, relativeTo, relativePoint = frame:GetPoint(i)
 			if relativeTo == anchorTab and point == "TOP" and relativePoint == "BOTTOM" and IsForeignTab(frame) then return frame end
 		end
