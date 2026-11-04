@@ -3738,21 +3738,37 @@ end
 
 local function IsUnitInBuffRange(unit, entry)
 	if CooldownManagerUtils.IsForeverBattleShout(entry) then return CooldownManagerUtils.IsUnitInForeverBattleShoutRange(unit) end
-	if unit == "player" or not C_Spell or type(C_Spell.IsSpellInRange) ~= "function" then return true end
+	if unit == "player" then return true end
 	local checked = false
-	local spellIDs = {entry.spellID}
-	for _, spellID in ipairs(entry.candidates) do
-		if spellID ~= entry.spellID then table.insert(spellIDs, spellID) end
-	end
-
-	for _, spellID in ipairs(spellIDs) do
-		local ok, inRange = pcall(C_Spell.IsSpellInRange, spellID, unit)
-		if ok and not IsSecret(inRange) and type(inRange) == "boolean" then
-			checked = true
-			if inRange then return true end
+	if C_Spell and type(C_Spell.IsSpellInRange) == "function" then
+		local spells = {entry.spellID}
+		for _, spellID in ipairs(entry.candidates) do
+			if spellID ~= entry.spellID then table.insert(spells, spellID) end
+		end
+		if type(entry.name) == "string" then table.insert(spells, entry.name) end
+		for _, spell in ipairs(spells) do
+			local ok, inRange = pcall(C_Spell.IsSpellInRange, spell, unit)
+			if ok and not IsSecret(inRange) and type(inRange) == "boolean" then
+				checked = true
+				if inRange then return true end
+			end
 		end
 	end
-	return not checked
+
+	if not checked and type(IsSpellInRange) == "function" and type(entry.name) == "string" then
+		local ok, inRange = pcall(IsSpellInRange, entry.name, unit)
+		if ok and not IsSecret(inRange) and inRange ~= nil then
+			checked = true
+			if inRange == 1 or inRange == true then return true end
+		end
+	end
+
+	if checked then return false end
+	if type(UnitInRange) == "function" then
+		local ok, inRange, checkedRange = pcall(UnitInRange, unit)
+		if ok and not IsSecret(inRange) and not IsSecret(checkedRange) and checkedRange == true then return inRange == true end
+	end
+	return true
 end
 
 local function GetUnitPaladinBlessingState(unit)
