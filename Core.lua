@@ -518,6 +518,7 @@ local WEAPON_ENCHANT_REQUIRED_SLOTS = {
 
 local eventFrame = CreateFrame("Frame")
 CooldownManagerUtils.reminderFrames = {}
+CooldownManagerUtils.auraInstanceSpells = {}
 local reminderOptionsFrame
 local editModeActive = false
 local updatePending = false
@@ -2059,6 +2060,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	wipe(availableBuffsByName)
 	weaponEnchantFallbackNames = nil
 	self.classSpellCatalog = nil
+	self.activeBuffEntries = nil
 	LearnCurrentPlayerAuras()
 	local knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources = BuildKnownAuraSpellLookup()
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
@@ -2160,6 +2162,7 @@ local function ResolveActiveLayoutData()
 	data.barSettings.buff = type(data.barSettings.buff) == "table" and data.barSettings.buff or {}
 	data.barSettings.ability = type(data.barSettings.ability) == "table" and data.barSettings.ability or {}
 	data.barSettings.expiring = type(data.barSettings.expiring) == "table" and data.barSettings.expiring or {}
+	data.barSettings.active = type(data.barSettings.active) == "table" and data.barSettings.active or {}
 	data.position = nil
 	data.settings = nil
 	local changed = key ~= activeLayoutKey or data ~= activeLayoutData
@@ -2174,7 +2177,7 @@ end
 
 local function RestorePosition(frame)
 	local position = GetActiveLayoutData().positions[frame.reminderType]
-	local defaultY = frame.reminderType == "ability" and DEFAULT_REMINDER_Y - 60 or frame.reminderType == "expiring" and DEFAULT_REMINDER_Y + 60 or DEFAULT_REMINDER_Y
+	local defaultY = frame.reminderType == "ability" and DEFAULT_REMINDER_Y - 60 or frame.reminderType == "expiring" and DEFAULT_REMINDER_Y + 60 or frame.reminderType == "active" and DEFAULT_REMINDER_Y + 120 or DEFAULT_REMINDER_Y
 	frame:ClearAllPoints()
 	if position then
 		local relativeTo = position.relativeTo and _G[position.relativeTo] or UIParent
@@ -2756,7 +2759,7 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 	row.Refresh = function(self)
 		self.refreshing = true
 		local owner = parent:GetParent().owner
-		self:SetShown(not optionKey or owner.reminderType == "expiring")
+		self:SetShown((not optionKey or owner.reminderType == "expiring") and not (owner.reminderType == "active" and key == "cooldownDisplayTime"))
 		self.Slider:SetValue(optionKey and CooldownManagerUtils:GetOption(optionKey) or GetReminderSettings(owner.reminderType)[key])
 		self.refreshing = nil
 	end
@@ -2793,6 +2796,7 @@ local function CreateCheckboxSetting(parent, layoutIndex, labelText, key)
 
 	row.Refresh = function(self)
 		local owner = parent:GetParent().owner
+		self:SetShown(owner.reminderType ~= "active" or key ~= "showGlow" and key ~= "checkGroupBuffs")
 		self.Button:SetChecked(GetReminderSettings(owner.reminderType)[key] == 1)
 	end
 
@@ -3116,13 +3120,13 @@ function CooldownManagerUtils:CreateReminderBar(reminderType)
 	if self.reminderFrames[reminderType] then return self.reminderFrames[reminderType] end
 	local nativeSelection = IsNativeSelectionAvailable()
 	local template = nativeSelection and nil or "BackdropTemplate"
-	local frameName = reminderType == "ability" and "CooldownManagerUtilsAbilityReminderFrame" or reminderType == "expiring" and "CooldownManagerUtilsExpiringReminderFrame" or "CooldownManagerUtilsReminderFrame"
+	local frameName = reminderType == "ability" and "CooldownManagerUtilsAbilityReminderFrame" or reminderType == "expiring" and "CooldownManagerUtilsExpiringReminderFrame" or reminderType == "active" and "CooldownManagerUtilsActiveBuffFrame" or "CooldownManagerUtilsReminderFrame"
 	local frame = CreateFrame("Frame", frameName, UIParent, template)
 	frame:SetFrameStrata("MEDIUM")
 	frame:SetClampedToScreen(true)
 	frame.icons = {}
 	frame.reminderType = reminderType
-	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or reminderType == "expiring" and "LID_EXPIRINGBUFFS_EDITMODE" or "LID_BUFFREMINDERS_EDITMODE"
+	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or reminderType == "expiring" and "LID_EXPIRINGBUFFS_EDITMODE" or reminderType == "active" and "LID_ACTIVEBUFFS" or "LID_BUFFREMINDERS_EDITMODE"
 	self.reminderFrames[reminderType] = frame
 	if nativeSelection then
 		SetupAddonEditModeFrame(frame)
@@ -3414,6 +3418,8 @@ end
 
 local function TrackAuraExpiration(entry, aura)
 	TrackAuraCharges(entry, aura)
+	local instanceID = aura.auraInstanceID
+	if not IsSecret(instanceID) and type(instanceID) == "number" then CooldownManagerUtils.auraInstanceSpells[instanceID] = entry.spellID end
 	local expirationTime, duration = aura.expirationTime, aura.duration
 	if IsSecret(expirationTime) or IsSecret(duration) then return end
 	if type(duration) == "number" and duration > 0 then GetLearnedAuras().durations[entry.spellID] = duration end
@@ -4206,6 +4212,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	end
 
 	if not editModeActive and not visibilityAllowed then frame:Hide() end
+	if reminderType == "active" then return CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed) end
 	local selected = self:GetProfile().selected
 	local entries = {}
 	local seenEntries = {}
@@ -4330,30 +4337,11 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 		return left.name < right.name
 	end)
 
-	local iconScale = frame.iconScale or 1
-	local iconSize = ICON_SIZE * iconScale
-	local iconPadding = frame.iconPadding or ICON_SPACING
-	local horizontal = not Enum or not Enum.CooldownViewerOrientation or frame.orientationSetting == nil or frame.orientationSetting == Enum.CooldownViewerOrientation.Horizontal
-	local forward
-	if horizontal then
-		forward = not Enum or not Enum.CooldownViewerIconDirection or frame.iconDirection == nil or frame.iconDirection == Enum.CooldownViewerIconDirection.Right
-	else
-		forward = Enum and Enum.CooldownViewerIconDirection and frame.iconDirection == Enum.CooldownViewerIconDirection.Left
-	end
-
+	local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
 	local glowingSpells = {}
 	local previousGlowingSpells = frame.glowingSpells or {}
 	for index, entry in ipairs(entries) do
-		local icon = frame.icons[index] or CreateReminderIcon(frame, index)
-		icon:SetScale(iconScale)
-		icon:ClearAllPoints()
-		local offset = (FRAME_PADDING + (index - 1) * (iconSize + iconPadding)) / iconScale
-		if horizontal then
-			icon:SetPoint(forward and "LEFT" or "RIGHT", frame, forward and "LEFT" or "RIGHT", forward and offset or -offset, 0)
-		else
-			icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
-		end
-
+		local icon = CooldownManagerUtils.PlaceReminderIcon(frame, index, geometry)
 		local expiring = expiringEntries[entry]
 		local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
 		local onCooldown, cooldownSecret, cooldownSecretIsZero
@@ -4385,23 +4373,424 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	end
 
 	frame.glowingSpells = glowingSpells
-	for index = #entries + 1, #frame.icons do
+	CooldownManagerUtils.FinishReminderBar(frame, #entries, geometry, visibilityAllowed)
+end
+
+function CooldownManagerUtils.GetReminderBarGeometry(frame)
+	local geometry = {
+		scale = frame.iconScale or 1,
+		padding = frame.iconPadding or ICON_SPACING
+	}
+
+	geometry.size = ICON_SIZE * geometry.scale
+	geometry.horizontal = not Enum or not Enum.CooldownViewerOrientation or frame.orientationSetting == nil or frame.orientationSetting == Enum.CooldownViewerOrientation.Horizontal
+	if geometry.horizontal then
+		geometry.forward = not Enum or not Enum.CooldownViewerIconDirection or frame.iconDirection == nil or frame.iconDirection == Enum.CooldownViewerIconDirection.Right
+	else
+		geometry.forward = Enum and Enum.CooldownViewerIconDirection and frame.iconDirection == Enum.CooldownViewerIconDirection.Left
+	end
+	return geometry
+end
+
+function CooldownManagerUtils.PlaceReminderIcon(frame, index, geometry)
+	local icon = frame.icons[index] or CreateReminderIcon(frame, index)
+	local forward = geometry.forward
+	icon:SetScale(geometry.scale)
+	icon:ClearAllPoints()
+	local offset = (FRAME_PADDING + (index - 1) * (geometry.size + geometry.padding)) / geometry.scale
+	if geometry.horizontal then
+		icon:SetPoint(forward and "LEFT" or "RIGHT", frame, forward and "LEFT" or "RIGHT", forward and offset or -offset, 0)
+	else
+		icon:SetPoint(forward and "TOP" or "BOTTOM", frame, forward and "TOP" or "BOTTOM", 0, forward and -offset or offset)
+	end
+	return icon
+end
+
+function CooldownManagerUtils.FinishReminderBar(frame, count, geometry, visibilityAllowed)
+	for index = count + 1, #frame.icons do
 		CooldownManagerUtils.UpdateIconGlow(frame.icons[index], false)
 		frame.icons[index]:Hide()
 	end
 
-	local extent = #entries > 0 and FRAME_PADDING * 2 + #entries * iconSize + (#entries - 1) * iconPadding or 180
-	frame:SetSize(horizontal and extent or iconSize + FRAME_PADDING * 2, horizontal and iconSize + FRAME_PADDING * 2 or extent)
-	if frame.Label then frame.Label:SetShown(editModeActive and #entries == 0) end
+	local extent = count > 0 and FRAME_PADDING * 2 + count * geometry.size + (count - 1) * geometry.padding or 180
+	frame:SetSize(geometry.horizontal and extent or geometry.size + FRAME_PADDING * 2, geometry.horizontal and geometry.size + FRAME_PADDING * 2 or extent)
+	if frame.Label then frame.Label:SetShown(editModeActive and count == 0) end
 	if frame.SetBackdropColor then frame:SetBackdropColor(0.05, 0.15, 0.25, editModeActive and 0.65 or 0) end
 	if frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(0.2, 0.65, 1, editModeActive and 1 or 0) end
 	if not frame.Selection then frame:EnableMouse(editModeActive) end
-	frame:SetShown(editModeActive or (#entries > 0 and visibilityAllowed))
+	frame:SetShown(editModeActive or (count > 0 and visibilityAllowed))
+end
+
+CooldownManagerUtils.ACTIVE_BUFF_SUGGESTIONS = {1022, 5599, 10278, 1044, 6940, 10060, 33206, 47788, 102342, 116849, 29166, 2825, 32182, 80353, 264667, 390386, 97463, 31821, 204018, 357170, 369459, 64901}
+
+function CooldownManagerUtils:GetActiveBuffList()
+	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
+	if type(CooldownManagerUtilsDB.activeBuffs) ~= "table" then CooldownManagerUtilsDB.activeBuffs = {} end
+	return CooldownManagerUtilsDB.activeBuffs
+end
+
+function CooldownManagerUtils:GetSeenAuras()
+	CooldownManagerUtilsGlobalDB = CooldownManagerUtilsGlobalDB or {}
+	if type(CooldownManagerUtilsGlobalDB.seenAuras) ~= "table" then CooldownManagerUtilsGlobalDB.seenAuras = {} end
+	return CooldownManagerUtilsGlobalDB.seenAuras
+end
+
+function CooldownManagerUtils.RecordSeenAura(aura)
+	if IsSecret(aura) or type(aura) ~= "table" then return end
+	local spellID, helpful = aura.spellId, aura.isHelpful
+	if IsSecret(spellID) or IsSecret(helpful) or helpful ~= true or type(spellID) ~= "number" then return end
+	local seen = CooldownManagerUtils:GetSeenAuras()
+	if not seen[spellID] and GetSpellNameSafe(spellID) then seen[spellID] = true end
+end
+
+function CooldownManagerUtils.RecordCurrentSeenAuras()
+	if not C_UnitAuras or type(C_UnitAuras.GetAuraDataByIndex) ~= "function" then return end
+	for index = 1, 255 do
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
+		if not ok or (not IsSecret(aura) and aura == nil) then return end
+		CooldownManagerUtils.RecordSeenAura(aura)
+	end
+end
+
+function CooldownManagerUtils.CreateActiveBuffSpell(spellID)
+	if type(spellID) ~= "number" or IsSecret(spellID) then return end
+	local spellName = GetSpellNameSafe(spellID)
+	if not spellName then return end
+	local spellInfo = GetReminderSpellInfo(spellID)
+	return {
+		spellID = spellID,
+		name = spellName,
+		iconID = spellInfo and spellInfo.iconID or 134400
+	}
+end
+
+function CooldownManagerUtils:GetActiveBuffEntries()
+	if self.activeBuffEntries then return self.activeBuffEntries end
+	local entries = {}
+	local seenNames = {}
+	local catalogRanks = self:GetClassSpellCatalog().ranks
+	for _, spellID in ipairs(self:GetActiveBuffList()) do
+		local spell = self.CreateActiveBuffSpell(spellID)
+		if spell and not seenNames[spell.name] then
+			seenNames[spell.name] = true
+			spell.activeBuff = true
+			spell.candidates = {}
+			local seen = {}
+			AddCandidate(spell.candidates, seen, spellID)
+			for _, rankSpellID in ipairs(catalogRanks[spell.name] or {}) do
+				AddCandidate(spell.candidates, seen, rankSpellID)
+			end
+			table.insert(entries, spell)
+		end
+	end
+
+	self.activeBuffEntries = entries
+	if self.reminderFrames.active then self.reminderFrames.active.auraContainerFilterDirty = true end
+	return entries
+end
+
+function CooldownManagerUtils:OnActiveBuffsChanged()
+	self.activeBuffEntries = nil
+	local activeFrame = self.reminderFrames.active
+	if activeFrame then activeFrame.auraContainerFilterDirty = true end
+	if self.RefreshReminderSettings then self:RefreshReminderSettings() end
+	self:ScheduleReminderUpdate()
+end
+
+function CooldownManagerUtils:IsActiveBuffTracked(spellID, spellName)
+	for _, entry in ipairs(self:GetActiveBuffEntries()) do
+		if entry.spellID == spellID or spellName and entry.name == spellName then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils:AddActiveBuff(spellID)
+	local spell = self.CreateActiveBuffSpell(spellID)
+	if not spell or self:IsActiveBuffTracked(spell.spellID, spell.name) then return false end
+	table.insert(self:GetActiveBuffList(), spell.spellID)
+	self:OnActiveBuffsChanged()
+	return true
+end
+
+function CooldownManagerUtils:RemoveActiveBuff(entry)
+	if type(entry) ~= "table" then return end
+	local list = self:GetActiveBuffList()
+	for index = #list, 1, -1 do
+		if list[index] == entry.spellID or GetSpellNameSafe(list[index]) == entry.name then table.remove(list, index) end
+	end
+
+	self:OnActiveBuffsChanged()
+end
+
+function CooldownManagerUtils:SetActiveBuffOrder(entries)
+	local list = self:GetActiveBuffList()
+	wipe(list)
+	for _, entry in ipairs(entries) do
+		table.insert(list, entry.spellID)
+	end
+
+	self:OnActiveBuffsChanged()
+end
+
+function CooldownManagerUtils:FindActiveBuffSpells(query)
+	local results = {}
+	local seenNames = {}
+	local function Add(spellID, needle)
+		local spell = CooldownManagerUtils.CreateActiveBuffSpell(spellID)
+		if not spell or seenNames[spell.name] or needle and not spell.name:lower():find(needle, 1, true) then return end
+		seenNames[spell.name] = true
+		table.insert(results, spell)
+	end
+
+	query = strtrim(query or "")
+	local spellID = tonumber(query)
+	if spellID then
+		Add(spellID)
+		return results
+	end
+
+	local needle = query ~= "" and query:lower() or nil
+	for _, suggestedSpellID in ipairs(self.ACTIVE_BUFF_SUGGESTIONS) do
+		Add(suggestedSpellID, needle)
+	end
+
+	for seenSpellID in pairs(self:GetSeenAuras()) do
+		Add(seenSpellID, needle)
+	end
+
+	if needle then
+		for _, spell in ipairs(self:GetClassSpellCatalog().spells) do
+			Add(spell.spellID, needle)
+		end
+	end
+
+	table.sort(results, function(left, right) return left.name < right.name end)
+	return results
+end
+
+function CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, present, showTimer)
+	local cooldown = icon.Cooldown
+	cooldown.updating = true
+	cooldown.displayTime = 0
+	cooldown.filterIcon = nil
+	cooldown:SetAlpha(1)
+	cooldown:SetHideCountdownNumbers(not showTimer)
+	local expirationTime = present and auraExpirationCache[entry.spellID]
+	local duration = expirationTime and GetLearnedAuras().durations[entry.spellID]
+	if duration and expirationTime > GetTime() and duration >= expirationTime - GetTime() then
+		cooldown:SetCooldown(expirationTime - duration, duration)
+	else
+		cooldown:Clear()
+	end
+
+	cooldown.updating = nil
+	icon:SetAlpha(1)
+	icon.Texture:SetTexture(entry.iconID)
+	icon.Texture:SetDesaturated(not present)
+	icon.Texture:SetAlpha(present and 1 or 0.5)
+	icon:SetMouseClickEnabled(false)
+	icon.spellID = entry.spellID
+	icon.GroupCount:SetText("")
+	icon.GroupCount:Hide()
+	CooldownManagerUtils.UpdateIconGlow(icon, false)
+	icon:Show()
+end
+
+CooldownManagerUtils.ACTIVE_CONTAINER_GROUP = "activeBuffs"
+
+function CooldownManagerUtils.GetActiveBuffSpellFilter()
+	local includeSpellIDs = {}
+	local names = {}
+	for _, entry in ipairs(CooldownManagerUtils:GetActiveBuffEntries()) do
+		names[entry.name] = true
+		includeSpellIDs[entry.spellID] = true
+		for _, candidateSpellID in ipairs(entry.candidates) do
+			includeSpellIDs[candidateSpellID] = true
+		end
+	end
+
+	for seenSpellID in pairs(CooldownManagerUtils:GetSeenAuras()) do
+		local seenName = GetSpellNameSafe(seenSpellID)
+		if seenName and names[seenName] then includeSpellIDs[seenSpellID] = true end
+	end
+	return includeSpellIDs
+end
+
+function CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, showTooltips)
+	button:SetSize(ICON_SIZE, ICON_SIZE)
+	local icon = button:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	local mask = button:CreateMaskTexture()
+	mask:SetAtlas("UI-HUD-CoolDownManager-Mask")
+	mask:SetAllPoints(icon)
+	icon:AddMaskTexture(mask)
+	button:SetIcon(icon)
+	local overlay = button:CreateTexture(nil, "OVERLAY")
+	overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
+	overlay:SetPoint("TOPLEFT", -8, 7)
+	overlay:SetPoint("BOTTOMRIGHT", 8, -7)
+	local font = _G[ICON_COUNTDOWN_FONT] and ICON_COUNTDOWN_FONT or "NumberFontNormal"
+	local function Inbound(object)
+		if type(GetForbiddenObjectTable) == "function" then return GetForbiddenObjectTable(object) end
+		return object
+	end
+
+	local cooldown
+	local cooldownOK = pcall(function()
+		cooldown = CreateFrame("Cooldown", nil, button)
+		cooldown:SetAllPoints()
+		cooldown:SetSwipeTexture("Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe")
+		cooldown:SetSwipeColor(0, 0, 0, 0.7)
+		cooldown:SetDrawSwipe(true)
+		cooldown:SetDrawEdge(false)
+		if _G[ICON_COUNTDOWN_FONT] and cooldown.SetCountdownFont then cooldown:SetCountdownFont(ICON_COUNTDOWN_FONT) end
+		cooldown:SetHideCountdownNumbers(not showTimer)
+		button:SetDurationCooldown(Inbound(cooldown))
+	end)
+
+	if not cooldownOK then
+		if cooldown then pcall(cooldown.Hide, cooldown) end
+		if showTimer then
+			local duration = button:CreateFontString(nil, "OVERLAY", font)
+			duration:SetPoint("CENTER", 0, 0)
+			pcall(button.SetDurationText, button, duration)
+		end
+	end
+
+	local countParent = button
+	if cooldownOK then
+		pcall(function()
+			local countFrame = CreateFrame("Frame", nil, button)
+			countFrame:SetAllPoints()
+			countFrame:SetFrameLevel(cooldown:GetFrameLevel() + 2)
+			countParent = countFrame
+		end)
+	end
+
+	local count = countParent:CreateFontString(nil, "OVERLAY", font)
+	local countFont, _, countFlags = count:GetFont()
+	if countFont then count:SetFont(countFont, GROUP_COUNT_FONT_SIZE, countFlags) end
+	count:SetPoint("BOTTOMRIGHT", -2, 2)
+	if not pcall(button.SetApplicationCount, button, Inbound(count)) then count:Hide() end
+	if not showTooltips then pcall(button.EnableMouse, button, false) end
+end
+
+function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTooltips)
+	local ok, container = pcall(CreateFrame, "AuraContainer", nil, frame, "CustomAuraContainerTemplate")
+	if not ok or not container then return end
+	local setupOK = pcall(function()
+		container:SetUnit("player")
+		container:AddAuraGroup(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, "HELPFUL", {
+			initializeFrame = function(button) CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, showTooltips) end,
+			candidateFilters = {
+				includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter()
+			}
+		})
+
+		container:SetEnabled(true)
+	end)
+
+	if not setupOK then
+		pcall(container.Hide, container)
+		return
+	end
+	return container
+end
+
+function CooldownManagerUtils.GetActiveAuraContainer(frame)
+	if frame.auraContainerUnsupported then return end
+	local key = tostring(frame.showTimer ~= false) .. tostring(frame.showTooltips ~= false)
+	if frame.auraContainer and frame.auraContainerKey == key then return frame.auraContainer end
+	if frame.auraContainer then
+		pcall(frame.auraContainer.SetEnabled, frame.auraContainer, false)
+		pcall(frame.auraContainer.Hide, frame.auraContainer)
+		frame.auraContainer = nil
+	end
+
+	local container = CooldownManagerUtils.CreateActiveAuraContainer(frame, frame.showTimer ~= false, frame.showTooltips ~= false)
+	if not container then
+		frame.auraContainerUnsupported = true
+		return
+	end
+
+	frame.auraContainer = container
+	frame.auraContainerKey = key
+	frame.auraContainerFilterDirty = nil
+	return container
+end
+
+function CooldownManagerUtils.LayoutActiveAuraContainer(frame, container, geometry)
+	local axis = AnchorUtil.FlowLayoutAxis
+	local direction = AnchorUtil.FlowDirection
+	local point, horizontalDirection, verticalDirection = "TOPLEFT", direction.Right, direction.Down
+	if geometry.horizontal and not geometry.forward then
+		point, horizontalDirection = "TOPRIGHT", direction.Left
+	elseif not geometry.horizontal and not geometry.forward then
+		point, verticalDirection = "BOTTOMLEFT", direction.Up
+	end
+
+	pcall(function()
+		container:ClearAllPoints()
+		container:SetPoint("CENTER", frame, "CENTER", 0, 0)
+		container:SetScale(geometry.scale)
+		container:SetFlowLayoutAxis(geometry.horizontal and axis.Horizontal or axis.Vertical)
+		container:SetFlowLayoutAnchorPoint(point)
+		container:SetFlowLayoutGrowthDirection(horizontalDirection, verticalDirection)
+		container:SetAuraGroupLayout(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, {
+			elementSpacing = geometry.padding / geometry.scale,
+			lineSpacing = geometry.padding / geometry.scale
+		})
+
+		if frame.auraContainerFilterDirty then
+			container:SetAuraGroupCandidateFilters(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, {
+				includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter()
+			})
+
+			frame.auraContainerFilterDirty = nil
+		end
+	end)
+end
+
+function CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed)
+	local container = CooldownManagerUtils.GetActiveAuraContainer(frame)
+	if container then
+		local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
+		CooldownManagerUtils.LayoutActiveAuraContainer(frame, container, geometry)
+		pcall(container.SetShown, container, not editModeActive)
+		if not editModeActive then
+			for _, icon in ipairs(frame.icons) do
+				CooldownManagerUtils.UpdateIconGlow(icon, false)
+				icon:Hide()
+			end
+
+			CooldownManagerUtils.FinishReminderBar(frame, #CooldownManagerUtils:GetActiveBuffEntries(), geometry, visibilityAllowed)
+			return
+		end
+	end
+
+	local shown = {}
+	for _, entry in ipairs(CooldownManagerUtils:GetActiveBuffEntries()) do
+		local present = GetAuraState(entry)
+		if present ~= nil then presenceCache[entry.spellID] = present end
+		if editModeActive or presenceCache[entry.spellID] == true then table.insert(shown, entry) end
+	end
+
+	local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
+	for index, entry in ipairs(shown) do
+		local icon = CooldownManagerUtils.PlaceReminderIcon(frame, index, geometry)
+		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
+		CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, presenceCache[entry.spellID] == true, frame.showTimer ~= false)
+	end
+
+	frame.glowingSpells = {}
+	CooldownManagerUtils.FinishReminderBar(frame, #shown, geometry, visibilityAllowed)
 end
 
 function CooldownManagerUtils:UpdateReminderBar()
+	self.SyncAuraInstances()
 	self:UpdateReminderBarType("buff")
 	self:UpdateReminderBarType("expiring")
+	self:UpdateReminderBarType("active")
 	if self:HasReactiveAbilities() then self:UpdateReminderBarType("ability") end
 end
 
@@ -4427,6 +4816,125 @@ function CooldownManagerUtils:OnWeaponEnchantUpdate(silent)
 	RecordWeaponEnchantChanges(silent)
 	if not silent and MatchWeaponEnchantLearning() then self:RefreshAvailableBuffs() end
 	self:ScheduleReminderUpdate()
+end
+
+CooldownManagerUtils.AURA_INSTANCE_MATCH_WINDOW = 1
+CooldownManagerUtils.pendingAuraCasts = {}
+CooldownManagerUtils.recentAuraInstances = {}
+
+function CooldownManagerUtils.GetPlayerAuraInstanceSet()
+	local getInstanceIDs = C_UnitAuras and C_UnitAuras.GetUnitAuraInstanceIDs
+	if type(getInstanceIDs) ~= "function" then return end
+	local ok, instanceIDs = pcall(getInstanceIDs, "player", "HELPFUL")
+	if not ok or IsSecret(instanceIDs) or type(instanceIDs) ~= "table" then return end
+	local instanceSet = {}
+	for _, instanceID in ipairs(instanceIDs) do
+		if IsSecret(instanceID) or type(instanceID) ~= "number" then return end
+		instanceSet[instanceID] = true
+	end
+	return instanceSet
+end
+
+function CooldownManagerUtils.PruneAuraInstanceMatches(now, current)
+	local window = CooldownManagerUtils.AURA_INSTANCE_MATCH_WINDOW
+	local pending, recent = CooldownManagerUtils.pendingAuraCasts, CooldownManagerUtils.recentAuraInstances
+	for index = #pending, 1, -1 do
+		if now - pending[index].time > window then table.remove(pending, index) end
+	end
+
+	for index = #recent, 1, -1 do
+		local instanceID = recent[index].instanceID
+		if now - recent[index].time > window or not current[instanceID] or CooldownManagerUtils.auraInstanceSpells[instanceID] then table.remove(recent, index) end
+	end
+end
+
+function CooldownManagerUtils.MatchPendingAuraCast()
+	local pending, recent = CooldownManagerUtils.pendingAuraCasts, CooldownManagerUtils.recentAuraInstances
+	if #pending ~= 1 or #recent ~= 1 then return end
+	CooldownManagerUtils.auraInstanceSpells[recent[1].instanceID] = pending[1].spellID
+	wipe(pending)
+	wipe(recent)
+end
+
+function CooldownManagerUtils.SyncAuraInstances()
+	local current = CooldownManagerUtils.GetPlayerAuraInstanceSet()
+	if not current then return end
+	local instanceSpells = CooldownManagerUtils.auraInstanceSpells
+	local previous = CooldownManagerUtils.lastAuraInstanceSet
+	local now = GetTime()
+	if previous then
+		for instanceID in pairs(current) do
+			if not previous[instanceID] and not instanceSpells[instanceID] then
+				table.insert(CooldownManagerUtils.recentAuraInstances, {
+					instanceID = instanceID,
+					time = now
+				})
+			end
+		end
+	end
+
+	CooldownManagerUtils.lastAuraInstanceSet = current
+	CooldownManagerUtils.PruneAuraInstanceMatches(now, current)
+	CooldownManagerUtils.MatchPendingAuraCast()
+	local keep = {}
+	local removed = {}
+	for _, cast in ipairs(CooldownManagerUtils.pendingAuraCasts) do
+		keep[cast.spellID] = true
+	end
+
+	for instanceID, spellID in pairs(instanceSpells) do
+		if current[instanceID] then
+			keep[spellID] = true
+		else
+			removed[instanceID] = spellID
+		end
+	end
+
+	for instanceID, spellID in pairs(removed) do
+		instanceSpells[instanceID] = nil
+		if not keep[spellID] and presenceCache[spellID] ~= false then
+			presenceCache[spellID] = false
+			SetAuraExpiration(spellID, nil)
+		end
+	end
+end
+
+function CooldownManagerUtils.GetExclusiveSpellFamily(spellID)
+	if IsHunterAspectSpell(spellID) then return "hunterAspect" end
+	if IsPaladinSealSpell(spellID) then return "paladinSeal" end
+	if CooldownManagerUtils.IsPaladinAuraSpell(spellID) then return "paladinAura" end
+end
+
+function CooldownManagerUtils.GetEntryExclusiveFamily(entry)
+	local family = CooldownManagerUtils.GetExclusiveSpellFamily(entry.spellID)
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		family = family or CooldownManagerUtils.GetExclusiveSpellFamily(candidateSpellID)
+	end
+	return family
+end
+
+function CooldownManagerUtils:OnActiveBuffCast(spellID, spellName, castTime)
+	local castFamily = self.GetExclusiveSpellFamily(spellID)
+	local changed = false
+	for _, entry in ipairs(self:GetActiveBuffEntries()) do
+		if GetReadableAuraState(entry) == nil then
+			if self.EntryMatchesSpell(entry, spellID, spellName) then
+				presenceCache[entry.spellID] = true
+				table.insert(self.pendingAuraCasts, {
+					spellID = entry.spellID,
+					time = castTime
+				})
+				local duration = GetLearnedAuras().durations[entry.spellID]
+				SetAuraExpiration(entry.spellID, duration and castTime + duration or nil)
+				changed = true
+			elseif castFamily and presenceCache[entry.spellID] == true and self.GetEntryExclusiveFamily(entry) == castFamily then
+				presenceCache[entry.spellID] = false
+				SetAuraExpiration(entry.spellID, nil)
+				changed = true
+			end
+		end
+	end
+	return changed
 end
 
 function CooldownManagerUtils:OnPlayerSpellCast(spellID)
@@ -4480,6 +4988,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 		end
 	end
 
+	if self:OnActiveBuffCast(spellID, spellName, castTime) then changed = true end
 	if changed then self:ScheduleReminderUpdate() end
 end
 
@@ -4519,9 +5028,11 @@ function CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
 		local addedAuras = updateInfo.addedAuras
 		if not IsSecret(isFullUpdate) and isFullUpdate == true then
 			learnedNew = LearnCurrentPlayerAuras()
+			self.RecordCurrentSeenAuras()
 		elseif not IsSecret(addedAuras) and type(addedAuras) == "table" then
 			for _, aura in ipairs(addedAuras) do
 				if LearnPlayerAura(aura) then learnedNew = true end
+				self.RecordSeenAura(aura)
 			end
 		end
 	end
@@ -4575,7 +5086,9 @@ function CooldownManagerUtils:Initialize()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	self:CreateReminderBar("buff")
 	self:CreateReminderBar("expiring")
+	self:CreateReminderBar("active")
 	if self:HasReactiveAbilities() then self:CreateReminderBar("ability") end
+	self.RecordCurrentSeenAuras()
 	if EventRegistry then
 		EventRegistry:RegisterCallback("EditMode.Enter", function() CooldownManagerUtils.SetEditModeActive(true) end, self)
 		EventRegistry:RegisterCallback("EditMode.Exit", function() CooldownManagerUtils.SetEditModeActive(false) end, self)
@@ -4631,7 +5144,9 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		CooldownManagerUtils:Initialize()
 	elseif event == "UNIT_AURA" then
 		local unit, updateInfo = ...
-		if unit == "player" then
+		if IsSecret(unit) then
+			CooldownManagerUtils:ScheduleReminderUpdate()
+		elseif unit == "player" then
 			CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
 		elseif IsGroupUnit(unit) then
 			CooldownManagerUtils:ScheduleGroupBuffUpdate()

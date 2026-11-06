@@ -18,15 +18,20 @@ local CATEGORY_DEFINITIONS = {
 	{key = "expiringBuff", localeKey = "LID_BUFFREMINDERS_CATEGORY_EXPIRING", buffOnly = true},
 	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
 	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_HIDDEN"},
-	{key = "notLearned", localeKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", abilityLocaleKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", readOnly = true}
+	{key = "notLearned", localeKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", abilityLocaleKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", readOnly = true},
+	{key = "activeBuff", localeKey = "LID_ACTIVEBUFFS_CATEGORY_TRACKED", activeOnly = true}
 }
 
+local ACTIVE_TAB_ATLAS = "icon_trackedbuffs"
+local TAB_ICON_COLOR = {0.35, 0.7, 1}
 local settingsFrame
 local reminderTab
 local abilityReminderTab
+local activeBuffTab
 local reminderContent
 local reminderUndoButton
 local reminderRestorePoint
+local activeRestorePoint
 local customMode = false
 local stockTabs = {}
 local categoryFrames = {}
@@ -39,9 +44,15 @@ local dropEntry
 local dragPreview
 local addBuffWindow
 
+local function IsCategoryVisible(definition)
+	if customMode == "active" then return definition.activeOnly == true end
+	if definition.activeOnly then return false end
+	return not definition.buffOnly or customMode ~= "ability"
+end
+
 local function IsValidCategory(key)
 	for _, definition in ipairs(CATEGORY_DEFINITIONS) do
-		if definition.key == key and not definition.readOnly then return not definition.buffOnly or customMode ~= "ability" end
+		if definition.key == key and not definition.readOnly then return IsCategoryVisible(definition) end
 	end
 	return false
 end
@@ -89,7 +100,11 @@ local function FinishDrag()
 			if sourceCategory == dropCategory and sourceIndex < targetIndex then targetIndex = targetIndex - 1 end
 			targetIndex = math.max(1, math.min(targetIndex, #dropCategory.entries + 1))
 			table.insert(dropCategory.entries, targetIndex, sourceEntry)
-			CooldownManagerUtils:SaveReminderLayout(categoryModels)
+			if customMode == "active" then
+				CooldownManagerUtils:SetActiveBuffOrder(categoryByKey.activeBuff.entries)
+			else
+				CooldownManagerUtils:SaveReminderLayout(categoryModels)
+			end
 			if reminderUndoButton then reminderUndoButton:Enable() end
 		end
 	end
@@ -100,6 +115,7 @@ end
 
 function CooldownManagerUtils:CaptureReminderRestorePoint()
 	reminderRestorePoint = CopyTable(self:GetProfile())
+	activeRestorePoint = CopyTable(self:GetActiveBuffList())
 	if reminderUndoButton then reminderUndoButton:Disable() end
 end
 
@@ -108,6 +124,13 @@ local function RestoreReminderProfile()
 	local profile = CooldownManagerUtils:GetProfile()
 	wipe(profile)
 	for key, value in pairs(reminderRestorePoint) do profile[key] = CopyTable(value) end
+	if activeRestorePoint then
+		local list = CooldownManagerUtils:GetActiveBuffList()
+		wipe(list)
+		for _, spellID in ipairs(activeRestorePoint) do table.insert(list, spellID) end
+		CooldownManagerUtils.activeBuffEntries = nil
+	end
+
 	CooldownManagerUtils:RefreshReminderSettings()
 	CooldownManagerUtils:UpdateReminderBar()
 	if reminderUndoButton then reminderUndoButton:Disable() end
@@ -180,6 +203,23 @@ local function ShowRemoveCustomBuffDialog(entry)
 	StaticPopup_Show("COOLDOWN_MANAGER_UTILS_REMOVE_CUSTOM_BUFF", entry.name, nil, entry)
 end
 
+local function ShowRemoveActiveBuffDialog(entry)
+	GameTooltip:Hide()
+	StaticPopup_Show("COOLDOWN_MANAGER_UTILS_REMOVE_ACTIVE_BUFF", entry.name, nil, entry)
+end
+
+local function AddItemTooltipHint(tooltip, button)
+	if customMode == "active" then
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ACTIVEBUFFS_TOOLTIP"), 0.8, 0.8, 0.8, true)
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ACTIVEBUFFS_DRAG"), 0.5, 0.8, 1, true)
+	elseif button.category.readOnly then
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_REMINDERS_NOT_LEARNED_TOOLTIP"), 0.6, 0.6, 0.6, true)
+	else
+		tooltip:AddLine(CooldownManagerUtils:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_TOOLTIP" or "LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_DRAG"), 0.5, 0.8, 1, true)
+	end
+end
+
 local function CreateItemButton(parent, index)
 	local button = CreateFrame("Button", nil, parent)
 	button:SetSize(ITEM_SIZE, ITEM_SIZE)
@@ -203,7 +243,12 @@ local function CreateItemButton(parent, index)
 	button:SetScript("OnDragStart", BeginDrag)
 	button:SetScript("OnDragStop", FinishDrag)
 	button:SetScript("OnClick", function(self, mouseButton)
-		if mouseButton == "RightButton" and not draggedButton and self.entry and self.entry.custom then ShowRemoveCustomBuffDialog(self.entry) end
+		if mouseButton ~= "RightButton" or draggedButton or not self.entry then return end
+		if self.entry.activeBuff and not self.category.readOnly then
+			ShowRemoveActiveBuffDialog(self.entry)
+		elseif self.entry.custom then
+			ShowRemoveCustomBuffDialog(self.entry)
+		end
 	end)
 	button:SetScript("OnEnter", function(self)
 		if not self.entry then return end
@@ -215,13 +260,8 @@ local function CreateItemButton(parent, index)
 		GameTooltip:SetSpellByID(displaySpellID)
 		if GameTooltip:NumLines() == 0 then GameTooltip:SetText(self.entry.name) end
 		GameTooltip:AddLine("ID: " .. tostring(displaySpellID), 0.5, 0.5, 0.5)
-		if self.category.readOnly then
-			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_REMINDERS_NOT_LEARNED_TOOLTIP"), 0.6, 0.6, 0.6, true)
-		else
-			GameTooltip:AddLine(CooldownManagerUtils:Trans(customMode == "ability" and "LID_ABILITYREMINDERS_TOOLTIP" or "LID_BUFFREMINDERS_TOOLTIP"), 0.8, 0.8, 0.8, true)
-			GameTooltip:AddLine(CooldownManagerUtils:Trans("LID_BUFFREMINDERS_DRAG"), 0.5, 0.8, 1, true)
-		end
-		if self.entry.custom then AddCustomBuffTooltip(GameTooltip) end
+		AddItemTooltipHint(GameTooltip, self)
+		if self.entry.custom and customMode ~= "active" then AddCustomBuffTooltip(GameTooltip) end
 		GameTooltip:Show()
 	end)
 	button:SetScript("OnLeave", GameTooltip_Hide)
@@ -288,6 +328,10 @@ local function CreateCategoryFrame(parent, definition, index)
 	return frame
 end
 
+local function BuildActiveCategoryModels(byKey)
+	for _, entry in ipairs(CooldownManagerUtils:GetActiveBuffEntries()) do table.insert(byKey.activeBuff.entries, entry) end
+end
+
 local function BuildCategoryModels()
 	local models = {}
 	local byKey = {}
@@ -295,6 +339,12 @@ local function BuildCategoryModels()
 		local model = {key = definition.key, entries = {}, readOnly = definition.readOnly}
 		table.insert(models, model)
 		byKey[definition.key] = model
+	end
+	if customMode == "active" then
+		BuildActiveCategoryModels(byKey)
+		categoryModels = models
+		categoryByKey = byKey
+		return
 	end
 	for _, entry in ipairs(CooldownManagerUtils:GetAvailableBuffs()) do
 		if (entry.reactiveAbility == true) == (customMode == "ability") then
@@ -326,6 +376,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 	local filter = settingsFrame and settingsFrame.filterText or ""
 	local info = reminderContent.Info
 	local isBuffMode = customMode ~= "ability"
+	local isActiveMode = customMode == "active"
 	info.AddButton:SetShown(isBuffMode)
 	info.Text:ClearAllPoints()
 	if isBuffMode then
@@ -333,8 +384,8 @@ function CooldownManagerUtils:RefreshReminderSettings()
 	else
 		info.Text:SetPoint("TOP", info, "TOP", 0, 0)
 	end
-	info.Text:SetText(self:Trans(isBuffMode and "LID_BUFFREMINDERS_CONTACT" or "LID_ABILITYREMINDERS_CONTACT"))
-	info.AddButton:SetText(self:Trans("LID_ADDBUFF"))
+	info.Text:SetText(self:Trans(isActiveMode and "LID_ACTIVEBUFFS_INFO" or isBuffMode and "LID_BUFFREMINDERS_CONTACT" or "LID_ABILITYREMINDERS_CONTACT"))
+	info.AddButton:SetText(self:Trans(isActiveMode and "LID_ACTIVEBUFFS_ADD" or "LID_ADDBUFF"))
 	local infoHeight = math.ceil(info.Text:GetStringHeight()) + INFO_SPACING + DISCORD_BOX_HEIGHT + (isBuffMode and ADD_BUTTON_HEIGHT + INFO_SPACING or 0)
 	info:SetHeight(math.max(1, infoHeight))
 	local yOffset = 0
@@ -342,7 +393,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 		local model = categoryModels[index]
 		local frame = categoryFrames[index]
 		frame:ClearAllPoints()
-		if definition.buffOnly and customMode == "ability" then
+		if not IsCategoryVisible(definition) then
 			frame:Hide()
 		else
 			frame:SetPoint("TOPLEFT", reminderContent.ScrollChild, "TOPLEFT", 0, -yOffset)
@@ -363,7 +414,7 @@ function CooldownManagerUtils:RefreshReminderSettings()
 				button.Icon:SetTexture(entry.iconID)
 				button.Icon:SetDesaturated(entry.isLearned == false)
 				button:SetAlpha(entry.isLearned == false and 0.45 or 1)
-				button.Alert:SetShown(entry.custom == true)
+				button.Alert:SetShown(entry.custom == true and not isActiveMode)
 				button.Filter:SetShown(filter ~= "" and not entry.name:lower():find(filter, 1, true))
 				button:Show()
 			end
@@ -399,6 +450,7 @@ local function SetCustomMode(mode)
 		for _, tab in ipairs(stockTabs) do tab:SetChecked(false) end
 		reminderTab:SetChecked(mode == "buff")
 		if abilityReminderTab then abilityReminderTab:SetChecked(mode == "ability") end
+		activeBuffTab:SetChecked(mode == "active")
 		CooldownManagerUtils:RefreshReminderSettings()
 	else
 		settingsFrame.LayoutDropdown:Show()
@@ -406,6 +458,7 @@ local function SetCustomMode(mode)
 		reminderUndoButton:Hide()
 		reminderTab:SetChecked(false)
 		if abilityReminderTab then abilityReminderTab:SetChecked(false) end
+		activeBuffTab:SetChecked(false)
 	end
 end
 
@@ -430,7 +483,7 @@ local function CreateReminderContent(parent)
 	content.Info.AddButton:SetText(CooldownManagerUtils:Trans("LID_ADDBUFF"))
 	content.Info.AddButton:SetScript("OnClick", function()
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-		CooldownManagerUtils:ToggleAddBuffWindow()
+		CooldownManagerUtils:ToggleAddBuffWindow(customMode == "active" and "active" or "buff")
 	end)
 	content.Info.Text = content.Info:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	content.Info.Text:SetWidth(CATEGORY_WIDTH - 20)
@@ -448,12 +501,25 @@ local function CreateReminderTab(parent, mode)
 	if mode == "buff" then
 		tab.tooltipText = CooldownManagerUtils:Trans("LID_BUFFREMINDERS")
 		tab.iconTexture = "Interface\\AddOns\\CooldownManagerUtils\\media\\buffreminder.blp"
+	elseif mode == "active" then
+		tab.tooltipText = CooldownManagerUtils:Trans("LID_ACTIVEBUFFS")
+		tab.iconTexture = "Interface\\AddOns\\CooldownManagerUtils\\media\\buffreminder.blp"
+		tab.iconAtlas = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(ACTIVE_TAB_ATLAS) and ACTIVE_TAB_ATLAS or nil
 	else
 		tab.tooltipText = CooldownManagerUtils:Trans("LID_ABILITYREMINDERS")
 		tab.iconTexture = "Interface\\AddOns\\CooldownManagerUtils\\media\\proc.blp"
 	end
+	tab.iconColor = TAB_ICON_COLOR
 	tab.SetChecked = function(self, checked)
-		self.Icon:SetTexture(self.iconTexture)
+		if self.iconAtlas then
+			self.Icon:SetAtlas(self.iconAtlas)
+		else
+			self.Icon:SetTexture(self.iconTexture)
+		end
+		if self.iconColor then
+			self.Icon:SetDesaturated(true)
+			self.Icon:SetVertexColor(self.iconColor[1], self.iconColor[2], self.iconColor[3])
+		end
 		self.Icon:SetSize(TAB_ICON_SIZE, TAB_ICON_SIZE)
 		self.SelectedTexture:SetShown(checked)
 	end
@@ -461,6 +527,8 @@ local function CreateReminderTab(parent, mode)
 	tab:ClearAllPoints()
 	if mode == "buff" then
 		tab:SetPoint("TOP", parent.GroupBuffsTab, "BOTTOM", 0, -3)
+	elseif mode == "active" then
+		tab:SetPoint("TOP", abilityReminderTab or reminderTab, "BOTTOM", 0, -3)
 	else
 		tab:SetPoint("TOP", reminderTab, "BOTTOM", 0, -3)
 	end
@@ -496,9 +564,10 @@ local function IsAnchoredTo(frame, target, depth)
 end
 
 local function IsForeignTab(frame)
-	if frame == reminderTab or frame == abilityReminderTab or not frame:IsShown() then return false end
+	if frame == reminderTab or frame == abilityReminderTab or frame == activeBuffTab or not frame:IsShown() then return false end
 	if IsAnchoredTo(frame, reminderTab, 0) then return false end
 	if abilityReminderTab and IsAnchoredTo(frame, abilityReminderTab, 0) then return false end
+	if activeBuffTab and IsAnchoredTo(frame, activeBuffTab, 0) then return false end
 	return true
 end
 
@@ -561,35 +630,45 @@ end
 local function GetAddBuffStatusText(row)
 	if row.listing == "custom" then return "|cffff3333" .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF") .. "|r" end
 	if row.listing == "listed" then return "|cff808080" .. CooldownManagerUtils:Trans("LID_ADDBUFF_LISTED") .. "|r" end
+	if row.listing == "active" then return "|cff59b3ff" .. CooldownManagerUtils:Trans("LID_ACTIVEBUFFS_LISTED") .. "|r" end
 	return "|cff33ff33" .. CooldownManagerUtils:Trans("LID_ADDBUFF_CLICK") .. "|r"
 end
 
 local function ShowAddBuffRowTooltip(tooltip, row)
 	tooltip:SetSpellByID(row.spellID)
+	tooltip:AddLine("ID: " .. tostring(row.spellID), 0.5, 0.5, 0.5)
 	if row.listing == "custom" then
 		AddCustomBuffTooltip(tooltip)
 	elseif row.listing == "listed" then
 		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ADDBUFF_LISTED"), 0.5, 0.5, 0.5)
+	elseif row.listing == "active" then
+		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ACTIVEBUFFS_DRAG"), 0.5, 0.8, 1, true)
 	else
 		tooltip:AddLine(CooldownManagerUtils:Trans("LID_ADDBUFF_CLICK"), 0.2, 1, 0.2)
 	end
 end
 
+local function GetActiveBuffListing(spell)
+	if CooldownManagerUtils:IsActiveBuffTracked(spell.spellID, spell.name) then return "active" end
+end
+
 local function UpdateAddBuffResults()
 	if not addBuffWindow or not addBuffWindow.results then return end
 	local query = addBuffWindow.query or ""
+	local isActive = addBuffWindow.mode == "active"
 	local rows = {}
-	for _, spell in ipairs(CooldownManagerUtils:FindClassSpells(query)) do
+	local spells = isActive and CooldownManagerUtils:FindActiveBuffSpells(query) or CooldownManagerUtils:FindClassSpells(query)
+	for _, spell in ipairs(spells) do
 		if #rows >= ADD_BUFF_MAX_RESULTS then break end
 		table.insert(rows, {
 			spellID = spell.spellID,
 			name = spell.name,
 			iconID = spell.iconID,
-			listing = CooldownManagerUtils:GetBuffSpellListing(spell.spellID, spell.name)
+			listing = isActive and GetActiveBuffListing(spell) or not isActive and CooldownManagerUtils:GetBuffSpellListing(spell.spellID, spell.name) or nil
 		})
 	end
 
-	addBuffWindow.results.emptyText = strtrim(query) == "" and "LID_ADDBUFF_HINT" or "LID_ADDBUFF_EMPTY"
+	addBuffWindow.results.emptyText = strtrim(query) == "" and "LID_ADDBUFF_HINT" or isActive and "LID_ACTIVEBUFFS_ADD_EMPTY" or "LID_ADDBUFF_EMPTY"
 	addBuffWindow.results:SetRows(rows)
 end
 
@@ -618,10 +697,12 @@ local function AddWindowText(win, text)
 end
 
 local function GetAddBuffTitle()
-	return format("|T%s:16:16:0:0|t %s", CooldownManagerUtils:GetAddonIcon(), CooldownManagerUtils:Trans("LID_ADDBUFF"))
+	local isActive = addBuffWindow and addBuffWindow.mode == "active"
+	return format("|T%s:16:16:0:0|t %s", CooldownManagerUtils:GetAddonIcon(), CooldownManagerUtils:Trans(isActive and "LID_ACTIVEBUFFS_ADD" or "LID_ADDBUFF"))
 end
 
 local function GetAddBuffInfoText()
+	if addBuffWindow and addBuffWindow.mode == "active" then return CooldownManagerUtils:Trans("LID_ACTIVEBUFFS_ADD_INFO") end
 	return CooldownManagerUtils:Trans("LID_ADDBUFF_INFO") .. "\n\n|cffff3333" .. CUSTOM_ALERT_ICON .. " " .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_WARNING") .. "|r\n" .. CooldownManagerUtils:Trans("LID_CUSTOMBUFF_CONTACT")
 end
 
@@ -638,10 +719,18 @@ end
 local function OnAddBuffRowClick(row, mouseButton)
 	if mouseButton == "RightButton" then
 		if row.listing == "custom" then ShowRemoveCustomBuffDialog({spellID = row.spellID, name = row.name}) end
+		if row.listing == "active" then ShowRemoveActiveBuffDialog({spellID = row.spellID, name = row.name}) end
 		return
 	end
 
-	if row.listing ~= nil or not CooldownManagerUtils:AddCustomBuff(row.spellID) then return end
+	if row.listing ~= nil then return end
+	local added
+	if addBuffWindow.mode == "active" then
+		added = CooldownManagerUtils:AddActiveBuff(row.spellID)
+	else
+		added = CooldownManagerUtils:AddCustomBuff(row.spellID)
+	end
+	if not added then return end
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 	UpdateAddBuffResults()
 end
@@ -710,8 +799,18 @@ local function CreateAddBuffWindow()
 	return win
 end
 
-function CooldownManagerUtils:ToggleAddBuffWindow()
+function CooldownManagerUtils:ToggleAddBuffWindow(mode)
+	mode = mode == "active" and "active" or "buff"
 	if not addBuffWindow then addBuffWindow = CreateAddBuffWindow() end
+	if addBuffWindow:IsShown() and addBuffWindow.mode ~= mode then
+		addBuffWindow.mode = mode
+		RefreshAddBuffWindowLanguage()
+		addBuffWindow:Raise()
+		return
+	end
+
+	addBuffWindow.mode = mode
+	RefreshAddBuffWindowLanguage()
 	addBuffWindow:Toggle()
 	if addBuffWindow:IsShown() then
 		addBuffWindow:Raise()
@@ -733,6 +832,7 @@ function CooldownManagerUtils:InitializeReminderSettings()
 	reminderContent = CreateReminderContent(frame)
 	reminderTab = CreateReminderTab(frame, "buff")
 	if self:HasReactiveAbilities() then abilityReminderTab = CreateReminderTab(frame, "ability") end
+	activeBuffTab = CreateReminderTab(frame, "active")
 	reminderUndoButton = CreateReminderUndoButton(frame)
 	CreateOptionsButton(frame)
 	stockTabs = {frame.SpellsTab, frame.AurasTab, frame.GroupBuffsTab}
@@ -757,10 +857,24 @@ function CooldownManagerUtils:InitializeReminderSettings()
 		whileDead = 1,
 		hideOnEscape = 1
 	}
+	StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REMOVE_ACTIVE_BUFF"] = {
+		text = self:Trans("LID_ACTIVEBUFFS_REMOVE_CONFIRM"),
+		button1 = REMOVE or YES,
+		button2 = CANCEL or NO,
+		OnAccept = function(_, entry)
+			CooldownManagerUtils:RemoveActiveBuff(entry)
+			UpdateAddBuffResults()
+		end,
+		timeout = 0,
+		whileDead = 1,
+		hideOnEscape = 1
+	}
 	self:OnLanguage(function()
 		reminderTab.tooltipText = CooldownManagerUtils:Trans("LID_BUFFREMINDERS")
 		if abilityReminderTab then abilityReminderTab.tooltipText = CooldownManagerUtils:Trans("LID_ABILITYREMINDERS") end
+		activeBuffTab.tooltipText = CooldownManagerUtils:Trans("LID_ACTIVEBUFFS")
 		StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REMOVE_CUSTOM_BUFF"].text = CooldownManagerUtils:Trans("LID_CUSTOMBUFF_REMOVE_CONFIRM")
+		StaticPopupDialogs["COOLDOWN_MANAGER_UTILS_REMOVE_ACTIVE_BUFF"].text = CooldownManagerUtils:Trans("LID_ACTIVEBUFFS_REMOVE_CONFIRM")
 		RefreshAddBuffWindowLanguage()
 		CooldownManagerUtils:RefreshReminderSettings()
 	end)
@@ -790,5 +904,5 @@ function CooldownManagerUtils:InitializeReminderSettings()
 end
 
 function CooldownManagerUtils:ShowReminderSettingsTab(reminderType)
-	if settingsFrame and settingsFrame:IsShown() then SetCustomMode(reminderType == "ability" and "ability" or "buff") end
+	if settingsFrame and settingsFrame:IsShown() then SetCustomMode((reminderType == "ability" or reminderType == "active") and reminderType or "buff") end
 end
