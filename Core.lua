@@ -269,7 +269,20 @@ local WEAPON_ENCHANT_FAMILIES = {
 			spells = {462757},
 			shield = true
 		}
-	}
+	},
+	ITEM = {
+		{
+			spells = {2828, 2829, 2830, 9900, 16138, 22756, 28891, 29452, 29453},
+			iconItems = {23529, 23528, 12404, 7964, 2871, 2863, 2862},
+			item = true
+		},
+		{
+			spells = {3112, 3113, 3114, 9903, 16622, 34339, 34340},
+			iconItems = {28421, 28420, 12643, 7965, 3241, 3240, 3239},
+			item = true
+		}
+	},
+	merged = {}
 }
 
 local HIT_CHARGE_AURAS = {
@@ -302,6 +315,9 @@ CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 		},
 		{
 			spells = {6572, 6574, 7379, 11600, 11601, 25288, 25269, 30357, 57823}
+		},
+		{
+			spells = {402927}
 		}
 	},
 	ROGUE = {
@@ -801,7 +817,20 @@ end
 
 local function GetWeaponEnchantFamilies()
 	local _, class = UnitClass("player")
-	return WEAPON_ENCHANT_FAMILIES[class] or {}
+	class = class or "NONE"
+	local families = WEAPON_ENCHANT_FAMILIES.merged[class]
+	if families then return families end
+	families = {}
+	for _, family in ipairs(WEAPON_ENCHANT_FAMILIES[class] or {}) do
+		table.insert(families, family)
+	end
+
+	for _, family in ipairs(WEAPON_ENCHANT_FAMILIES.ITEM) do
+		table.insert(families, family)
+	end
+
+	WEAPON_ENCHANT_FAMILIES.merged[class] = families
+	return families
 end
 
 local function GetWeaponEnchantFamily(spellID)
@@ -815,6 +844,23 @@ local function GetWeaponEnchantFamily(spellID)
 		end
 	end
 	return weaponEnchantFamilyBySpell[spellID]
+end
+
+function CooldownManagerUtils.GetWeaponEnchantIcon(spellID, fallbackIconID)
+	local family = GetWeaponEnchantFamily(spellID)
+	if not family or not family.iconItems then return fallbackIconID end
+	if family.iconID == nil then
+		family.iconID = false
+		local getItemInfoInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+		for _, itemID in ipairs(getItemInfoInstant and family.iconItems or {}) do
+			local ok, _, _, _, _, icon = pcall(getItemInfoInstant, itemID)
+			if ok and not IsSecret(icon) and icon then
+				family.iconID = icon
+				break
+			end
+		end
+	end
+	return family.iconID or fallbackIconID
 end
 
 local function GetWeaponEnchantFallbackIDs()
@@ -1307,6 +1353,7 @@ local function BuildKnownAuraSpellLookup()
 	for _, spellID in ipairs(GetWeaponEnchantFallbackIDs()) do
 		knownAuraSources[spellID] = spellID
 		unlearnedAuraSources[spellID] = true
+		if GetWeaponEnchantFamily(spellID).item then learnedAuraSources[spellID] = true end
 	end
 
 	local cooldownViewer = C_CooldownViewer
@@ -1444,7 +1491,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	local entry = {
 		spellID = spellID,
 		name = spellInfo.name,
-		iconID = spellInfo.iconID,
+		iconID = CooldownManagerUtils.GetWeaponEnchantIcon(spellID, spellInfo.iconID),
 		defaultCategory = "hidden",
 		weaponEnchant = weaponEnchant,
 		minimapTracking = minimapTracking,
@@ -3164,7 +3211,7 @@ local function GetSavedEntry(spellID)
 	return {
 		spellID = spellID,
 		name = spellInfo.name,
-		iconID = spellInfo.iconID,
+		iconID = CooldownManagerUtils.GetWeaponEnchantIcon(spellID, spellInfo.iconID),
 		weaponEnchant = IsWeaponEnchantSpell(spellID),
 		minimapTracking = MINIMAP_TRACKING_SPELLS[spellID] == true,
 		paladinBlessing = IsPaladinBlessingSpell(spellID),
