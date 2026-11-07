@@ -907,17 +907,21 @@ local function IsForeignWeaponEnchant(family, enchantID)
 	return false
 end
 
-local function AddTemporaryWeaponEnchant(enchants, slot, enchantID, remaining)
+local function AddTemporaryWeaponEnchant(enchants, slot, enchantID, remaining, source)
 	if IsSecret(enchantID) then
 		enchants.hasSecret = true
 		return
 	end
 
-	if type(enchantID) ~= "number" or enchants.slots[slot] then return end
-	enchants.slots[slot] = true
+	if type(enchantID) ~= "number" then return end
+	local key = slot .. ":" .. enchantID
+	if enchants.slots[key] then return end
+	enchants.slots[key] = true
 	table.insert(enchants, {
 		slot = slot,
+		key = key,
 		enchantID = enchantID,
+		source = source,
 		remaining = not IsSecret(remaining) and type(remaining) == "number" and remaining or nil
 	})
 end
@@ -928,7 +932,8 @@ local function GetTemporaryWeaponEnchants()
 	}
 
 	if C_Item and type(C_Item.GetWeaponEnchantInfo) == "function" and Enum and Enum.WeaponSlot then
-		local permanentType = Enum.ItemEnchantType and Enum.ItemEnchantType.Permanent or 1
+		local enchantTypes = Enum.ItemEnchantType or {}
+		local permanentType = enchantTypes.Permanent or 1
 		for _, slotName in ipairs(WEAPON_ENCHANT_SLOT_NAMES) do
 			local slot = Enum.WeaponSlot[slotName]
 			if slot ~= nil then
@@ -937,7 +942,16 @@ local function GetTemporaryWeaponEnchants()
 					enchants.hasSecret = true
 				elseif ok and type(list) == "table" then
 					for _, info in pairs(list) do
-						if type(info) == "table" and info.hasEnchant == true and info.enchantType ~= permanentType then AddTemporaryWeaponEnchant(enchants, slotName, info.enchantID, info.timeLeft) end
+						if type(info) == "table" and info.hasEnchant == true and info.enchantType ~= permanentType then
+							local source
+							if enchantTypes.Imbue ~= nil and info.enchantType == enchantTypes.Imbue then
+								source = "imbue"
+							elseif enchantTypes.Imbue ~= nil and info.enchantType == enchantTypes.Temporary then
+								source = "item"
+							end
+
+							AddTemporaryWeaponEnchant(enchants, slotName, info.enchantID, info.timeLeft, source)
+						end
 					end
 				end
 			end
@@ -971,11 +985,11 @@ local function RecordWeaponEnchantChanges(silent)
 	local now = GetTime()
 	local current = GetTemporaryWeaponEnchants()
 	if silent then wipe(recentWeaponEnchantChanges) end
-	local seenSlots = {}
+	local seenKeys = {}
 	for _, enchant in ipairs(current) do
-		seenSlots[enchant.slot] = true
-		local previous = weaponEnchantState[enchant.slot]
-		local changed = not previous or previous.enchantID ~= enchant.enchantID
+		seenKeys[enchant.key] = true
+		local previous = weaponEnchantState[enchant.key]
+		local changed = not previous
 		if not changed and enchant.remaining and previous.remaining then
 			local expected = previous.remaining - (now - previous.time) * 1000
 			changed = enchant.remaining - expected > TIMING.WEAPON_ENCHANT_REFRESH_MS
@@ -988,7 +1002,7 @@ local function RecordWeaponEnchantChanges(silent)
 			})
 		end
 
-		weaponEnchantState[enchant.slot] = {
+		weaponEnchantState[enchant.key] = {
 			enchantID = enchant.enchantID,
 			remaining = enchant.remaining,
 			time = now
@@ -996,8 +1010,8 @@ local function RecordWeaponEnchantChanges(silent)
 	end
 
 	if current.hasSecret then return end
-	for slot in pairs(weaponEnchantState) do
-		if not seenSlots[slot] then weaponEnchantState[slot] = nil end
+	for key in pairs(weaponEnchantState) do
+		if not seenKeys[key] then weaponEnchantState[key] = nil end
 	end
 end
 
@@ -1115,12 +1129,15 @@ local function GetEntryWeaponEnchantIDs(entry)
 	return enchantIDs
 end
 
-local function IsShieldWeaponEnchantEntry(entry)
+local function GetWeaponEnchantEntryKind(entry)
 	local family = GetWeaponEnchantFamily(entry.spellID)
 	for _, candidateSpellID in ipairs(entry.candidates) do
 		family = family or GetWeaponEnchantFamily(candidateSpellID)
 	end
-	return family ~= nil and family.shield == true
+
+	if family and family.shield then return "shield" end
+	if family and family.item then return "item" end
+	return "weapon"
 end
 
 local function GetEquippedWeaponEnchantSlotKind(inventorySlot)
@@ -3254,37 +3271,45 @@ local function GetWeaponEnchantState(entry)
 	local trackedEntries = GetTrackedWeaponEnchantEntries(entry)
 	local entryEnchantIDs = {}
 	local entryKinds = {}
-	local tracksShield = false
 	for spellID, trackedEntry in pairs(trackedEntries) do
 		entryEnchantIDs[spellID] = GetEntryWeaponEnchantIDs(trackedEntry)
-		entryKinds[spellID] = IsShieldWeaponEnchantEntry(trackedEntry) and "shield" or "weapon"
-		tracksShield = tracksShield or entryKinds[spellID] == "shield"
+		entryKinds[spellID] = GetWeaponEnchantEntryKind(trackedEntry)
 	end
 
 	local knownEnchantIDs = GetKnownWeaponEnchantIDs()
 	local activeEntries = {}
-	local imbuedSlots = {}
+	local imbuedSlots = {
+		weapon = {},
+		shield = {},
+		item = {}
+	}
+
 	for _, enchant in ipairs(current) do
-		local counts = not knownEnchantIDs[enchant.enchantID]
 		for spellID, enchantIDs in pairs(entryEnchantIDs) do
 			if enchantIDs[enchant.enchantID] then
 				activeEntries[spellID] = true
-				counts = true
+				imbuedSlots[entryKinds[spellID]][enchant.slot] = true
 			end
 		end
 
-		if counts then imbuedSlots[enchant.slot] = true end
-	end
+		if not knownEnchantIDs[enchant.enchantID] then
+			if enchant.source ~= "item" then
+				imbuedSlots.weapon[enchant.slot] = true
+				imbuedSlots.shield[enchant.slot] = true
+			end
 
-	local missingKinds = {}
-	for slotName, inventorySlot in pairs(WEAPON_ENCHANT_REQUIRED_SLOTS) do
-		local kind = GetEquippedWeaponEnchantSlotKind(inventorySlot)
-		if kind == "shield" and not tracksShield then kind = nil end
-		if kind and not imbuedSlots[slotName] then missingKinds[kind] = true end
+			if enchant.source ~= "imbue" then imbuedSlots.item[enchant.slot] = true end
+		end
 	end
 
 	local kind = entryKinds[entry.spellID]
-	if not missingKinds[kind] then return true end
+	local slotKind = kind == "item" and "weapon" or kind
+	local missing = false
+	for slotName, inventorySlot in pairs(WEAPON_ENCHANT_REQUIRED_SLOTS) do
+		if GetEquippedWeaponEnchantSlotKind(inventorySlot) == slotKind and not imbuedSlots[kind][slotName] then missing = true end
+	end
+
+	if not missing then return true end
 	if not activeEntries[entry.spellID] then return false end
 	for spellID in pairs(trackedEntries) do
 		if not activeEntries[spellID] and entryKinds[spellID] == kind then return true end
