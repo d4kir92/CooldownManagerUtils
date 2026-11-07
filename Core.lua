@@ -1564,6 +1564,7 @@ local function AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learn
 		if type(isKnown) ~= "boolean" and type(isSpellKnown) == "function" then
 			local knownOK, result = pcall(isSpellKnown, spellID, playerBank, true)
 			if knownOK and not IsSecret(result) and type(result) == "boolean" then isKnown = result end
+			if isKnown == false then isKnown = CooldownManagerUtils.AddKnownSpellRanks(spellID, knownAuraSpells[spellID]) end
 		end
 
 		if type(isKnown) == "boolean" and (isKnown or unlearnedAuraSources[spellID]) then AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, isKnown) end
@@ -1757,6 +1758,17 @@ function CooldownManagerUtils.IsSpellRankKnown(spellID)
 		if ok and result == true then return true end
 	end
 	return false
+end
+
+function CooldownManagerUtils.AddKnownSpellRanks(spellID, mapping)
+	local spellName = GetSpellNameSafe(spellID)
+	if not spellName then return false end
+	local isKnown = false
+	for _, rankSpellID in ipairs(CooldownManagerUtils:GetClassSpellCatalog().ranks[spellName] or {}) do
+		if mapping then AddCandidate(mapping.candidates, mapping.seen, rankSpellID) end
+		if not isKnown and CooldownManagerUtils.IsSpellRankKnown(rankSpellID) then isKnown = true end
+	end
+	return isKnown
 end
 
 function CooldownManagerUtils:GetDisplaySpellID(entry)
