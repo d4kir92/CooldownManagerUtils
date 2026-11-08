@@ -4283,6 +4283,62 @@ function CooldownManagerUtils.ScheduleExpiryWarning(warningAt)
 	end)
 end
 
+function CooldownManagerUtils.GetShamanShieldSpellLookup()
+	if CooldownManagerUtils.shamanShieldSpellLookup then return CooldownManagerUtils.shamanShieldSpellLookup end
+	local lookup = {}
+	for _, definition in ipairs(HIT_CHARGE_AURAS.SHAMAN) do
+		for _, shieldSpellID in ipairs(definition.spells) do
+			lookup[shieldSpellID] = true
+		end
+	end
+
+	CooldownManagerUtils.shamanShieldSpellLookup = lookup
+	return lookup
+end
+
+function CooldownManagerUtils.IsShamanShieldSpell(spellID)
+	return type(spellID) == "number" and CooldownManagerUtils.GetShamanShieldSpellLookup()[spellID] == true
+end
+
+function CooldownManagerUtils.IsShamanShieldEntry(entry)
+	if CooldownManagerUtils.IsShamanShieldSpell(entry.spellID) then return true end
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		if CooldownManagerUtils.IsShamanShieldSpell(candidateSpellID) then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils.GetShamanShieldState(selected)
+	local unknown = false
+	if C_UnitAuras and type(C_UnitAuras.GetPlayerAuraBySpellID) == "function" then
+		for spellID in pairs(CooldownManagerUtils.GetShamanShieldSpellLookup()) do
+			if IsAuraSecretNow(spellID) then
+				unknown = true
+			else
+				local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+				if not ok or IsSecret(aura) then
+					unknown = true
+				elseif aura then
+					return true
+				end
+			end
+		end
+	end
+
+	for spellID in pairs(selected) do
+		local entry = GetSavedEntry(spellID)
+		if entry and CooldownManagerUtils.IsShamanShieldEntry(entry) then
+			local present = GetAuraState(entry)
+			if present ~= nil then presenceCache[entry.spellID] = present end
+			if presenceCache[entry.spellID] == true then return true end
+			if presenceCache[entry.spellID] == nil then unknown = true end
+		end
+	end
+
+	if unknown then return nil end
+	return false
+end
+
 function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local frame = self:CreateReminderBar(reminderType)
 	local visibleSetting = frame.visibleSetting
@@ -4303,6 +4359,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local sharedPaladinState = {}
 	local sharedPaladinSealState = {}
 	local sharedHunterAspectState = {}
+	local sharedShamanShieldState = {}
 	local sharedMinimapTrackingState = {}
 	local expiringEntries = {}
 	local warningTime = reminderType == "expiring" and self:GetExpiryWarningTime()
@@ -4362,6 +4419,15 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					end
 
 					if sharedHunterAspectState.present ~= nil then show = not sharedHunterAspectState.present end
+				end
+
+				if CooldownManagerUtils.IsShamanShieldEntry(entry) then
+					if not sharedShamanShieldState.resolved then
+						sharedShamanShieldState.present = CooldownManagerUtils.GetShamanShieldState(selected)
+						sharedShamanShieldState.resolved = true
+					end
+
+					if sharedShamanShieldState.present ~= nil then show = not sharedShamanShieldState.present end
 				end
 
 				if entry.minimapTracking then
@@ -4987,6 +5053,7 @@ function CooldownManagerUtils.GetExclusiveSpellFamily(spellID)
 	if IsHunterAspectSpell(spellID) then return "hunterAspect" end
 	if IsPaladinSealSpell(spellID) then return "paladinSeal" end
 	if CooldownManagerUtils.IsPaladinAuraSpell(spellID) then return "paladinAura" end
+	if CooldownManagerUtils.IsShamanShieldSpell(spellID) then return "shamanShield" end
 end
 
 function CooldownManagerUtils.GetEntryExclusiveFamily(entry)
