@@ -4380,7 +4380,9 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 				if entry.reactiveAbility then
 					show = presenceCache[entry.spellID] == true
 				else
-					show = presenceCache[entry.spellID] == false or CooldownManagerUtils.IsGroupBuffMissing(entry)
+					local cached = presenceCache[entry.spellID]
+					local unknownAura = cached == nil and not entry.weaponEnchant and not entry.minimapTracking
+					show = cached == false or unknownAura or CooldownManagerUtils.IsGroupBuffMissing(entry)
 				end
 
 				if entry.tankOnly or entry.paladinBlessing and frame.checkGroupBuffs and IsInGroup() then
@@ -5307,6 +5309,18 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "MINIMAP_UPDATE_TRACKING" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "PLAYER_DEAD" or event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
+		wipe(presenceCache)
+		wipe(groupBuffCache)
+		wipe(auraExpirationCache)
+		wipe(auraChargeCache)
+		wipe(CooldownManagerUtils.auraInstanceSpells)
+		wipe(CooldownManagerUtils.pendingAuraCasts)
+		wipe(CooldownManagerUtils.recentAuraInstances)
+		CooldownManagerUtils.lastAuraInstanceSet = nil
+		CooldownManagerUtils.paladinBlessingPresent = nil
+		CooldownManagerUtils.paladinAuraPresent = nil
+		paladinSealPresent, paladinSealExpiration = nil, nil
+		hunterAspectPresent, hunterAspectExpiration = nil, nil
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local _, _, spellID = ...
