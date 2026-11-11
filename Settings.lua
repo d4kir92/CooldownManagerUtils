@@ -16,7 +16,7 @@ local DISCORD_BOX_WIDTH = 230
 local DISCORD_BOX_HEIGHT = 22
 local CATEGORY_DEFINITIONS = {
 	{key = "expiringBuff", localeKey = "LID_BUFFREMINDERS_CATEGORY_EXPIRING", buffOnly = true},
-	{key = "trackedBuff", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_TRACKED_BUFF", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
+	{key = "trackedBuff", localeKey = "LID_BUFFREMINDERS_CATEGORY_BUFFS", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_ABILITIES"},
 	{key = "hidden", titleGlobal = "COOLDOWN_VIEWER_SETTINGS_CATEGORY_NOT_IN_BAR", localeKey = "LID_BUFFREMINDERS_CATEGORY_HIDDEN", abilityLocaleKey = "LID_ABILITYREMINDERS_CATEGORY_HIDDEN"},
 	{key = "notLearned", localeKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", abilityLocaleKey = "LID_REMINDERS_CATEGORY_NOT_LEARNED", readOnly = true},
 	{key = "activeBuff", localeKey = "LID_ACTIVEBUFFS_CATEGORY_TRACKED", activeOnly = true}

@@ -1,13 +1,13 @@
 local _, CooldownManagerUtils = ...
 CooldownManagerUtils:SetAddonOutput()
 CooldownManagerUtils:SetVersion()
-local ICON_SIZE = 40
-local ICON_SPACING = 4
+local ICON_SIZE = 50
+local DEFAULT_ICON_PADDING = 5
+local ICON_PADDING_OFFSET = -4
 local ICON_SCALE_MIN = 50
 local ICON_SCALE_MAX = 400
 local ICON_COUNTDOWN_FONT = "GameFontHighlightHugeOutline"
 local GROUP_COUNT_FONT_SIZE = 10
-local FRAME_PADDING = 6
 local DEFAULT_REMINDER_X = 0
 local DEFAULT_REMINDER_Y = -180
 local REMINDER_CATEGORY_ORDER = {
@@ -591,7 +591,7 @@ local reminderSettingDefaults = {
 	orientation = 0,
 	iconDirection = 1,
 	iconSize = 100,
-	iconPadding = ICON_SPACING,
+	iconPadding = DEFAULT_ICON_PADDING,
 	opacity = 100,
 	visibleSetting = 0,
 	showTimer = 1,
@@ -3153,8 +3153,8 @@ local function CreateReminderIcon(parent, index)
 	icon.Texture:AddMaskTexture(icon.Mask)
 	icon.Overlay = icon:CreateTexture(nil, "OVERLAY")
 	icon.Overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
-	icon.Overlay:SetPoint("TOPLEFT", -8, 7)
-	icon.Overlay:SetPoint("BOTTOMRIGHT", 8, -7)
+	icon.Overlay:SetPoint("TOPLEFT", -9, 8)
+	icon.Overlay:SetPoint("BOTTOMRIGHT", 9, -8)
 	icon.Cooldown = CreateFrame("Cooldown", nil, icon)
 	icon.Cooldown:SetAllPoints()
 	icon.Cooldown:SetSwipeTexture("Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe")
@@ -4531,7 +4531,7 @@ end
 function CooldownManagerUtils.GetReminderBarGeometry(frame)
 	local geometry = {
 		scale = frame.iconScale or 1,
-		padding = frame.iconPadding or ICON_SPACING
+		padding = (frame.iconPadding or DEFAULT_ICON_PADDING) + ICON_PADDING_OFFSET
 	}
 
 	geometry.size = ICON_SIZE * geometry.scale
@@ -4549,7 +4549,7 @@ function CooldownManagerUtils.PlaceReminderIcon(frame, index, geometry)
 	local forward = geometry.forward
 	icon:SetScale(geometry.scale)
 	icon:ClearAllPoints()
-	local offset = (FRAME_PADDING + (index - 1) * (geometry.size + geometry.padding)) / geometry.scale
+	local offset = (index - 1) * (geometry.size + geometry.padding) / geometry.scale
 	if geometry.horizontal then
 		icon:SetPoint(forward and "LEFT" or "RIGHT", frame, forward and "LEFT" or "RIGHT", forward and offset or -offset, 0)
 	else
@@ -4564,8 +4564,8 @@ function CooldownManagerUtils.FinishReminderBar(frame, count, geometry, visibili
 		frame.icons[index]:Hide()
 	end
 
-	local extent = count > 0 and FRAME_PADDING * 2 + count * geometry.size + (count - 1) * geometry.padding or 180
-	frame:SetSize(geometry.horizontal and extent or geometry.size + FRAME_PADDING * 2, geometry.horizontal and geometry.size + FRAME_PADDING * 2 or extent)
+	local extent = count > 0 and count * geometry.size + (count - 1) * geometry.padding or 180
+	frame:SetSize(geometry.horizontal and extent or geometry.size, geometry.horizontal and geometry.size or extent)
 	if frame.Label then frame.Label:SetShown(editModeActive and count == 0) end
 	if frame.SetBackdropColor then frame:SetBackdropColor(0.05, 0.15, 0.25, editModeActive and 0.65 or 0) end
 	if frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(0.2, 0.65, 1, editModeActive and 1 or 0) end
@@ -4779,8 +4779,8 @@ function CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, show
 	button:SetIcon(icon)
 	local overlay = button:CreateTexture(nil, "OVERLAY")
 	overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
-	overlay:SetPoint("TOPLEFT", -8, 7)
-	overlay:SetPoint("BOTTOMRIGHT", 8, -7)
+	overlay:SetPoint("TOPLEFT", -9, 8)
+	overlay:SetPoint("BOTTOMRIGHT", 9, -8)
 	local font = _G[ICON_COUNTDOWN_FONT] and ICON_COUNTDOWN_FONT or "NumberFontNormal"
 	local function Inbound(object)
 		if type(GetForbiddenObjectTable) == "function" then return GetForbiddenObjectTable(object) end
