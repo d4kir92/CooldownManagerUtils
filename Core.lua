@@ -3143,7 +3143,7 @@ end
 
 local function CreateReminderIcon(parent, index)
 	local icon = CreateFrame("Frame", nil, parent)
-	icon:SetSize(ICON_SIZE, ICON_SIZE)
+	icon:SetSize(parent.iconBaseSize, parent.iconBaseSize)
 	icon:SetMouseClickEnabled(false)
 	icon.Texture = icon:CreateTexture(nil, "ARTWORK")
 	icon.Texture:SetAllPoints()
@@ -3153,8 +3153,9 @@ local function CreateReminderIcon(parent, index)
 	icon.Texture:AddMaskTexture(icon.Mask)
 	icon.Overlay = icon:CreateTexture(nil, "OVERLAY")
 	icon.Overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
-	icon.Overlay:SetPoint("TOPLEFT", -9, 8)
-	icon.Overlay:SetPoint("BOTTOMRIGHT", 9, -8)
+	local overlayInset = parent.iconBaseSize == ICON_SIZE and 9 or 8
+	icon.Overlay:SetPoint("TOPLEFT", -overlayInset, overlayInset - 1)
+	icon.Overlay:SetPoint("BOTTOMRIGHT", overlayInset, 1 - overlayInset)
 	icon.Cooldown = CreateFrame("Cooldown", nil, icon)
 	icon.Cooldown:SetAllPoints()
 	icon.Cooldown:SetSwipeTexture("Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe")
@@ -3202,6 +3203,7 @@ function CooldownManagerUtils:CreateReminderBar(reminderType)
 	frame:SetClampedToScreen(true)
 	frame.icons = {}
 	frame.reminderType = reminderType
+	frame.iconBaseSize = (reminderType == "buff" or reminderType == "expiring") and 40 or ICON_SIZE
 	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or reminderType == "expiring" and "LID_EXPIRINGBUFFS_EDITMODE" or reminderType == "active" and "LID_ACTIVEBUFFS" or "LID_BUFFREMINDERS_EDITMODE"
 	self.reminderFrames[reminderType] = frame
 	if nativeSelection then
@@ -4240,7 +4242,8 @@ function CooldownManagerUtils.UpdateIconGlow(icon, show, birth, cooldownSecret, 
 
 	if not alert then
 		alert = CreateFrame("Frame", nil, icon, "ActionButtonSpellAlertTemplate")
-		alert:SetSize(ICON_SIZE * 1.4, ICON_SIZE * 1.4)
+		local alertSize = icon:GetWidth() * 1.4
+		alert:SetSize(alertSize, alertSize)
 		alert:SetPoint("CENTER")
 		alert:SetFrameLevel(icon.Cooldown:GetFrameLevel() + 1)
 		alert:HookScript("OnShow", function(self) if not self.ProcStartAnim:IsPlaying() and not self.ProcLoop:IsPlaying() then self.ProcLoop:Play() end end)
@@ -4534,7 +4537,7 @@ function CooldownManagerUtils.GetReminderBarGeometry(frame)
 		padding = ((frame.iconPadding or DEFAULT_ICON_PADDING) + ICON_PADDING_OFFSET) * (frame.iconScale or 1)
 	}
 
-	geometry.size = ICON_SIZE * geometry.scale
+	geometry.size = frame.iconBaseSize * geometry.scale
 	geometry.horizontal = not Enum or not Enum.CooldownViewerOrientation or frame.orientationSetting == nil or frame.orientationSetting == Enum.CooldownViewerOrientation.Horizontal
 	if geometry.horizontal then
 		geometry.forward = not Enum or not Enum.CooldownViewerIconDirection or frame.iconDirection == nil or frame.iconDirection == Enum.CooldownViewerIconDirection.Right
