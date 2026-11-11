@@ -2,6 +2,7 @@ local _, CooldownManagerUtils = ...
 CooldownManagerUtils:SetAddonOutput()
 CooldownManagerUtils:SetVersion()
 local ICON_SIZE = 50
+local BUFF_ICON_SIZE = 40
 local DEFAULT_ICON_PADDING = 5
 local ICON_PADDING_OFFSET = -4
 local ICON_SCALE_MIN = 50
@@ -3211,7 +3212,7 @@ function CooldownManagerUtils:CreateReminderBar(reminderType)
 	frame:SetClampedToScreen(true)
 	frame.icons = {}
 	frame.reminderType = reminderType
-	frame.iconBaseSize = (reminderType == "buff" or reminderType == "expiring") and 40 or ICON_SIZE
+	frame.iconBaseSize = reminderType == "ability" and ICON_SIZE or BUFF_ICON_SIZE
 	frame.labelKey = reminderType == "ability" and "LID_PROCREMINDER_EDITMODE" or reminderType == "expiring" and "LID_EXPIRINGBUFFS_EDITMODE" or reminderType == "active" and "LID_ACTIVEBUFFS" or "LID_BUFFREMINDERS_EDITMODE"
 	self.reminderFrames[reminderType] = frame
 	if nativeSelection then
@@ -4789,7 +4790,7 @@ function CooldownManagerUtils.GetActiveBuffSpellFilter(onlyEntry)
 end
 
 function CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, showTooltips)
-	button:SetSize(ICON_SIZE, ICON_SIZE)
+	button:SetSize(BUFF_ICON_SIZE, BUFF_ICON_SIZE)
 	local icon = button:CreateTexture(nil, "ARTWORK")
 	icon:SetAllPoints()
 	local mask = button:CreateMaskTexture()
@@ -4799,8 +4800,8 @@ function CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, show
 	button:SetIcon(icon)
 	local overlay = button:CreateTexture(nil, "OVERLAY")
 	overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
-	overlay:SetPoint("TOPLEFT", -9, 8)
-	overlay:SetPoint("BOTTOMRIGHT", 9, -8)
+	overlay:SetPoint("TOPLEFT", -8, 7)
+	overlay:SetPoint("BOTTOMRIGHT", 8, -7)
 	local font = _G[ICON_COUNTDOWN_FONT] and ICON_COUNTDOWN_FONT or "NumberFontNormal"
 	local function Inbound(object)
 		if type(GetForbiddenObjectTable) == "function" then return GetForbiddenObjectTable(object) end
