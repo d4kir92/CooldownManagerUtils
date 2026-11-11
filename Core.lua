@@ -588,7 +588,7 @@ local SNAP_DIAGONAL_CORNERS = {
 }
 
 local reminderSettingDefaults = {
-	fixedIconPositions = 0,
+	fixedIconPositions = 1,
 	orientation = 0,
 	iconDirection = 1,
 	iconSize = 100,
