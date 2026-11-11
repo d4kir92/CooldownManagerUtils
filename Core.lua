@@ -2149,6 +2149,9 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 
 	CooldownManagerUtils.AddUnlearnedTalentSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddMinimapTrackingSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local wellFedSpellID = GetReminderSpellInfo(19705) and 19705 or 1284617
+	knownAuraSpells[wellFedSpellID] = {candidates = {wellFedSpellID}}
+	AddAvailableSpell(wellFedSpellID, wellFedSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
