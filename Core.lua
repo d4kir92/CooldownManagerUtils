@@ -4531,7 +4531,7 @@ end
 function CooldownManagerUtils.GetReminderBarGeometry(frame)
 	local geometry = {
 		scale = frame.iconScale or 1,
-		padding = (frame.iconPadding or DEFAULT_ICON_PADDING) + ICON_PADDING_OFFSET
+		padding = ((frame.iconPadding or DEFAULT_ICON_PADDING) + ICON_PADDING_OFFSET) * (frame.iconScale or 1)
 	}
 
 	geometry.size = ICON_SIZE * geometry.scale
