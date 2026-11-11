@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("enUS", "LID_DISCORD_COPY", "Click the link and pr
 CooldownManagerUtils:AddTrans("enUS", "LID_EXPIRINGBUFFS_EDITMODE", "Expiring Buffs")
 CooldownManagerUtils:AddTrans("enUS", "LID_EXPIRYWARNINGTIME", "Seconds before expiry")
 CooldownManagerUtils:AddTrans("enUS", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Seconds remaining before a buff expires at which the Expiring Buffs reminder appears. For example, 10 shows the reminder during the final 10 seconds. This controls buff duration, not spell cooldown.")
+CooldownManagerUtils:AddTrans("enUS", "LID_FIXED_ICON_POSITIONS", "Fixed icon positions")
 CooldownManagerUtils:AddTrans("enUS", "LID_GENERAL", "General")
 CooldownManagerUtils:AddTrans("enUS", "LID_LANGUAGE", "Language")
 CooldownManagerUtils:AddTrans("enUS", "LID_MMBTN", "Show Minimap Button")

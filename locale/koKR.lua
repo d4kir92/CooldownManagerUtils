@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("koKR", "LID_DISCORD_COPY", "링크를 클릭한 �
 CooldownManagerUtils:AddTrans("koKR", "LID_EXPIRINGBUFFS_EDITMODE", "만료 임박 버프")
 CooldownManagerUtils:AddTrans("koKR", "LID_EXPIRYWARNINGTIME", "만료 전 초")
 CooldownManagerUtils:AddTrans("koKR", "LID_EXPIRYWARNINGTIME_TOOLTIP", "강화 효과가 만료되기 몇 초 전에 알림을 표시할지 설정합니다. 10이면 마지막 10초 동안 표시됩니다. 주문 재사용 대기시간이 아닌 강화 효과 지속시간에 적용됩니다.")
+CooldownManagerUtils:AddTrans("koKR", "LID_FIXED_ICON_POSITIONS", "아이콘 위치 고정")
 CooldownManagerUtils:AddTrans("koKR", "LID_GENERAL", "일반")
 CooldownManagerUtils:AddTrans("koKR", "LID_LANGUAGE", "언어 / Language")
 CooldownManagerUtils:AddTrans("koKR", "LID_MMBTN", "미니맵 버튼 표시")

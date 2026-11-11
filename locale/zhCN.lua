@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("zhCN", "LID_DISCORD_COPY", "点击链接后按 Ct
 CooldownManagerUtils:AddTrans("zhCN", "LID_EXPIRINGBUFFS_EDITMODE", "即将结束的增益")
 CooldownManagerUtils:AddTrans("zhCN", "LID_EXPIRYWARNINGTIME", "结束前秒数")
 CooldownManagerUtils:AddTrans("zhCN", "LID_EXPIRYWARNINGTIME_TOOLTIP", "增益效果到期前多少秒显示即将到期提醒。例如，设为 10 时，在最后 10 秒显示提醒。此设置针对增益持续时间，而非技能冷却时间。")
+CooldownManagerUtils:AddTrans("zhCN", "LID_FIXED_ICON_POSITIONS", "固定图标位置")
 CooldownManagerUtils:AddTrans("zhCN", "LID_GENERAL", "常规")
 CooldownManagerUtils:AddTrans("zhCN", "LID_LANGUAGE", "语言 / Language")
 CooldownManagerUtils:AddTrans("zhCN", "LID_MMBTN", "显示小地图按钮")

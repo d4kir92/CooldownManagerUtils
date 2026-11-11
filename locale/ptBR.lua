@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("ptBR", "LID_DISCORD_COPY", "Clique no link e pres
 CooldownManagerUtils:AddTrans("ptBR", "LID_EXPIRINGBUFFS_EDITMODE", "Bônus expirando")
 CooldownManagerUtils:AddTrans("ptBR", "LID_EXPIRYWARNINGTIME", "Segundos antes de expirar")
 CooldownManagerUtils:AddTrans("ptBR", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Segundos restantes antes de um benefício expirar para mostrar o lembrete. Com 10, ele aparece durante os últimos 10 segundos. Esta opção controla a duração do benefício, não a recarga do feitiço.")
+CooldownManagerUtils:AddTrans("ptBR", "LID_FIXED_ICON_POSITIONS", "Posições fixas dos ícones")
 CooldownManagerUtils:AddTrans("ptBR", "LID_GENERAL", "Geral")
 CooldownManagerUtils:AddTrans("ptBR", "LID_LANGUAGE", "Idioma / Language")
 CooldownManagerUtils:AddTrans("ptBR", "LID_MMBTN", "Mostrar botão do minimapa")

@@ -588,6 +588,7 @@ local SNAP_DIAGONAL_CORNERS = {
 }
 
 local reminderSettingDefaults = {
+	fixedIconPositions = 0,
 	orientation = 0,
 	iconDirection = 1,
 	iconSize = 100,
@@ -2313,6 +2314,9 @@ local function ApplyReminderSettings(frame)
 	frame.iconDirection = settings.iconDirection
 	frame.iconScale = settings.iconSize / 100
 	frame.iconPadding = settings.iconPadding
+	local fixedIconPositions = settings.fixedIconPositions == 1
+	if frame.fixedIconPositions ~= fixedIconPositions then frame.auraContainerFilterDirty = true end
+	frame.fixedIconPositions = fixedIconPositions
 	frame.visibleSetting = settings.visibleSetting
 	frame.showTimer = settings.showTimer == 1
 	frame.showTooltips = settings.showTooltips == 1
@@ -2955,6 +2959,7 @@ local function CreateReminderOptionsFrame(owner)
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 10, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_SHOW_GLOW"), "showGlow"))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 11, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_CHECK_GROUP_BUFFS"), "checkGroupBuffs"))
 	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 12, CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME"), "expiryWarningTime", 1, 60, 1, "", "EXPIRYWARNINGTIME", CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME_TOOLTIP")))
+	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 13, CooldownManagerUtils:Trans("LID_FIXED_ICON_POSITIONS"), "fixedIconPositions"))
 	panel.Buttons = CreateFrame("Frame", nil, panel, "VerticalLayoutFrame")
 	panel.Buttons:SetPoint("TOP", panel.Settings, "BOTTOM", 0, -12)
 	panel.Buttons.spacing = 2
@@ -4365,6 +4370,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local sharedShamanShieldState = {}
 	local sharedMinimapTrackingState = {}
 	local expiringEntries = {}
+	local visibleEntries = {}
 	local warningTime = reminderType == "expiring" and self:GetExpiryWarningTime()
 	local layouts = self:GetProfile().layout
 	if editModeActive or (GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true and not self.IsPlayerFlying()) then
@@ -4472,7 +4478,8 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 
 				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and CooldownManagerUtils.IsCooldownAboveDisplayTime(entry.spellID, frame.cooldownDisplayTime) then show = false end
 				if entry.tankOnly and InCombatLockdown() then show = false end
-				if editModeActive or show then table.insert(entries, entry) end
+				if editModeActive or show then visibleEntries[entry] = true end
+				if frame.fixedIconPositions or visibleEntries[entry] then table.insert(entries, entry) end
 			end
 		end
 	end
@@ -4495,40 +4502,47 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
 	local glowingSpells = {}
 	local previousGlowingSpells = frame.glowingSpells or {}
+	local hasVisibleIcons = false
 	for index, entry in ipairs(entries) do
 		local icon = CooldownManagerUtils.PlaceReminderIcon(frame, index, geometry)
-		local expiring = expiringEntries[entry]
-		local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
-		local onCooldown, cooldownSecret, cooldownSecretIsZero
-		local displaySpellID = CooldownManagerUtils:GetDisplaySpellID(entry)
-		if expiring then
-			icon.Cooldown.displayTime = 0
-			icon:SetAlpha(1)
-			icon.Cooldown:SetAlpha(1)
-			icon.Cooldown:SetHideCountdownNumbers(false)
-			icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
+		if not visibleEntries[entry] then
+			CooldownManagerUtils.UpdateIconGlow(icon, false)
+			icon:Hide()
 		else
-			onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, displaySpellID, frame.showTimer ~= false, frame.cooldownDisplayTime)
-		end
+			hasVisibleIcons = true
+			local expiring = expiringEntries[entry]
+			local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
+			local onCooldown, cooldownSecret, cooldownSecretIsZero
+			local displaySpellID = CooldownManagerUtils:GetDisplaySpellID(entry)
+			if expiring then
+				icon.Cooldown.displayTime = 0
+				icon:SetAlpha(1)
+				icon.Cooldown:SetAlpha(1)
+				icon.Cooldown:SetHideCountdownNumbers(false)
+				icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
+			else
+				onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, displaySpellID, frame.showTimer ~= false, frame.cooldownDisplayTime)
+			end
 
-		icon.Texture:SetTexture(entry.iconID)
-		CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(displaySpellID), cooldownSecret, cooldownSecretIsZero)
-		icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
-		icon:SetMouseClickEnabled(false)
-		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
-		icon.spellID = displaySpellID
-		local groupState = groupBuffCache[entry.spellID]
-		icon.GroupCount:SetText(entry.tankOnly and "Tank" or groupState and (groupState.have .. "/" .. groupState.total) or "")
-		icon.GroupCount:SetShown(entry.tankOnly or groupState ~= nil)
-		icon:Show()
-		local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
-		if entry.reactiveAbility and not editModeActive then glow = glow and not cooldownSecret and CooldownManagerUtils.CanGlowReactiveAbility(entry) end
-		if glow then glowingSpells[entry.spellID] = true end
-		CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID], cooldownSecret, cooldownSecretIsZero)
+			icon.Texture:SetTexture(entry.iconID)
+			CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(displaySpellID), cooldownSecret, cooldownSecretIsZero)
+			icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
+			icon:SetMouseClickEnabled(false)
+			icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
+			icon.spellID = displaySpellID
+			local groupState = groupBuffCache[entry.spellID]
+			icon.GroupCount:SetText(entry.tankOnly and "Tank" or groupState and (groupState.have .. "/" .. groupState.total) or "")
+			icon.GroupCount:SetShown(entry.tankOnly or groupState ~= nil)
+			icon:Show()
+			local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
+			if entry.reactiveAbility and not editModeActive then glow = glow and not cooldownSecret and CooldownManagerUtils.CanGlowReactiveAbility(entry) end
+			if glow then glowingSpells[entry.spellID] = true end
+			CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID], cooldownSecret, cooldownSecretIsZero)
+		end
 	end
 
 	frame.glowingSpells = glowingSpells
-	CooldownManagerUtils.FinishReminderBar(frame, #entries, geometry, visibilityAllowed)
+	CooldownManagerUtils.FinishReminderBar(frame, #entries, geometry, visibilityAllowed and hasVisibleIcons)
 end
 
 function CooldownManagerUtils.GetReminderBarGeometry(frame)
@@ -4753,10 +4767,10 @@ end
 
 CooldownManagerUtils.ACTIVE_CONTAINER_GROUP = "activeBuffs"
 
-function CooldownManagerUtils.GetActiveBuffSpellFilter()
+function CooldownManagerUtils.GetActiveBuffSpellFilter(onlyEntry)
 	local includeSpellIDs = {}
 	local names = {}
-	for _, entry in ipairs(CooldownManagerUtils:GetActiveBuffEntries()) do
+	for _, entry in ipairs(onlyEntry and {onlyEntry} or CooldownManagerUtils:GetActiveBuffEntries()) do
 		names[entry.name] = true
 		includeSpellIDs[entry.spellID] = true
 		for _, candidateSpellID in ipairs(entry.candidates) do
@@ -4830,7 +4844,7 @@ function CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, show
 	if not showTooltips then pcall(button.EnableMouse, button, false) end
 end
 
-function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTooltips)
+function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTooltips, entry)
 	local ok, container = pcall(CreateFrame, "AuraContainer", nil, frame, "CustomAuraContainerTemplate")
 	if not ok or not container then return end
 	local setupOK = pcall(function()
@@ -4838,7 +4852,7 @@ function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTo
 		container:AddAuraGroup(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, "HELPFUL", {
 			initializeFrame = function(button) CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, showTooltips) end,
 			candidateFilters = {
-				includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter()
+				includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(entry)
 			}
 		})
 
@@ -4852,25 +4866,25 @@ function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTo
 	return container
 end
 
-function CooldownManagerUtils.GetActiveAuraContainer(frame)
-	if frame.auraContainerUnsupported then return end
+function CooldownManagerUtils.GetActiveAuraContainer(frame, state, entry)
+	if state.auraContainerUnsupported then return end
 	local key = tostring(frame.showTimer ~= false) .. tostring(frame.showTooltips ~= false)
-	if frame.auraContainer and frame.auraContainerKey == key then return frame.auraContainer end
-	if frame.auraContainer then
-		pcall(frame.auraContainer.SetEnabled, frame.auraContainer, false)
-		pcall(frame.auraContainer.Hide, frame.auraContainer)
-		frame.auraContainer = nil
+	if state.auraContainer and state.auraContainerKey == key then return state.auraContainer end
+	if state.auraContainer then
+		pcall(state.auraContainer.SetEnabled, state.auraContainer, false)
+		pcall(state.auraContainer.Hide, state.auraContainer)
+		state.auraContainer = nil
 	end
 
-	local container = CooldownManagerUtils.CreateActiveAuraContainer(frame, frame.showTimer ~= false, frame.showTooltips ~= false)
+	local container = CooldownManagerUtils.CreateActiveAuraContainer(frame, frame.showTimer ~= false, frame.showTooltips ~= false, entry)
 	if not container then
-		frame.auraContainerUnsupported = true
+		state.auraContainerUnsupported = true
 		return
 	end
 
-	frame.auraContainer = container
-	frame.auraContainerKey = key
-	frame.auraContainerFilterDirty = nil
+	state.auraContainer = container
+	state.auraContainerKey = key
+	state.auraContainerFilterDirty = nil
 	return container
 end
 
@@ -4907,9 +4921,21 @@ function CooldownManagerUtils.LayoutActiveAuraContainer(frame, container, geomet
 end
 
 function CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed)
-	local container = CooldownManagerUtils.GetActiveAuraContainer(frame)
+	local entries = CooldownManagerUtils:GetActiveBuffEntries()
+	local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
+	for index, icon in ipairs(frame.icons) do
+		if icon.auraContainer and (not frame.fixedIconPositions or editModeActive or index > #entries) then
+			pcall(icon.auraContainer.Hide, icon.auraContainer)
+		end
+	end
+
+	local container
+	if frame.fixedIconPositions then
+		if frame.auraContainer then pcall(frame.auraContainer.Hide, frame.auraContainer) end
+	else
+		container = CooldownManagerUtils.GetActiveAuraContainer(frame, frame)
+	end
 	if container then
-		local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
 		CooldownManagerUtils.LayoutActiveAuraContainer(frame, container, geometry)
 		pcall(container.SetShown, container, not editModeActive)
 		if not editModeActive then
@@ -4918,27 +4944,54 @@ function CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed)
 				icon:Hide()
 			end
 
-			CooldownManagerUtils.FinishReminderBar(frame, #CooldownManagerUtils:GetActiveBuffEntries(), geometry, visibilityAllowed)
+			CooldownManagerUtils.FinishReminderBar(frame, #entries, geometry, visibilityAllowed)
 			return
 		end
 	end
 
-	local shown = {}
-	for _, entry in ipairs(CooldownManagerUtils:GetActiveBuffEntries()) do
+	local count = 0
+	local hasVisibleIcons = false
+	for _, entry in ipairs(entries) do
 		local present = GetAuraState(entry)
 		if present ~= nil then presenceCache[entry.spellID] = present end
-		if editModeActive or presenceCache[entry.spellID] == true then table.insert(shown, entry) end
+		local show = editModeActive or presenceCache[entry.spellID] == true
+		if frame.fixedIconPositions or show then
+			count = count + 1
+			local icon = CooldownManagerUtils.PlaceReminderIcon(frame, count, geometry)
+			local slot
+			if frame.fixedIconPositions and not editModeActive then
+				slot = CooldownManagerUtils.GetActiveAuraContainer(frame, icon, entry)
+			end
+
+			if slot then
+				if icon.auraContainerEntry ~= entry or frame.auraContainerFilterDirty then
+					pcall(slot.SetAuraGroupCandidateFilters, slot, CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, {
+						includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(entry)
+					})
+					icon.auraContainerEntry = entry
+				end
+				pcall(function()
+					slot:ClearAllPoints()
+					slot:SetPoint("TOPLEFT", icon, "TOPLEFT", 0, 0)
+					slot:SetFlowLayoutAnchorPoint("TOPLEFT")
+					slot:SetScale(geometry.scale)
+					slot:Show()
+				end)
+				icon:Hide()
+				hasVisibleIcons = true
+			elseif show then
+				icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
+				CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, presenceCache[entry.spellID] == true, frame.showTimer ~= false)
+				hasVisibleIcons = true
+			else
+				icon:Hide()
+			end
+		end
 	end
 
-	local geometry = CooldownManagerUtils.GetReminderBarGeometry(frame)
-	for index, entry in ipairs(shown) do
-		local icon = CooldownManagerUtils.PlaceReminderIcon(frame, index, geometry)
-		icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
-		CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, presenceCache[entry.spellID] == true, frame.showTimer ~= false)
-	end
-
+	if frame.fixedIconPositions and not editModeActive then frame.auraContainerFilterDirty = nil end
 	frame.glowingSpells = {}
-	CooldownManagerUtils.FinishReminderBar(frame, #shown, geometry, visibilityAllowed)
+	CooldownManagerUtils.FinishReminderBar(frame, count, geometry, visibilityAllowed and hasVisibleIcons)
 end
 
 function CooldownManagerUtils:UpdateReminderBar()

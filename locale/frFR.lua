@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("frFR", "LID_DISCORD_COPY", "Cliquez sur le lien e
 CooldownManagerUtils:AddTrans("frFR", "LID_EXPIRINGBUFFS_EDITMODE", "Améliorations sur le point d'expirer")
 CooldownManagerUtils:AddTrans("frFR", "LID_EXPIRYWARNINGTIME", "Secondes avant l'expiration")
 CooldownManagerUtils:AddTrans("frFR", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Temps restant en secondes avant la fin d'une amélioration pour afficher le rappel. Avec 10, il apparaît pendant les 10 dernières secondes. Ce réglage concerne la durée de l'amélioration, pas la recharge du sort.")
+CooldownManagerUtils:AddTrans("frFR", "LID_FIXED_ICON_POSITIONS", "Positions fixes des icônes")
 CooldownManagerUtils:AddTrans("frFR", "LID_GENERAL", "Général")
 CooldownManagerUtils:AddTrans("frFR", "LID_LANGUAGE", "Langue / Language")
 CooldownManagerUtils:AddTrans("frFR", "LID_MMBTN", "Afficher le bouton de la minicarte")

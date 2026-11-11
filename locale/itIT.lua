@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("itIT", "LID_DISCORD_COPY", "Clicca sul link e pre
 CooldownManagerUtils:AddTrans("itIT", "LID_EXPIRINGBUFFS_EDITMODE", "Benefici in scadenza")
 CooldownManagerUtils:AddTrans("itIT", "LID_EXPIRYWARNINGTIME", "Secondi prima della scadenza")
 CooldownManagerUtils:AddTrans("itIT", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Secondi rimanenti prima della scadenza di un beneficio per mostrare il promemoria. Con 10, appare negli ultimi 10 secondi. Riguarda la durata del beneficio, non il recupero della magia.")
+CooldownManagerUtils:AddTrans("itIT", "LID_FIXED_ICON_POSITIONS", "Posizioni fisse delle icone")
 CooldownManagerUtils:AddTrans("itIT", "LID_GENERAL", "Generale")
 CooldownManagerUtils:AddTrans("itIT", "LID_LANGUAGE", "Lingua / Language")
 CooldownManagerUtils:AddTrans("itIT", "LID_MMBTN", "Mostra pulsante della minimappa")

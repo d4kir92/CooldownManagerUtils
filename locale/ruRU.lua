@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_DISCORD_COPY", "Нажмите на �
 CooldownManagerUtils:AddTrans("ruRU", "LID_EXPIRINGBUFFS_EDITMODE", "Истекающие баффы")
 CooldownManagerUtils:AddTrans("ruRU", "LID_EXPIRYWARNINGTIME", "Секунд до окончания")
 CooldownManagerUtils:AddTrans("ruRU", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Оставшееся время усиления в секундах, при котором появляется напоминание об истечении. При значении 10 оно показывается в последние 10 секунд. Настройка относится к длительности усиления, а не к перезарядке заклинания.")
+CooldownManagerUtils:AddTrans("ruRU", "LID_FIXED_ICON_POSITIONS", "Фиксированные позиции значков")
 CooldownManagerUtils:AddTrans("ruRU", "LID_GENERAL", "Общие")
 CooldownManagerUtils:AddTrans("ruRU", "LID_LANGUAGE", "Язык / Language")
 CooldownManagerUtils:AddTrans("ruRU", "LID_MMBTN", "Показывать кнопку у миникарты")

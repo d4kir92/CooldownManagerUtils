@@ -47,6 +47,7 @@ CooldownManagerUtils:AddTrans("deDE", "LID_DISCORD_COPY", "Link anklicken und mi
 CooldownManagerUtils:AddTrans("deDE", "LID_EXPIRINGBUFFS_EDITMODE", "Auslaufende Buffs")
 CooldownManagerUtils:AddTrans("deDE", "LID_EXPIRYWARNINGTIME", "Sekunden vor dem Auslaufen")
 CooldownManagerUtils:AddTrans("deDE", "LID_EXPIRYWARNINGTIME_TOOLTIP", "Restzeit in Sekunden, ab der die Erinnerung für ablaufende Buffs erscheint. Bei 10 erscheint sie während der letzten 10 Sekunden. Dies betrifft die Buffdauer, nicht die Abklingzeit des Zaubers.")
+CooldownManagerUtils:AddTrans("deDE", "LID_FIXED_ICON_POSITIONS", "Feste Symbolplätze")
 CooldownManagerUtils:AddTrans("deDE", "LID_GENERAL", "Allgemein")
 CooldownManagerUtils:AddTrans("deDE", "LID_LANGUAGE", "Sprache / Language")
 CooldownManagerUtils:AddTrans("deDE", "LID_MMBTN", "Minimapknopf anzeigen")
