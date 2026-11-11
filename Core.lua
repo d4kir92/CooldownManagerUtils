@@ -4904,7 +4904,7 @@ function CooldownManagerUtils.LayoutActiveAuraContainer(frame, container, geomet
 
 	pcall(function()
 		container:ClearAllPoints()
-		container:SetPoint("CENTER", frame, "CENTER", 0, 0)
+		container:SetPoint(point, frame, point, 0, 0)
 		container:SetScale(geometry.scale)
 		container:SetFlowLayoutAxis(geometry.horizontal and axis.Horizontal or axis.Vertical)
 		container:SetFlowLayoutAnchorPoint(point)
