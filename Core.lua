@@ -319,11 +319,19 @@ CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 		},
 		{
 			spells = {402927}
+		},
+		{
+			spells = {5308, 20658, 20660, 20661, 20662},
+			execute = true
 		}
 	},
 	ROGUE = {
 		{
 			spells = {14251}
+		},
+		{
+			spells = {1329283, 1329549},
+			readyOnly = true
 		}
 	},
 	HUNTER = {
@@ -343,6 +351,7 @@ CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 }
 
 CooldownManagerUtils.cooldownResetState = {}
+CooldownManagerUtils.foreverWarriorDebuffs = {6343, 1160}
 
 local MINIMAP_TRACKING_SPELLS = {
 	[2481] = true,
@@ -1477,7 +1486,8 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 	end
 
 	local spellName = GetSpellNameSafe(spellID)
-	if spellName then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
+	local targetDebuff = auraMapping and auraMapping.targetDebuff
+	if spellName and not targetDebuff then AddCandidate(candidates, seenCandidates, GetLearnedAuras().names[spellName]) end
 	local weaponEnchant = family ~= nil or IsWeaponEnchantSpell(sourceSpellID) or IsWeaponEnchantSpell(baseSpellID)
 	local minimapTracking = MINIMAP_TRACKING_SPELLS[sourceSpellID] == true or MINIMAP_TRACKING_SPELLS[baseSpellID] == true
 	local existing = availableBuffsBySpellID[spellID] or (spellName and availableBuffsByName[spellName])
@@ -1493,6 +1503,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		existing.hunterAspect = existing.hunterAspect or hunterAspect
 		existing.reactiveAbility = existing.reactiveAbility or reactiveFamily ~= nil
 		existing.custom = existing.custom and custom
+		existing.targetDebuff = existing.targetDebuff or targetDebuff
 		existing.isLearned = existing.isLearned or isLearned
 		local existingCandidates = {}
 		for _, candidateSpellID in ipairs(existing.candidates) do
@@ -1520,6 +1531,7 @@ local function AddAvailableSpell(spellID, baseSpellID, knownAuraSpells, availabl
 		paladinAura = paladinAura,
 		hunterAspect = hunterAspect,
 		reactiveAbility = reactiveFamily ~= nil,
+		targetDebuff = targetDebuff,
 		custom = custom,
 		isLearned = isLearned,
 		candidates = candidates
@@ -2121,6 +2133,26 @@ function CooldownManagerUtils:MigrateReminderSelection(availableBuffsBySpellID)
 	end
 end
 
+function CooldownManagerUtils.AddForeverWarriorDebuffMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
+	local _, class = UnitClass("player")
+	if class ~= "WARRIOR" or not CooldownManagerUtils:IsForever() then return end
+	for _, spellID in ipairs(CooldownManagerUtils.foreverWarriorDebuffs) do
+		local mapping = {
+			candidates = {spellID},
+			seen = {[spellID] = true},
+			targetDebuff = true
+		}
+
+		CooldownManagerUtils.AddKnownSpellRanks(spellID, mapping)
+		for _, rankSpellID in ipairs(mapping.candidates) do
+			knownAuraSpells[rankSpellID] = mapping
+		end
+
+		knownAuraSources[spellID] = spellID
+		unlearnedAuraSources[spellID] = true
+	end
+end
+
 function CooldownManagerUtils:RefreshAvailableBuffs()
 	if InCombatLockdown() then
 		self.pendingSourceRefresh = true
@@ -2141,6 +2173,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	self.activeBuffEntries = nil
 	LearnCurrentPlayerAuras()
 	local knownAuraSpells, knownAuraSources, unlearnedAuraSources, learnedAuraSources = BuildKnownAuraSpellLookup()
+	CooldownManagerUtils.AddForeverWarriorDebuffMappings(knownAuraSpells, knownAuraSources, unlearnedAuraSources)
 	local skillLineEnum = Enum.SpellBookSkillLineIndex
 	local generalLine = skillLineEnum and skillLineEnum.General or 1
 	local numSkillLines = type(C_SpellBook.GetNumSpellBookSkillLines) == "function" and C_SpellBook.GetNumSpellBookSkillLines() or 3
@@ -3514,7 +3547,7 @@ end
 local function TrackAuraExpiration(entry, aura)
 	TrackAuraCharges(entry, aura)
 	local instanceID = aura.auraInstanceID
-	if not IsSecret(instanceID) and type(instanceID) == "number" then CooldownManagerUtils.auraInstanceSpells[instanceID] = entry.spellID end
+	if not entry.harmful and not IsSecret(instanceID) and type(instanceID) == "number" then CooldownManagerUtils.auraInstanceSpells[instanceID] = entry.spellID end
 	local expirationTime, duration = aura.expirationTime, aura.duration
 	if IsSecret(expirationTime) or IsSecret(duration) then return end
 	if type(duration) == "number" and duration > 0 then GetLearnedAuras().durations[entry.spellID] = duration end
@@ -3611,10 +3644,14 @@ end
 
 function CooldownManagerUtils.GetReactiveAbilityState(entry)
 	local family = CooldownManagerUtils.GetForeverReactiveAbilityFamily(entry.spellID)
-	if family and family.cooldownReset then return CooldownManagerUtils.IsCooldownResetActive(family) end
+	if family then
+		if family.cooldownReset then return CooldownManagerUtils.IsCooldownResetActive(family) end
+		if family.execute or family.readyOnly then return CooldownManagerUtils.GetTargetAbilityState(entry, family) end
+	end
+
 	local overlay = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed
 	if type(overlay) ~= "function" then overlay = nil end
-	local isSpellUsable = CooldownManagerUtils.GetForeverReactiveAbilityFamily(entry.spellID) and (C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell)
+	local isSpellUsable = family and (C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell)
 	if type(isSpellUsable) ~= "function" then isSpellUsable = nil end
 	if not overlay and not isSpellUsable then return end
 	local resolved = false
@@ -3639,16 +3676,17 @@ function CooldownManagerUtils.GetReactiveAbilityState(entry)
 	if resolved then return false end
 end
 
-function CooldownManagerUtils.FindReadableBuffByName(unit, name)
+function CooldownManagerUtils.FindReadableAuraByName(unit, name, filter)
 	if not name or not C_UnitAuras then return end
+	filter = filter or "HELPFUL"
 	if type(C_UnitAuras.GetAuraDataBySpellName) == "function" then
-		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, "HELPFUL")
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, filter)
 		if ok and not IsSecret(aura) and aura then return aura end
 	end
 
 	if type(C_UnitAuras.GetAuraDataByIndex) ~= "function" then return end
 	for index = 1, 255 do
-		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, "HELPFUL")
+		local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
 		if not ok or (not IsSecret(aura) and aura == nil) then return end
 		if not IsSecret(aura) and not IsSecret(aura.name) and aura.name == name then return aura end
 	end
@@ -3658,7 +3696,22 @@ local function GetReadableAuraState(entry)
 	if entry.reactiveAbility then return CooldownManagerUtils.GetReactiveAbilityState(entry) end
 	if entry.minimapTracking then return GetMinimapTrackingState() end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
-	if not C_UnitAuras or not C_UnitAuras.GetPlayerAuraBySpellID then return nil end
+	if not C_UnitAuras then return end
+	if entry.harmful then
+		if type(C_UnitAuras.GetUnitAuraBySpellID) ~= "function" then return end
+		local ok, aura = pcall(C_UnitAuras.GetUnitAuraBySpellID, "player", entry.spellID)
+		if not ok or IsSecret(aura) then return end
+		if aura then
+			TrackAuraExpiration(entry, aura)
+			return true, aura
+		end
+
+		if IsAuraSecretNow(entry.spellID) then return end
+		SetAuraExpiration(entry.spellID, nil)
+		return false
+	end
+
+	if type(C_UnitAuras.GetPlayerAuraBySpellID) ~= "function" then return end
 	local unknown = false
 	for _, spellID in ipairs(entry.candidates) do
 		if IsAuraSecretNow(spellID) then
@@ -3669,15 +3722,15 @@ local function GetReadableAuraState(entry)
 				unknown = true
 			elseif aura then
 				TrackAuraExpiration(entry, aura)
-				return true
+				return true, aura
 			end
 		end
 	end
 
-	local aura = CooldownManagerUtils.FindReadableBuffByName("player", entry.name)
+	local aura = CooldownManagerUtils.FindReadableAuraByName("player", entry.name)
 	if aura then
 		TrackAuraExpiration(entry, aura)
-		return true
+		return true, aura
 	end
 
 	if unknown then return nil end
@@ -3735,8 +3788,8 @@ function CooldownManagerUtils.GetCooldownViewerAuraState(entry)
 end
 
 local function GetAuraState(entry)
-	local present = GetReadableAuraState(entry)
-	if present ~= nil or entry.weaponEnchant or entry.reactiveAbility or entry.minimapTracking then return present end
+	local present, aura = GetReadableAuraState(entry)
+	if present ~= nil or entry.weaponEnchant or entry.reactiveAbility or entry.minimapTracking then return present, aura end
 	local viewerState = CooldownManagerUtils.GetCooldownViewerAuraState(entry)
 	if viewerState ~= nil then
 		if not viewerState then
@@ -3784,6 +3837,25 @@ local function GetUnitFlag(unitFunction, unit)
 	local ok, value = pcall(unitFunction, unit)
 	if not ok or IsSecret(value) then return end
 	return value and true or false
+end
+
+function CooldownManagerUtils.HasAttackableTarget()
+	local ok, canAttack = pcall(UnitCanAttack, "player", "target")
+	return ok and not IsSecret(canAttack) and canAttack == true and GetUnitFlag(UnitIsDeadOrGhost, "target") ~= true
+end
+
+function CooldownManagerUtils.GetTargetDebuff(entry)
+	if not CooldownManagerUtils.HasAttackableTarget() or not C_UnitAuras or type(C_UnitAuras.GetUnitAuraBySpellID) ~= "function" then return end
+	local unknown = false
+	for _, spellID in ipairs(entry.candidates) do
+		local ok, aura = pcall(C_UnitAuras.GetUnitAuraBySpellID, "target", spellID)
+		if ok and not IsSecret(aura) and aura then return true, aura end
+		if not ok or IsSecret(aura) or IsAuraSecretNow(spellID) then unknown = true end
+	end
+
+	local aura = CooldownManagerUtils.FindReadableAuraByName("target", entry.name, "HARMFUL")
+	if aura then return true, aura end
+	if not unknown then return false end
 end
 
 function CooldownManagerUtils.IsPlayerFlying()
@@ -3971,7 +4043,7 @@ function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 		end
 	end
 
-	if CooldownManagerUtils.FindReadableBuffByName(unit, entry.name) then return "present" end
+	if CooldownManagerUtils.FindReadableAuraByName(unit, entry.name) then return "present" end
 	return unknown and "unknown" or "missing"
 end
 
@@ -4124,17 +4196,40 @@ function CooldownManagerUtils.GetSpellCooldownState(spellID)
 	return true, nil, startTime, duration, not IsSecret(info.modRate) and info.modRate or 1
 end
 
-function CooldownManagerUtils.CanGlowReactiveAbility(entry)
+function CooldownManagerUtils.IsReactiveSpellUsable(spellID)
 	local isSpellUsable = C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell
 	if type(isSpellUsable) ~= "function" then return false end
-	for _, spellID in ipairs(entry.candidates) do
-		local ok, usable, insufficientPower = pcall(isSpellUsable, spellID)
-		if ok and not IsSecret(usable) and usable == true and not IsSecret(insufficientPower) and insufficientPower ~= true then
-			local onCooldown, _, _, _, _, secret = CooldownManagerUtils.GetSpellCooldownState(spellID)
-			if not onCooldown and not secret then return true end
-		end
+	local ok, usable = pcall(isSpellUsable, spellID)
+	return ok and not IsSecret(usable) and usable == true
+end
+
+function CooldownManagerUtils.GetTargetAbilityState(entry, family)
+	if not CooldownManagerUtils.HasAttackableTarget() then return false end
+	local spellID = CooldownManagerUtils:GetDisplaySpellID(entry)
+	if not CooldownManagerUtils.IsReactiveSpellUsable(spellID) then return false end
+	if family.readyOnly then
+		local onCooldown, _, _, _, _, secret, isZero = CooldownManagerUtils.GetSpellCooldownState(spellID)
+		if not secret then return not onCooldown end
+		local evaluate = C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean
+		if not evaluate then return false end
+		local ok, alpha = pcall(evaluate, isZero, 1, 0)
+		if ok then return true, alpha end
+		return false
 	end
-	return false
+
+	if type(UnitHealthPercent) ~= "function" or not C_CurveUtil or not C_CurveUtil.CreateCurve or not Enum or not Enum.LuaCurveType or not Enum.LuaCurveType.Step then return false end
+	if not CooldownManagerUtils.executeHealthCurve then
+		local curve = C_CurveUtil.CreateCurve()
+		curve:SetType(Enum.LuaCurveType.Step)
+		curve:AddPoint(0, 1)
+		curve:AddPoint(0.20000001, 0)
+		CooldownManagerUtils.executeHealthCurve = curve
+	end
+
+	local ok, alpha = pcall(UnitHealthPercent, "target", false, CooldownManagerUtils.executeHealthCurve)
+	if not ok then return false end
+	if IsSecret(alpha) then return true, alpha end
+	return alpha == 1
 end
 
 function CooldownManagerUtils.HasInsufficientPower(spellID)
@@ -4175,6 +4270,11 @@ function CooldownManagerUtils.UpdateCooldownDisplayAlpha(cooldown)
 	local threshold = cooldown.displayTime or 0
 	local target = cooldown:GetParent()
 	cooldown:SetAlpha(threshold > 0 and 1 or 0)
+	if cooldown.useVisibilityAlpha then
+		if not pcall(target.SetAlpha, target, cooldown.visibilityAlpha) then target:SetAlpha(0) end
+		return
+	end
+
 	if threshold <= 0 or not cooldown.filterIcon or not cooldown.displayDuration and not cooldown.displayEndTime then target:SetAlpha(1) return end
 	local durationObject = cooldown.displayDuration
 	if durationObject and durationObject.EvaluateRemainingDuration and C_CurveUtil and C_CurveUtil.CreateCurve then
@@ -4314,6 +4414,7 @@ end
 
 function CooldownManagerUtils.IsShamanShieldEntry(entry)
 	if CooldownManagerUtils.IsShamanShieldSpell(entry.spellID) then return true end
+	if entry.name and (entry.name == GetSpellNameSafe(324) or entry.name == GetSpellNameSafe(408510) or entry.name == GetSpellNameSafe(52127)) then return true end
 	for _, candidateSpellID in ipairs(entry.candidates) do
 		if CooldownManagerUtils.IsShamanShieldSpell(candidateSpellID) then return true end
 	end
@@ -4321,6 +4422,8 @@ function CooldownManagerUtils.IsShamanShieldEntry(entry)
 end
 
 function CooldownManagerUtils.GetShamanShieldState(selected)
+	local _, class = UnitClass("player")
+	if class ~= "SHAMAN" then return end
 	local unknown = false
 	if C_UnitAuras and type(C_UnitAuras.GetPlayerAuraBySpellID) == "function" then
 		for spellID in pairs(CooldownManagerUtils.GetShamanShieldSpellLookup()) do
@@ -4335,6 +4438,11 @@ function CooldownManagerUtils.GetShamanShieldState(selected)
 				end
 			end
 		end
+	end
+
+	local waterShield = CooldownManagerUtils:IsForever() and 408510 or 52127
+	for _, spellID in ipairs({324, waterShield}) do
+		if CooldownManagerUtils.FindReadableAuraByName("player", GetSpellNameSafe(spellID)) then return true end
 	end
 
 	for spellID in pairs(selected) do
@@ -4375,6 +4483,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local sharedMinimapTrackingState = {}
 	local expiringEntries = {}
 	local visibleEntries = {}
+	local visibilityAlphas = {}
 	local warningTime = reminderType == "expiring" and self:GetExpiryWarningTime()
 	local layouts = self:GetProfile().layout
 	if editModeActive or (GetUnitFlag(UnitIsDeadOrGhost, "player") ~= true and not self.IsPlayerFlying()) then
@@ -4386,13 +4495,20 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 			local entryBarType = entry and (entry.reactiveAbility and "ability" or entryLayout and entryLayout.category == "expiringBuff" and "expiring" or "buff")
 			if entry and entry.isLearned ~= false and entryBarType == reminderType and not seenEntries[entry] then
 				seenEntries[entry] = true
-				local present = GetAuraState(entry)
-				if present ~= nil then presenceCache[entry.spellID] = present end
-				CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState, frame.checkGroupBuffs)
-				local show
-				if entry.reactiveAbility then
+				local show, targetAura
+				if entry.targetDebuff then
+					local present
+					present, targetAura = CooldownManagerUtils.GetTargetDebuff(entry)
+					show = present == false
+				elseif entry.reactiveAbility then
+					local present, alpha = CooldownManagerUtils.GetReactiveAbilityState(entry)
+					if present ~= nil then presenceCache[entry.spellID] = present end
 					show = presenceCache[entry.spellID] == true
+					visibilityAlphas[entry] = alpha
 				else
+					local present = GetAuraState(entry)
+					if present ~= nil then presenceCache[entry.spellID] = present end
+					CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState, frame.checkGroupBuffs)
 					local cached = presenceCache[entry.spellID]
 					local unknownAura = cached == nil and not entry.weaponEnchant and not entry.minimapTracking
 					show = cached == false or unknownAura or CooldownManagerUtils.IsGroupBuffMissing(entry)
@@ -4456,7 +4572,11 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 
 				if not show and warningTime and not entry.reactiveAbility then
 					local expirationTime, duration
-					if entry.paladinSeal then
+					if entry.targetDebuff then
+						if targetAura and not IsSecret(targetAura.expirationTime) and not IsSecret(targetAura.duration) then
+							expirationTime, duration = targetAura.expirationTime, targetAura.duration
+						end
+					elseif entry.paladinSeal then
 						expirationTime, duration = sharedPaladinSealState.present and paladinSealExpiration, paladinSealDuration
 					elseif entry.hunterAspect then
 						expirationTime, duration = sharedHunterAspectState.present and hunterAspectExpiration, hunterAspectDuration
@@ -4480,7 +4600,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					end
 				end
 
-				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and CooldownManagerUtils.IsCooldownAboveDisplayTime(entry.spellID, frame.cooldownDisplayTime) then show = false end
+				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and CooldownManagerUtils.IsCooldownAboveDisplayTime(self:GetDisplaySpellID(entry), frame.cooldownDisplayTime) then show = false end
 				if entry.tankOnly and InCombatLockdown() then show = false end
 				if editModeActive or show then visibleEntries[entry] = true end
 				if frame.fixedIconPositions or visibleEntries[entry] then table.insert(entries, entry) end
@@ -4518,6 +4638,9 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 			local previewPresent = editModeActive and not expiring and not entry.reactiveAbility and presenceCache[entry.spellID] == true and not CooldownManagerUtils.IsGroupBuffMissing(entry)
 			local onCooldown, cooldownSecret, cooldownSecretIsZero
 			local displaySpellID = CooldownManagerUtils:GetDisplaySpellID(entry)
+			local visibilityAlpha = visibilityAlphas[entry]
+			icon.Cooldown.useVisibilityAlpha = not editModeActive and (IsSecret(visibilityAlpha) or visibilityAlpha ~= nil)
+			icon.Cooldown.visibilityAlpha = visibilityAlpha
 			if expiring then
 				icon.Cooldown.displayTime = 0
 				icon:SetAlpha(1)
@@ -4539,7 +4662,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 			icon.GroupCount:SetShown(entry.tankOnly or groupState ~= nil)
 			icon:Show()
 			local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
-			if entry.reactiveAbility and not editModeActive then glow = glow and not cooldownSecret and CooldownManagerUtils.CanGlowReactiveAbility(entry) end
+			if entry.reactiveAbility and not editModeActive then glow = glow and CooldownManagerUtils.IsReactiveSpellUsable(displaySpellID) end
 			if glow then glowingSpells[entry.spellID] = true end
 			CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID], cooldownSecret, cooldownSecretIsZero)
 		end
@@ -4596,6 +4719,10 @@ end
 
 CooldownManagerUtils.ACTIVE_BUFF_SUGGESTIONS = {1022, 5599, 10278, 1044, 6940, 10060, 33206, 47788, 102342, 116849, 29166, 2825, 32182, 80353, 264667, 390386, 97463, 31821, 204018, 357170, 369459, 64901}
 
+CooldownManagerUtils.FOREVER_ACTIVE_AURA_SUGGESTIONS = {1229741, 1229451, 429959}
+CooldownManagerUtils.FOREVER_MAELSTROM_AURA = 408505
+CooldownManagerUtils.FOREVER_BOOSTED_REST = 1229451
+
 function CooldownManagerUtils:GetActiveBuffList()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
 	if type(CooldownManagerUtilsDB.activeBuffs) ~= "table" then CooldownManagerUtilsDB.activeBuffs = {} end
@@ -4629,11 +4756,15 @@ function CooldownManagerUtils.CreateActiveBuffSpell(spellID)
 	if type(spellID) ~= "number" or IsSecret(spellID) then return end
 	local spellName = GetSpellNameSafe(spellID)
 	if not spellName then return end
+	local forever = CooldownManagerUtils:IsForever()
+	local maelstromAura = CooldownManagerUtils.FOREVER_MAELSTROM_AURA
+	if forever and spellName == GetSpellNameSafe(maelstromAura) then spellID = maelstromAura end
 	local spellInfo = GetReminderSpellInfo(spellID)
 	return {
 		spellID = spellID,
 		name = spellName,
-		iconID = spellInfo and spellInfo.iconID or 134400
+		iconID = spellInfo and spellInfo.iconID or 134400,
+		harmful = forever and spellID == CooldownManagerUtils.FOREVER_BOOSTED_REST
 	}
 end
 
@@ -4649,7 +4780,7 @@ function CooldownManagerUtils:GetActiveBuffEntries()
 			spell.activeBuff = true
 			spell.candidates = {}
 			local seen = {}
-			AddCandidate(spell.candidates, seen, spellID)
+			AddCandidate(spell.candidates, seen, spell.spellID)
 			for _, rankSpellID in ipairs(catalogRanks[spell.name] or {}) do
 				AddCandidate(spell.candidates, seen, rankSpellID)
 			end
@@ -4727,6 +4858,15 @@ function CooldownManagerUtils:FindActiveBuffSpells(query)
 		Add(suggestedSpellID, needle)
 	end
 
+	if self:IsForever() then
+		for _, suggestedSpellID in ipairs(self.FOREVER_ACTIVE_AURA_SUGGESTIONS) do
+			Add(suggestedSpellID, needle)
+		end
+
+		local _, class = UnitClass("player")
+		if class == "SHAMAN" then Add(self.FOREVER_MAELSTROM_AURA, needle) end
+	end
+
 	for seenSpellID in pairs(self:GetSeenAuras()) do
 		Add(seenSpellID, needle)
 	end
@@ -4741,7 +4881,7 @@ function CooldownManagerUtils:FindActiveBuffSpells(query)
 	return results
 end
 
-function CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, present, showTimer)
+function CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, present, showTimer, aura)
 	local cooldown = icon.Cooldown
 	cooldown.updating = true
 	cooldown.displayTime = 0
@@ -4763,25 +4903,31 @@ function CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, present, showTim
 	icon.Texture:SetAlpha(present and 1 or 0.5)
 	icon:SetMouseClickEnabled(false)
 	icon.spellID = entry.spellID
-	icon.GroupCount:SetText("")
-	icon.GroupCount:Hide()
+	local count = aura and aura.applications
+	local showCount = not IsSecret(count) and type(count) == "number" and count > 1
+	icon.GroupCount:SetText(showCount and count or "")
+	icon.GroupCount:SetShown(showCount)
 	CooldownManagerUtils.UpdateIconGlow(icon, false)
 	icon:Show()
 end
 
 CooldownManagerUtils.ACTIVE_CONTAINER_GROUP = "activeBuffs"
+CooldownManagerUtils.ACTIVE_DEBUFF_CONTAINER_GROUP = "activeDebuffs"
 
-function CooldownManagerUtils.GetActiveBuffSpellFilter(onlyEntry)
+function CooldownManagerUtils.GetActiveBuffSpellFilter(onlyEntry, harmful)
 	local includeSpellIDs = {}
 	local names = {}
 	for _, entry in ipairs(onlyEntry and {onlyEntry} or CooldownManagerUtils:GetActiveBuffEntries()) do
-		names[entry.name] = true
-		includeSpellIDs[entry.spellID] = true
-		for _, candidateSpellID in ipairs(entry.candidates) do
-			includeSpellIDs[candidateSpellID] = true
+		if (entry.harmful == true) == harmful then
+			names[entry.name] = true
+			includeSpellIDs[entry.spellID] = true
+			for _, candidateSpellID in ipairs(entry.candidates) do
+				includeSpellIDs[candidateSpellID] = true
+			end
 		end
 	end
 
+	if harmful then return includeSpellIDs end
 	for seenSpellID in pairs(CooldownManagerUtils:GetSeenAuras()) do
 		local seenName = GetSpellNameSafe(seenSpellID)
 		if seenName and names[seenName] then includeSpellIDs[seenSpellID] = true end
@@ -4848,17 +4994,22 @@ function CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, show
 	if not showTooltips then pcall(button.EnableMouse, button, false) end
 end
 
-function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTooltips, entry)
+function CooldownManagerUtils.CreateActiveAuraContainer(frame, showTimer, showTooltips, entry, hasDebuffGroup)
 	local ok, container = pcall(CreateFrame, "AuraContainer", nil, frame, "CustomAuraContainerTemplate")
 	if not ok or not container then return end
 	local setupOK = pcall(function()
 		container:SetUnit("player")
-		container:AddAuraGroup(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, "HELPFUL", {
-			initializeFrame = function(button) CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, showTooltips) end,
-			candidateFilters = {
-				includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(entry)
-			}
-		})
+		local function AddGroup(group, filter, harmful)
+			container:AddAuraGroup(group, filter, {
+				initializeFrame = function(button) CooldownManagerUtils.InitializeActiveAuraButton(button, showTimer, showTooltips) end,
+				candidateFilters = {
+					includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(entry, harmful)
+				}
+			})
+		end
+
+		if not entry or not entry.harmful then AddGroup(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, "HELPFUL", false) end
+		if hasDebuffGroup then AddGroup(CooldownManagerUtils.ACTIVE_DEBUFF_CONTAINER_GROUP, "HARMFUL", true) end
 
 		container:SetEnabled(true)
 	end)
@@ -4872,7 +5023,8 @@ end
 
 function CooldownManagerUtils.GetActiveAuraContainer(frame, state, entry)
 	if state.auraContainerUnsupported then return end
-	local key = tostring(frame.showTimer ~= false) .. tostring(frame.showTooltips ~= false)
+	local hasDebuffGroup = entry and entry.harmful or not entry and CooldownManagerUtils:IsActiveBuffTracked(CooldownManagerUtils.FOREVER_BOOSTED_REST)
+	local key = tostring(frame.showTimer ~= false) .. tostring(frame.showTooltips ~= false) .. tostring(hasDebuffGroup == true)
 	if state.auraContainer and state.auraContainerKey == key then return state.auraContainer end
 	if state.auraContainer then
 		pcall(state.auraContainer.SetEnabled, state.auraContainer, false)
@@ -4880,7 +5032,7 @@ function CooldownManagerUtils.GetActiveAuraContainer(frame, state, entry)
 		state.auraContainer = nil
 	end
 
-	local container = CooldownManagerUtils.CreateActiveAuraContainer(frame, frame.showTimer ~= false, frame.showTooltips ~= false, entry)
+	local container = CooldownManagerUtils.CreateActiveAuraContainer(frame, frame.showTimer ~= false, frame.showTooltips ~= false, entry, hasDebuffGroup)
 	if not container then
 		state.auraContainerUnsupported = true
 		return
@@ -4888,6 +5040,7 @@ function CooldownManagerUtils.GetActiveAuraContainer(frame, state, entry)
 
 	state.auraContainer = container
 	state.auraContainerKey = key
+	state.auraContainerHasDebuffGroup = hasDebuffGroup
 	state.auraContainerFilterDirty = nil
 	return container
 end
@@ -4909,18 +5062,22 @@ function CooldownManagerUtils.LayoutActiveAuraContainer(frame, container, geomet
 		container:SetFlowLayoutAxis(geometry.horizontal and axis.Horizontal or axis.Vertical)
 		container:SetFlowLayoutAnchorPoint(point)
 		container:SetFlowLayoutGrowthDirection(horizontalDirection, verticalDirection)
-		container:SetAuraGroupLayout(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, {
-			elementSpacing = geometry.padding / geometry.scale,
-			lineSpacing = geometry.padding / geometry.scale
-		})
-
-		if frame.auraContainerFilterDirty then
-			container:SetAuraGroupCandidateFilters(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, {
-				includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter()
+		local function UpdateGroup(group, harmful)
+			container:SetAuraGroupLayout(group, {
+				elementSpacing = geometry.padding / geometry.scale,
+				lineSpacing = geometry.padding / geometry.scale
 			})
 
-			frame.auraContainerFilterDirty = nil
+			if frame.auraContainerFilterDirty then
+				container:SetAuraGroupCandidateFilters(group, {
+					includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(nil, harmful)
+				})
+			end
 		end
+
+		UpdateGroup(CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, false)
+		if frame.auraContainerHasDebuffGroup then UpdateGroup(CooldownManagerUtils.ACTIVE_DEBUFF_CONTAINER_GROUP, true) end
+		frame.auraContainerFilterDirty = nil
 	end)
 end
 
@@ -4956,7 +5113,7 @@ function CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed)
 	local count = 0
 	local hasVisibleIcons = false
 	for _, entry in ipairs(entries) do
-		local present = GetAuraState(entry)
+		local present, aura = GetAuraState(entry)
 		if present ~= nil then presenceCache[entry.spellID] = present end
 		local show = editModeActive or presenceCache[entry.spellID] == true
 		if frame.fixedIconPositions or show then
@@ -4969,8 +5126,9 @@ function CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed)
 
 			if slot then
 				if icon.auraContainerEntry ~= entry or frame.auraContainerFilterDirty then
-					pcall(slot.SetAuraGroupCandidateFilters, slot, CooldownManagerUtils.ACTIVE_CONTAINER_GROUP, {
-						includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(entry)
+					local group = entry.harmful and CooldownManagerUtils.ACTIVE_DEBUFF_CONTAINER_GROUP or CooldownManagerUtils.ACTIVE_CONTAINER_GROUP
+					pcall(slot.SetAuraGroupCandidateFilters, slot, group, {
+						includeSpellIDs = CooldownManagerUtils.GetActiveBuffSpellFilter(entry, entry.harmful == true)
 					})
 					icon.auraContainerEntry = entry
 				end
@@ -4985,7 +5143,7 @@ function CooldownManagerUtils.UpdateActiveBuffBar(frame, visibilityAllowed)
 				hasVisibleIcons = true
 			elseif show then
 				icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
-				CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, presenceCache[entry.spellID] == true, frame.showTimer ~= false)
+				CooldownManagerUtils.UpdateActiveBuffIcon(icon, entry, presenceCache[entry.spellID] == true, frame.showTimer ~= false, aura)
 				hasVisibleIcons = true
 			else
 				icon:Hide()
@@ -5184,7 +5342,7 @@ function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 
 	for selectedSpellID in pairs(self:GetProfile().selected) do
 		local entry = GetSavedEntry(selectedSpellID)
-		if entry and CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName) and (GetReadableAuraState(entry) == nil or (GetHitChargeAura(entry) and GetHitChargeAura(entry).castCharges)) then
+		if entry and not entry.targetDebuff and CooldownManagerUtils.EntryMatchesSpell(entry, spellID, spellName) and (GetReadableAuraState(entry) == nil or (GetHitChargeAura(entry) and GetHitChargeAura(entry).castCharges)) then
 			presenceCache[entry.spellID] = true
 			changed = true
 			local groupState = groupBuffCache[entry.spellID]
@@ -5325,6 +5483,15 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 	eventFrame:RegisterEvent("SPELLS_CHANGED")
 	eventFrame:RegisterEvent("UNIT_AURA")
+	if CooldownManagerUtils:IsForever() then
+		eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+		local _, class = UnitClass("player")
+		if class == "WARRIOR" then
+			eventFrame:RegisterUnitEvent("UNIT_HEALTH", "target")
+			eventFrame:RegisterUnitEvent("UNIT_MAXHEALTH", "target")
+		end
+	end
+
 	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	eventFrame:RegisterEvent("PLAYER_DEAD")
@@ -5361,9 +5528,13 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 			CooldownManagerUtils:ScheduleReminderUpdate()
 		elseif unit == "player" then
 			CooldownManagerUtils:OnPlayerAuraUpdate(updateInfo)
+		elseif unit == "target" and CooldownManagerUtils:IsForever() then
+			CooldownManagerUtils:ScheduleReminderUpdate()
 		elseif IsGroupUnit(unit) then
 			CooldownManagerUtils:ScheduleGroupBuffUpdate()
 		end
+	elseif event == "PLAYER_TARGET_CHANGED" or event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
+		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_CONNECTION" then
 		CooldownManagerUtils:ScheduleGroupBuffUpdate()
 	elseif event == "MINIMAP_UPDATE_TRACKING" then
