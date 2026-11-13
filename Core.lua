@@ -271,6 +271,20 @@ local WEAPON_ENCHANT_FAMILIES = {
 			shield = true
 		}
 	},
+	WARLOCK = {
+		{
+			spells = {758, 17945, 17947, 17949},
+			enchants = {1803, 1823, 1824, 1825},
+			iconItems = {13701, 13700, 13699, 1254},
+			item = true
+		},
+		{
+			spells = {1237152, 1237156, 1237159},
+			enchants = {8059, 8060, 8061},
+			iconItems = {13603, 13602, 5522},
+			item = true
+		}
+	},
 	ITEM = {
 		{
 			spells = {2828, 2829, 2830, 9900, 16138, 22756, 28891, 29452, 29453},
