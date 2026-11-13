@@ -2186,6 +2186,19 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	local wellFedSpellID = GetReminderSpellInfo(19705) and 19705 or 1284617
 	knownAuraSpells[wellFedSpellID] = {candidates = {wellFedSpellID}}
 	AddAvailableSpell(wellFedSpellID, wellFedSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local campfireSpellID = 1283391 -- Campfire Nearby
+	if GetReminderSpellInfo(campfireSpellID) then
+		knownAuraSpells[campfireSpellID] = knownAuraSpells[campfireSpellID] or {candidates = {campfireSpellID}}
+		AddAvailableSpell(campfireSpellID, campfireSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	end
+	if self:IsForever() then
+		for _, foreverAuraSpellID in ipairs(self.FOREVER_ACTIVE_AURA_SUGGESTIONS) do
+			knownAuraSpells[foreverAuraSpellID] = knownAuraSpells[foreverAuraSpellID] or {candidates = {foreverAuraSpellID}}
+			AddAvailableSpell(foreverAuraSpellID, foreverAuraSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+			local foreverEntry = availableBuffsBySpellID[foreverAuraSpellID]
+			if foreverEntry and foreverAuraSpellID == self.FOREVER_BOOSTED_REST then foreverEntry.harmful = true end
+		end
+	end
 	AddKnownAuraSources(knownAuraSources, unlearnedAuraSources, learnedAuraSources, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddRetailProcAbilities(availableBuffs, availableBuffsBySpellID)
 	CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
