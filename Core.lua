@@ -1399,6 +1399,7 @@ end
 local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
 	if not C_Spell then return false end
 	if MINIMAP_TRACKING_SPELLS[spellID] or MINIMAP_TRACKING_SPELLS[baseSpellID] then return true end
+	if spellID == 1283391 or baseSpellID == 1283391 then return true end -- Campfire Nearby (passive aura)
 	if GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
 	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
 	if IsLearnedBuffSpell(spellID) or IsLearnedBuffSpell(baseSpellID) then return true end
