@@ -6,7 +6,8 @@ local DEFAULT_WIDTH = 420
 local DEFAULT_HEIGHT = 320
 local MIN_WIDTH = 400
 local OPTION_DEFAULTS = {
-	EXPIRYWARNINGTIME = 5
+	EXPIRYWARNINGTIME = 5,
+	AMMOWARNINGCOUNT = 200
 }
 
 CooldownManagerUtils.LANGUAGES = {{"English", "enUS"}, {"Deutsch", "deDE"}, {"Español (España)", "esES"}, {"Español (México)", "esMX"}, {"Français", "frFR"}, {"Italiano", "itIT"}, {"한국어", "koKR"}, {"Português (Brasil)", "ptBR"}, {"Русский", "ruRU"}, {"简体中文", "zhCN"}, {"繁體中文", "zhTW"}}
@@ -60,6 +61,10 @@ function CooldownManagerUtils:GetExpiryWarningTime()
 	local seconds = tonumber(self:GetOption("EXPIRYWARNINGTIME"))
 	if not seconds or seconds <= 0 then return nil end
 	return seconds
+end
+
+function CooldownManagerUtils:GetAmmoWarningCount()
+	return tonumber(self:GetOption("AMMOWARNINGCOUNT")) or 0
 end
 
 function CooldownManagerUtils:ToggleOptions()

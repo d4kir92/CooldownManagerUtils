@@ -2168,6 +2168,56 @@ function CooldownManagerUtils.AddForeverWarriorDebuffMappings(knownAuraSpells, k
 	end
 end
 
+CooldownManagerUtils.AMMO_SPELL_ID = 75
+CooldownManagerUtils.AMMO_FALLBACK_ICON = 132382
+function CooldownManagerUtils.GetAmmoSlot()
+	if type(GetInventorySlotInfo) ~= "function" then return end
+	local ok, slot = pcall(GetInventorySlotInfo, "AmmoSlot")
+	if ok and type(slot) == "number" then return slot end
+end
+
+function CooldownManagerUtils.UsesAmmo()
+	local _, class = UnitClass("player")
+	return class == "HUNTER" and CooldownManagerUtils.GetAmmoSlot() ~= nil
+end
+
+function CooldownManagerUtils.GetAmmoCount()
+	local slot = CooldownManagerUtils.GetAmmoSlot()
+	if not slot then return end
+	local itemID = GetInventoryItemID("player", slot)
+	if not itemID then return 0 end
+	local getItemCount = C_Item and C_Item.GetItemCount or _G.GetItemCount
+	local count = type(getItemCount) == "function" and getItemCount(itemID) or GetInventoryItemCount("player", slot)
+	return tonumber(count) or 0, GetInventoryItemTexture("player", slot)
+end
+
+function CooldownManagerUtils.GetAmmoState(entry)
+	local count, iconID = CooldownManagerUtils.GetAmmoCount()
+	if not count then return end
+	entry.ammoCount = count
+	entry.iconID = iconID or CooldownManagerUtils.AMMO_FALLBACK_ICON
+	return count > CooldownManagerUtils:GetAmmoWarningCount()
+end
+
+function CooldownManagerUtils.AddAmmoEntry(availableBuffs, availableBuffsBySpellID)
+	if not CooldownManagerUtils.UsesAmmo() then return end
+	local spellID = CooldownManagerUtils.AMMO_SPELL_ID
+	if availableBuffsBySpellID[spellID] then return end
+	local _, iconID = CooldownManagerUtils.GetAmmoCount()
+	local entry = {
+		spellID = spellID,
+		name = CooldownManagerUtils:Trans("LID_AMMO"),
+		iconID = iconID or CooldownManagerUtils.AMMO_FALLBACK_ICON,
+		defaultCategory = "hidden",
+		ammo = true,
+		isLearned = true,
+		candidates = {spellID}
+	}
+
+	availableBuffsBySpellID[spellID] = entry
+	table.insert(availableBuffs, entry)
+end
+
 function CooldownManagerUtils:RefreshAvailableBuffs()
 	if InCombatLockdown() then
 		self.pendingSourceRefresh = true
@@ -2206,6 +2256,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 		knownAuraSpells[campfireSpellID] = knownAuraSpells[campfireSpellID] or {candidates = {campfireSpellID}}
 		AddAvailableSpell(campfireSpellID, campfireSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 	end
+	CooldownManagerUtils.AddAmmoEntry(availableBuffs, availableBuffsBySpellID)
 	if self:IsForever() then
 		for _, foreverAuraSpellID in ipairs(self.FOREVER_ACTIVE_AURA_SUGGESTIONS) do
 			knownAuraSpells[foreverAuraSpellID] = knownAuraSpells[foreverAuraSpellID] or {candidates = {foreverAuraSpellID}}
@@ -2899,12 +2950,17 @@ local function CreateSliderSetting(parent, layoutIndex, labelText, key, minimum,
 		end
 		if panel.RevertChanges then panel.RevertChanges:SetEnabled(true) end
 		ApplyReminderSettings(panel.owner)
+		if optionKey then CooldownManagerUtils:ScheduleReminderUpdate() end
 	end, row)
 
 	row.Refresh = function(self)
 		self.refreshing = true
 		local owner = parent:GetParent().owner
-		self:SetShown((not optionKey or owner.reminderType == "expiring") and not (owner.reminderType == "active" and key == "cooldownDisplayTime"))
+		if optionKey == "AMMOWARNINGCOUNT" then
+			self:SetShown((owner.reminderType == "buff" or owner.reminderType == "expiring") and CooldownManagerUtils.UsesAmmo())
+		else
+			self:SetShown((not optionKey or owner.reminderType == "expiring") and not (owner.reminderType == "active" and key == "cooldownDisplayTime"))
+		end
 		self.Slider:SetValue(optionKey and CooldownManagerUtils:GetOption(optionKey) or GetReminderSettings(owner.reminderType)[key])
 		self.refreshing = nil
 	end
@@ -3025,6 +3081,7 @@ local function CreateReminderOptionsFrame(owner)
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 11, CooldownManagerUtils:Trans("LID_BUFFREMINDERS_CHECK_GROUP_BUFFS"), "checkGroupBuffs"))
 	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 12, CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME"), "expiryWarningTime", 1, 60, 1, "", "EXPIRYWARNINGTIME", CooldownManagerUtils:Trans("LID_EXPIRYWARNINGTIME_TOOLTIP")))
 	table.insert(panel.controls, CreateCheckboxSetting(panel.Settings, 13, CooldownManagerUtils:Trans("LID_FIXED_ICON_POSITIONS"), "fixedIconPositions"))
+	table.insert(panel.controls, CreateSliderSetting(panel.Settings, 14, CooldownManagerUtils:Trans("LID_AMMOWARNINGCOUNT"), "ammoWarningCount", 0, 1000, 10, "", "AMMOWARNINGCOUNT", CooldownManagerUtils:Trans("LID_AMMOWARNINGCOUNT_TOOLTIP")))
 	panel.Buttons = CreateFrame("Frame", nil, panel, "VerticalLayoutFrame")
 	panel.Buttons:SetPoint("TOP", panel.Settings, "BOTTOM", 0, -12)
 	panel.Buttons.spacing = 2
@@ -3040,6 +3097,7 @@ local function CreateReminderOptionsFrame(owner)
 		end
 
 		if panel.owner.reminderType == "expiring" then CooldownManagerUtils:GetOptions().EXPIRYWARNINGTIME = panel.originalExpiryWarningTime end
+		CooldownManagerUtils:GetOptions().AMMOWARNINGCOUNT = panel.originalAmmoWarningCount
 		self:SetEnabled(false)
 		ApplyReminderSettings(panel.owner)
 	end)
@@ -3096,6 +3154,7 @@ local function CreateReminderOptionsFrame(owner)
 		end
 
 		self.originalExpiryWarningTime = CooldownManagerUtils:GetOption("EXPIRYWARNINGTIME")
+		self.originalAmmoWarningCount = CooldownManagerUtils:GetOptions().AMMOWARNINGCOUNT
 		self.RevertChanges:SetEnabled(false)
 		self:Refresh()
 		self:Layout()
@@ -3722,6 +3781,7 @@ end
 
 local function GetReadableAuraState(entry)
 	if entry.reactiveAbility then return CooldownManagerUtils.GetReactiveAbilityState(entry) end
+	if entry.ammo then return CooldownManagerUtils.GetAmmoState(entry) end
 	if entry.minimapTracking then return GetMinimapTrackingState() end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if not C_UnitAuras then return end
@@ -3817,7 +3877,7 @@ end
 
 local function GetAuraState(entry)
 	local present, aura = GetReadableAuraState(entry)
-	if present ~= nil or entry.weaponEnchant or entry.reactiveAbility or entry.minimapTracking then return present, aura end
+	if present ~= nil or entry.weaponEnchant or entry.reactiveAbility or entry.minimapTracking or entry.ammo then return present, aura end
 	local viewerState = CooldownManagerUtils.GetCooldownViewerAuraState(entry)
 	if viewerState ~= nil then
 		if not viewerState then
@@ -4538,7 +4598,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					if present ~= nil then presenceCache[entry.spellID] = present end
 					CooldownManagerUtils.UpdateGroupBuffState(entry, sharedPaladinState, frame.checkGroupBuffs)
 					local cached = presenceCache[entry.spellID]
-					local unknownAura = cached == nil and not entry.weaponEnchant and not entry.minimapTracking
+					local unknownAura = cached == nil and not entry.weaponEnchant and not entry.minimapTracking and not entry.ammo
 					show = cached == false or unknownAura or CooldownManagerUtils.IsGroupBuffMissing(entry)
 				end
 
@@ -4608,7 +4668,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 						expirationTime, duration = sharedPaladinSealState.present and paladinSealExpiration, paladinSealDuration
 					elseif entry.hunterAspect then
 						expirationTime, duration = sharedHunterAspectState.present and hunterAspectExpiration, hunterAspectDuration
-					elseif not entry.tankOnly and not entry.minimapTracking and not entry.weaponEnchant and presenceCache[entry.spellID] == true then
+					elseif not entry.tankOnly and not entry.minimapTracking and not entry.weaponEnchant and not entry.ammo and presenceCache[entry.spellID] == true then
 						expirationTime, duration = auraExpirationCache[entry.spellID], GetLearnedAuras().durations[entry.spellID]
 					end
 
@@ -4628,7 +4688,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					end
 				end
 
-				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and CooldownManagerUtils.IsCooldownAboveDisplayTime(self:GetDisplaySpellID(entry), frame.cooldownDisplayTime) then show = false end
+				if not editModeActive and show and frame.showTimer and not expiringEntries[entry] and not entry.ammo and CooldownManagerUtils.IsCooldownAboveDisplayTime(self:GetDisplaySpellID(entry), frame.cooldownDisplayTime) then show = false end
 				if entry.tankOnly and InCombatLockdown() then show = false end
 				if editModeActive or show then visibleEntries[entry] = true end
 				if frame.fixedIconPositions or visibleEntries[entry] then table.insert(entries, entry) end
@@ -4675,19 +4735,24 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 				icon.Cooldown:SetAlpha(1)
 				icon.Cooldown:SetHideCountdownNumbers(false)
 				icon.Cooldown:SetCooldown(expiring.expirationTime - expiring.duration, expiring.duration)
+			elseif entry.ammo then
+				icon.Cooldown.displayTime = 0
+				icon:SetAlpha(1)
+				icon.Cooldown:Clear()
 			else
 				onCooldown, cooldownSecret, cooldownSecretIsZero = CooldownManagerUtils.UpdateIconCooldown(icon, displaySpellID, frame.showTimer ~= false, frame.cooldownDisplayTime)
 			end
 
 			icon.Texture:SetTexture(entry.iconID)
-			CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or CooldownManagerUtils.HasInsufficientPower(displaySpellID), cooldownSecret, cooldownSecretIsZero)
+			CooldownManagerUtils.SetIconDesaturation(icon.Texture, previewPresent or onCooldown or not entry.ammo and CooldownManagerUtils.HasInsufficientPower(displaySpellID), cooldownSecret, cooldownSecretIsZero)
 			icon.Texture:SetAlpha(previewPresent and 0.5 or 1)
 			icon:SetMouseClickEnabled(false)
 			icon:SetMouseMotionEnabled(frame.showTooltips ~= false)
 			icon.spellID = displaySpellID
 			local groupState = groupBuffCache[entry.spellID]
-			icon.GroupCount:SetText(entry.tankOnly and "Tank" or groupState and (groupState.have .. "/" .. groupState.total) or "")
-			icon.GroupCount:SetShown(entry.tankOnly or groupState ~= nil)
+			local ammoCount = entry.ammo and entry.ammoCount
+			icon.GroupCount:SetText(entry.tankOnly and "Tank" or ammoCount or groupState and (groupState.have .. "/" .. groupState.total) or "")
+			icon.GroupCount:SetShown(entry.tankOnly or ammoCount ~= nil or groupState ~= nil)
 			icon:Show()
 			local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
 			if entry.reactiveAbility and not editModeActive then glow = glow and CooldownManagerUtils.IsReactiveSpellUsable(displaySpellID) end
@@ -5537,6 +5602,7 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_CONNECTION")
 	pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED")
+	if CooldownManagerUtils.UsesAmmo() then pcall(eventFrame.RegisterEvent, eventFrame, "BAG_UPDATE_DELAYED") end
 	pcall(eventFrame.RegisterEvent, eventFrame, "ACTIONBAR_UPDATE_USABLE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_UPDATE_USABLE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_SHOW")
@@ -5591,6 +5657,8 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
 	elseif event == "WEAPON_ENCHANT_CHANGED" then
 		CooldownManagerUtils:OnWeaponEnchantUpdate()
+	elseif event == "BAG_UPDATE_DELAYED" then
+		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "UNIT_INVENTORY_CHANGED" then
 		local unit = ...
 		if unit == "player" then CooldownManagerUtils:OnWeaponEnchantUpdate() end
