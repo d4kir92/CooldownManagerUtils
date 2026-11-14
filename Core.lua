@@ -285,6 +285,38 @@ local WEAPON_ENCHANT_FAMILIES = {
 			item = true
 		}
 	},
+	ROGUE = {
+		{
+			spells = {8679, 8686, 8688, 11338, 11339, 11340},
+			enchants = {323, 324, 325, 623, 624, 625},
+			iconItems = {8928, 8927, 8926, 6950, 6949, 6947},
+			item = true
+		},
+		{
+			spells = {2823, 2824, 11355, 11356, 25351},
+			enchants = {7, 8, 626, 627, 2630},
+			iconItems = {20844, 8985, 8984, 2893, 2892},
+			item = true
+		},
+		{
+			spells = {3408, 11202},
+			enchants = {22, 603},
+			iconItems = {3776, 3775},
+			item = true
+		},
+		{
+			spells = {5761, 8693, 11399},
+			enchants = {35, 23, 643},
+			iconItems = {9186, 6951, 5237},
+			item = true
+		},
+		{
+			spells = {13219, 13225, 13226, 13227},
+			enchants = {703, 704, 705, 706},
+			iconItems = {10922, 10921, 10920, 10918},
+			item = true
+		}
+	},
 	ITEM = {
 		{
 			spells = {2828, 2829, 2830, 9900, 16138, 22756, 28891, 29452, 29453},
