@@ -4579,6 +4579,73 @@ function CooldownManagerUtils.GetShamanShieldState(selected)
 	return false
 end
 
+CooldownManagerUtils.MAGE_ARMOR_SPELLS = {168, 7300, 7301, 7302, 7320, 10219, 10220, 27124, 43008, 6117, 22782, 22783, 27125, 43023, 43024, 30482, 43045, 43046}
+CooldownManagerUtils.MAGE_ARMOR_BASE_SPELLS = {168, 7302, 6117, 30482}
+function CooldownManagerUtils.IsMageArmorSpell(spellID)
+	if type(spellID) ~= "number" then return false end
+	if not CooldownManagerUtils.mageArmorSpellLookup then
+		local lookup = {}
+		for _, armorSpellID in ipairs(CooldownManagerUtils.MAGE_ARMOR_SPELLS) do
+			lookup[armorSpellID] = true
+		end
+
+		CooldownManagerUtils.mageArmorSpellLookup = lookup
+	end
+	return CooldownManagerUtils.mageArmorSpellLookup[spellID] == true
+end
+
+function CooldownManagerUtils.IsMageArmorEntry(entry)
+	if CooldownManagerUtils.IsMageArmorSpell(entry.spellID) then return true end
+	if entry.name then
+		for _, spellID in ipairs(CooldownManagerUtils.MAGE_ARMOR_BASE_SPELLS) do
+			if entry.name == GetSpellNameSafe(spellID) then return true end
+		end
+	end
+
+	for _, candidateSpellID in ipairs(entry.candidates) do
+		if CooldownManagerUtils.IsMageArmorSpell(candidateSpellID) then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils.GetMageArmorState(selected)
+	local _, class = UnitClass("player")
+	if class ~= "MAGE" then return end
+	local unknown = false
+	if C_UnitAuras and type(C_UnitAuras.GetPlayerAuraBySpellID) == "function" then
+		for _, spellID in ipairs(CooldownManagerUtils.MAGE_ARMOR_SPELLS) do
+			if IsAuraSecretNow(spellID) then
+				unknown = true
+			else
+				local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+				if not ok or IsSecret(aura) then
+					unknown = true
+				elseif aura then
+					return true
+				end
+			end
+		end
+	end
+
+	for _, spellID in ipairs(CooldownManagerUtils.MAGE_ARMOR_BASE_SPELLS) do
+		local name = GetSpellNameSafe(spellID)
+		if name and CooldownManagerUtils.FindReadableAuraByName("player", name) then return true end
+	end
+
+	for spellID in pairs(selected) do
+		local entry = GetSavedEntry(spellID)
+		if entry and CooldownManagerUtils.IsMageArmorEntry(entry) then
+			local present = GetAuraState(entry)
+			if present ~= nil then presenceCache[entry.spellID] = present end
+			if presenceCache[entry.spellID] == true then return true end
+			if presenceCache[entry.spellID] == nil then unknown = true end
+		end
+	end
+
+	if unknown then return nil end
+	return false
+end
+
 function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 	local frame = self:CreateReminderBar(reminderType)
 	local visibleSetting = frame.visibleSetting
@@ -4679,6 +4746,15 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 					end
 
 					if sharedShamanShieldState.present ~= nil then show = not sharedShamanShieldState.present end
+				end
+
+				if CooldownManagerUtils.IsMageArmorEntry(entry) then
+					if not sharedShamanShieldState.mageArmorResolved then
+						sharedShamanShieldState.mageArmorPresent = CooldownManagerUtils.GetMageArmorState(selected)
+						sharedShamanShieldState.mageArmorResolved = true
+					end
+
+					if sharedShamanShieldState.mageArmorPresent ~= nil then show = not sharedShamanShieldState.mageArmorPresent end
 				end
 
 				if entry.minimapTracking then
@@ -5399,6 +5475,7 @@ function CooldownManagerUtils.GetExclusiveSpellFamily(spellID)
 	if IsPaladinSealSpell(spellID) then return "paladinSeal" end
 	if CooldownManagerUtils.IsPaladinAuraSpell(spellID) then return "paladinAura" end
 	if CooldownManagerUtils.IsShamanShieldSpell(spellID) then return "shamanShield" end
+	if CooldownManagerUtils.IsMageArmorSpell(spellID) then return "mageArmor" end
 end
 
 function CooldownManagerUtils.GetEntryExclusiveFamily(entry)
