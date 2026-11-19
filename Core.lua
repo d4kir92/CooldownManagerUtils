@@ -358,7 +358,8 @@ local HIT_CHARGE_AURAS = {
 CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 	WARRIOR = {
 		{
-			spells = {7384, 7887, 11584, 11585}
+			spells = {7384, 7887, 11584, 11585},
+			dodgeWindow = 5
 		},
 		{
 			spells = {6572, 6574, 7379, 11600, 11601, 25288, 25269, 30357, 57823}
@@ -397,6 +398,7 @@ CooldownManagerUtils.foreverReactiveAbilityFamilies = {
 }
 
 CooldownManagerUtils.cooldownResetState = {}
+CooldownManagerUtils.targetDodgeState = {}
 CooldownManagerUtils.foreverWarriorDebuffs = {6343, 1160}
 
 local MINIMAP_TRACKING_SPELLS = {
@@ -3792,7 +3794,27 @@ function CooldownManagerUtils.GetReactiveAbilityState(entry)
 		end
 	end
 
+	if CooldownManagerUtils.IsTargetDodgeActive(family) then return true end
 	if resolved then return false end
+end
+
+function CooldownManagerUtils.IsTargetDodgeActive(family)
+	if not family or not family.dodgeWindow then return false end
+	local dodgeTime = CooldownManagerUtils.targetDodgeState.time
+	return dodgeTime ~= nil and GetTime() - dodgeTime < family.dodgeWindow
+end
+
+function CooldownManagerUtils:OnTargetDodge()
+	local _, class = UnitClass("player")
+	local window
+	for _, family in ipairs(self.foreverReactiveAbilityFamilies[class] or {}) do
+		if family.dodgeWindow and (not window or family.dodgeWindow > window) then window = family.dodgeWindow end
+	end
+
+	if not window then return end
+	self.targetDodgeState.time = GetTime()
+	C_Timer.After(window + 0.05, function() CooldownManagerUtils:ScheduleReminderUpdate() end)
+	self:ScheduleReminderUpdate()
 end
 
 function CooldownManagerUtils.FindReadableAuraByName(unit, name, filter)
@@ -4863,7 +4885,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 			icon.GroupCount:SetShown(entry.tankOnly or ammoCount ~= nil or groupState ~= nil)
 			icon:Show()
 			local glow = (editModeActive or visibilityAllowed) and frame.showGlow and not previewPresent and not onCooldown and not expiring
-			if entry.reactiveAbility and not editModeActive then glow = glow and CooldownManagerUtils.IsReactiveSpellUsable(displaySpellID) end
+			if entry.reactiveAbility and not editModeActive then glow = glow and (CooldownManagerUtils.IsReactiveSpellUsable(displaySpellID) or CooldownManagerUtils.IsTargetDodgeActive(CooldownManagerUtils.GetForeverReactiveAbilityFamily(entry.spellID))) end
 			if glow then glowingSpells[entry.spellID] = true end
 			CooldownManagerUtils.UpdateIconGlow(icon, glow, not previousGlowingSpells[entry.spellID], cooldownSecret, cooldownSecretIsZero)
 		end
@@ -5512,6 +5534,12 @@ end
 
 function CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	if IsSecret(spellID) or type(spellID) ~= "number" then return end
+	local reactiveFamily = self.GetForeverReactiveAbilityFamily(spellID)
+	if reactiveFamily and reactiveFamily.dodgeWindow and self.targetDodgeState.time then
+		self.targetDodgeState.time = nil
+		self:ScheduleReminderUpdate()
+	end
+
 	local spellName = GetSpellNameSafe(spellID)
 	if GetWeaponEnchantCatalogFamily(spellID, spellName) then
 		table.insert(recentPlayerCasts, {
@@ -5583,14 +5611,22 @@ function CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
 	if changed then self:ScheduleReminderUpdate() end
 end
 
-function CooldownManagerUtils:OnCriticalHealCombatLog()
+function CooldownManagerUtils:OnPlayerCombatLog()
 	if not self:IsForever() or type(CombatLogGetCurrentEventInfo) ~= "function" then return end
 	if C_CombatLog and C_CombatLog.IsCombatLogRestricted and C_CombatLog.IsCombatLogRestricted() then return end
-	local ok, _, subevent, _, sourceGUID, _, _, _, _, _, _, _, _, _, _, _, _, _, critical = pcall(CombatLogGetCurrentEventInfo)
-	if not ok or IsSecret(subevent) or (subevent ~= "SPELL_HEAL" and subevent ~= "SPELL_PERIODIC_HEAL") then return end
-	if IsSecret(sourceGUID) or IsSecret(critical) or critical ~= true then return end
+	local ok, _, subevent, _, sourceGUID, _, _, _, _, _, _, _, swingMissType, _, _, spellMissType, _, _, critical = pcall(CombatLogGetCurrentEventInfo)
+	if not ok or IsSecret(subevent) or IsSecret(sourceGUID) then return end
+	local isHeal = subevent == "SPELL_HEAL" or subevent == "SPELL_PERIODIC_HEAL"
+	local missType = subevent == "SWING_MISSED" and swingMissType or (subevent == "SPELL_MISSED" or subevent == "RANGE_MISSED") and spellMissType
+	if not isHeal and not missType then return end
 	local playerGUID = UnitGUID("player")
 	if IsSecret(playerGUID) or not playerGUID or sourceGUID ~= playerGUID then return end
+	if missType then
+		if not IsSecret(missType) and missType == "DODGE" then self:OnTargetDodge() end
+		return
+	end
+
+	if IsSecret(critical) or critical ~= true then return end
 	self:OnPlayerCombatEvent("HEAL_CRIT")
 end
 
@@ -5760,7 +5796,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		local _, _, spellID = ...
 		CooldownManagerUtils:OnPlayerSpellCast(spellID)
 	elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-		CooldownManagerUtils:OnCriticalHealCombatLog()
+		CooldownManagerUtils:OnPlayerCombatLog()
 	elseif event == "UNIT_COMBAT" then
 		local _, action, _, _, schoolMask = ...
 		CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
