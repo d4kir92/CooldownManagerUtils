@@ -1448,6 +1448,8 @@ local function IsPlayerBuffSpell(spellID, baseSpellID, knownAuraSpells)
 	if not C_Spell then return false end
 	if MINIMAP_TRACKING_SPELLS[spellID] or MINIMAP_TRACKING_SPELLS[baseSpellID] then return true end
 	if spellID == 1283391 or baseSpellID == 1283391 then return true end -- Campfire Nearby (passive aura)
+	local customMapping = knownAuraSpells[spellID] or knownAuraSpells[baseSpellID]
+	if customMapping and customMapping.custom then return true end
 	if GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then return false end
 	if knownAuraSpells[spellID] or knownAuraSpells[baseSpellID] then return true end
 	if IsLearnedBuffSpell(spellID) or IsLearnedBuffSpell(baseSpellID) then return true end
@@ -1895,7 +1897,7 @@ function CooldownManagerUtils:FindClassSpells(query)
 	if spellID then
 		local spell = catalog.byID[spellID]
 		local spellName = GetSpellNameSafe(spellID)
-		if not spell and spellName and catalog.ranks[spellName] and not GetSpellPredicate(C_Spell.IsSpellPassive, spellID) then
+		if not spell and spellName and (not catalog.ranks[spellName] or not GetSpellPredicate(C_Spell.IsSpellPassive, spellID)) then
 			local spellInfo = GetReminderSpellInfo(spellID)
 			spell = {
 				spellID = spellID,
@@ -1917,6 +1919,19 @@ function CooldownManagerUtils:FindClassSpells(query)
 		end
 	end
 
+	for seenSpellID in pairs(self:GetSeenAuras()) do
+		local spellName = GetSpellNameSafe(seenSpellID)
+		if spellName and not seenNames[spellName] and spellName:lower():find(needle, 1, true) then
+			seenNames[spellName] = true
+			local spellInfo = GetReminderSpellInfo(seenSpellID)
+			table.insert(results, {
+				spellID = seenSpellID,
+				name = spellName,
+				iconID = spellInfo and spellInfo.iconID
+			})
+		end
+	end
+
 	table.sort(results, function(left, right) return left.name < right.name end)
 	return results
 end
@@ -1932,7 +1947,8 @@ function CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuff
 	local catalog = CooldownManagerUtils:GetClassSpellCatalog()
 	for spellID in pairs(CooldownManagerUtils:GetCustomBuffs()) do
 		local spellName = GetSpellNameSafe(spellID)
-		if spellName and not availableBuffsBySpellID[spellID] and not availableBuffsByName[spellName] and not GetSpellPredicate(C_Spell and C_Spell.IsSpellPassive, spellID) then
+		local classSpell = spellName and catalog.ranks[spellName] ~= nil
+		if spellName and not availableBuffsBySpellID[spellID] and not availableBuffsByName[spellName] and (not classSpell or not GetSpellPredicate(C_Spell and C_Spell.IsSpellPassive, spellID)) then
 			local mapping = {
 				candidates = {},
 				seen = {},
@@ -1944,7 +1960,7 @@ function CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuff
 				AddCandidate(mapping.candidates, mapping.seen, rankSpellID)
 			end
 
-			local isLearned = false
+			local isLearned = not classSpell
 			for _, candidateSpellID in ipairs(mapping.candidates) do
 				if CooldownManagerUtils.GetTalentSpellLearnedState(candidateSpellID) then
 					isLearned = true
@@ -1956,6 +1972,25 @@ function CooldownManagerUtils.AddCustomBuffSpells(knownAuraSpells, availableBuff
 			AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, isLearned)
 		end
 	end
+end
+
+CooldownManagerUtils.SOULSTONE_AURA = 20707
+CooldownManagerUtils.CREATE_SOULSTONE_SPELLS = {693, 20752, 20755, 20756, 20757, 27238, 47884}
+
+function CooldownManagerUtils.AddSoulstoneEntry(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
+	local _, class = UnitClass("player")
+	local spellID = CooldownManagerUtils.SOULSTONE_AURA
+	if class ~= "WARLOCK" or not GetSpellNameSafe(spellID) then return end
+	knownAuraSpells[spellID] = knownAuraSpells[spellID] or {candidates = {spellID}}
+	local learned = CooldownManagerUtils.IsSpellRankKnown(spellID)
+	for _, createSpellID in ipairs(CooldownManagerUtils.CREATE_SOULSTONE_SPELLS) do
+		if learned then break end
+		learned = CooldownManagerUtils.IsSpellRankKnown(createSpellID)
+	end
+
+	AddAvailableSpell(spellID, spellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID, learned)
+	local entry = availableBuffsBySpellID[spellID]
+	if entry then entry.soulstone = true end
 end
 
 function CooldownManagerUtils:AddCustomBuff(spellID)
@@ -2292,6 +2327,7 @@ function CooldownManagerUtils:RefreshAvailableBuffs()
 	end
 	CooldownManagerUtils.AddAmmoEntry(availableBuffs, availableBuffsBySpellID)
 	if self:IsForever() then
+		CooldownManagerUtils.AddSoulstoneEntry(knownAuraSpells, availableBuffs, availableBuffsBySpellID)
 		for _, foreverAuraSpellID in ipairs(self.FOREVER_ACTIVE_AURA_SUGGESTIONS) do
 			knownAuraSpells[foreverAuraSpellID] = knownAuraSpells[foreverAuraSpellID] or {candidates = {foreverAuraSpellID}}
 			AddAvailableSpell(foreverAuraSpellID, foreverAuraSpellID, knownAuraSpells, availableBuffs, availableBuffsBySpellID)
@@ -3668,7 +3704,8 @@ end
 local function TrackAuraExpiration(entry, aura)
 	TrackAuraCharges(entry, aura)
 	local instanceID = aura.auraInstanceID
-	if not entry.harmful and not IsSecret(instanceID) and type(instanceID) == "number" then CooldownManagerUtils.auraInstanceSpells[instanceID] = entry.spellID end
+	local harmfulAura = entry.harmful or not IsSecret(aura.isHarmful) and aura.isHarmful == true
+	if not harmfulAura and not IsSecret(instanceID) and type(instanceID) == "number" then CooldownManagerUtils.auraInstanceSpells[instanceID] = entry.spellID end
 	local expirationTime, duration = aura.expirationTime, aura.duration
 	if IsSecret(expirationTime) or IsSecret(duration) then return end
 	if type(duration) == "number" and duration > 0 then GetLearnedAuras().durations[entry.spellID] = duration end
@@ -3838,6 +3875,8 @@ local function GetReadableAuraState(entry)
 	if entry.ammo then return CooldownManagerUtils.GetAmmoState(entry) end
 	if entry.minimapTracking then return GetMinimapTrackingState() end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
+	if entry.soulstone then return CooldownManagerUtils.GetSoulstoneState(entry) end
+	if not entry.activeBuff and entry.spellID == CooldownManagerUtils.FOREVER_BOOSTED_REST and CooldownManagerUtils.IsBoostedRestUnavailable() then return true end
 	if not C_UnitAuras then return end
 	if entry.harmful then
 		if type(C_UnitAuras.GetUnitAuraBySpellID) ~= "function" then return end
@@ -3870,6 +3909,7 @@ local function GetReadableAuraState(entry)
 	end
 
 	local aura = CooldownManagerUtils.FindReadableAuraByName("player", entry.name)
+	if not aura and (entry.activeBuff or entry.custom) then aura = CooldownManagerUtils.FindReadableAuraByName("player", entry.name, "HARMFUL") end
 	if aura then
 		TrackAuraExpiration(entry, aura)
 		return true, aura
@@ -4187,6 +4227,21 @@ function CooldownManagerUtils.GetUnitBuffState(unit, entry)
 
 	if CooldownManagerUtils.FindReadableAuraByName(unit, entry.name) then return "present" end
 	return unknown and "unknown" or "missing"
+end
+
+function CooldownManagerUtils.GetSoulstoneState(entry)
+	for _, unit in ipairs(GetGroupUnits() or {"player"}) do
+		if GetUnitFlag(UnitExists, unit) and CooldownManagerUtils.FindReadableAuraByName(unit, entry.name, "HELPFUL|PLAYER") then return true end
+	end
+	return false
+end
+
+function CooldownManagerUtils.IsBoostedRestUnavailable()
+	if type(GetXPExhaustion) ~= "function" or type(UnitXPMax) ~= "function" then return false end
+	local okRested, rested = pcall(GetXPExhaustion)
+	local okMax, maxXP = pcall(UnitXPMax, "player")
+	if not okRested or not okMax or IsSecret(rested) or IsSecret(maxXP) or type(rested) ~= "number" or type(maxXP) ~= "number" or maxXP <= 0 then return false end
+	return rested / maxXP > CooldownManagerUtils.BOOSTED_REST_MAX_RESTED
 end
 
 function CooldownManagerUtils.GetTankShieldNames()
@@ -4945,6 +5000,7 @@ CooldownManagerUtils.ACTIVE_BUFF_SUGGESTIONS = {1022, 5599, 10278, 1044, 6940, 1
 CooldownManagerUtils.FOREVER_ACTIVE_AURA_SUGGESTIONS = {1229741, 1229451, 429959}
 CooldownManagerUtils.FOREVER_MAELSTROM_AURA = 408505
 CooldownManagerUtils.FOREVER_BOOSTED_REST = 1229451
+CooldownManagerUtils.BOOSTED_REST_MAX_RESTED = 0.05
 
 function CooldownManagerUtils:GetActiveBuffList()
 	CooldownManagerUtilsDB = CooldownManagerUtilsDB or {}
@@ -5611,11 +5667,18 @@ function CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
 	if changed then self:ScheduleReminderUpdate() end
 end
 
+function CooldownManagerUtils:OnTargetCombatEvent(action)
+	if not self:IsForever() or IsSecret(action) or action ~= "DODGE" then return end
+	if self.combatLogActive and IsInGroup() then return end
+	self:OnTargetDodge()
+end
+
 function CooldownManagerUtils:OnPlayerCombatLog()
 	if not self:IsForever() or type(CombatLogGetCurrentEventInfo) ~= "function" then return end
 	if C_CombatLog and C_CombatLog.IsCombatLogRestricted and C_CombatLog.IsCombatLogRestricted() then return end
 	local ok, _, subevent, _, sourceGUID, _, _, _, _, _, _, _, swingMissType, _, _, spellMissType, _, _, critical = pcall(CombatLogGetCurrentEventInfo)
 	if not ok or IsSecret(subevent) or IsSecret(sourceGUID) then return end
+	self.combatLogActive = true
 	local isHeal = subevent == "SPELL_HEAL" or subevent == "SPELL_PERIODIC_HEAL"
 	local missType = subevent == "SWING_MISSED" and swingMissType or (subevent == "SPELL_MISSED" or subevent == "RANGE_MISSED") and spellMissType
 	if not isHeal and not missType then return end
@@ -5741,7 +5804,11 @@ if IsSupportedClient() then
 	eventFrame:RegisterEvent("MINIMAP_UPDATE_TRACKING")
 	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
-	pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_COMBAT", "player")
+	if CooldownManagerUtils:IsForever() then
+		pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_COMBAT", "player", "target")
+	else
+		pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_COMBAT", "player")
+	end
 	if CooldownManagerUtils:IsForever() and type(CombatLogGetCurrentEventInfo) == "function" and (not C_CombatLog or not C_CombatLog.IsCombatLogRestricted or not C_CombatLog.IsCombatLogRestricted()) then pcall(eventFrame.RegisterEvent, eventFrame, "COMBAT_LOG_EVENT_UNFILTERED") end
 	eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
@@ -5756,6 +5823,7 @@ if IsSupportedClient() then
 	pcall(eventFrame.RegisterEvent, eventFrame, "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 	pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "EDIT_MODE_LAYOUTS_UPDATED")
+	if CooldownManagerUtils:IsForever() then pcall(eventFrame.RegisterEvent, eventFrame, "UPDATE_EXHAUSTION") end
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
@@ -5772,7 +5840,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		elseif IsGroupUnit(unit) then
 			CooldownManagerUtils:ScheduleGroupBuffUpdate()
 		end
-	elseif event == "PLAYER_TARGET_CHANGED" or event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
+	elseif event == "PLAYER_TARGET_CHANGED" or event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UPDATE_EXHAUSTION" then
 		CooldownManagerUtils:ScheduleReminderUpdate()
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_CONNECTION" then
 		CooldownManagerUtils:ScheduleGroupBuffUpdate()
@@ -5798,8 +5866,12 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
 		CooldownManagerUtils:OnPlayerCombatLog()
 	elseif event == "UNIT_COMBAT" then
-		local _, action, _, _, schoolMask = ...
-		CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
+		local unit, action, _, _, schoolMask = ...
+		if not IsSecret(unit) and unit == "target" then
+			CooldownManagerUtils:OnTargetCombatEvent(action)
+		else
+			CooldownManagerUtils:OnPlayerCombatEvent(action, schoolMask)
+		end
 	elseif event == "WEAPON_ENCHANT_CHANGED" then
 		CooldownManagerUtils:OnWeaponEnchantUpdate()
 	elseif event == "BAG_UPDATE_DELAYED" then

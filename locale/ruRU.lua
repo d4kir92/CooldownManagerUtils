@@ -19,7 +19,7 @@ CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF", "Добавить эффе�
 CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_CLICK", "Нажмите, чтобы добавить")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_EMPTY", "Подходящее заклинание вашего класса не найдено.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_HINT", "Введите название или ID заклинания.")
-CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_INFO", "Найдите заклинание своего класса по названию или ID и нажмите на него, чтобы добавить его в напоминания об эффектах.")
+CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_INFO", "Найдите по названию заклинание своего класса или полученный эффект либо введите любой ID заклинания и нажмите на него, чтобы добавить его в напоминания об эффектах.")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_LISTED", "Уже в списке")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_SEARCH", "Название или ID заклинания")
 CooldownManagerUtils:AddTrans("ruRU", "LID_ADDBUFF_STATUS", "Статус")

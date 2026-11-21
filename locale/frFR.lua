@@ -19,7 +19,7 @@ CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF", "Ajouter une amélioration"
 CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_CLICK", "Cliquez pour ajouter")
 CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_EMPTY", "Aucun sort correspondant de votre classe n'a été trouvé.")
 CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_HINT", "Saisissez un nom ou un identifiant de sort.")
-CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_INFO", "Recherchez un sort de votre classe par nom ou par identifiant de sort, puis cliquez dessus pour l'ajouter aux rappels d'améliorations.")
+CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_INFO", "Recherchez par nom un sort de votre classe ou une amélioration que vous avez reçue, ou saisissez n'importe quel identifiant de sort, puis cliquez dessus pour l'ajouter aux rappels d'améliorations.")
 CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_LISTED", "Déjà présent")
 CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_SEARCH", "Nom ou identifiant du sort")
 CooldownManagerUtils:AddTrans("frFR", "LID_ADDBUFF_STATUS", "Statut")
