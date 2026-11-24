@@ -315,8 +315,9 @@ function CooldownManagerUtils:InitCDMMinimapButton()
 		["name"] = "CooldownManagerUtilsCDM",
 		["atlas"] = "QuestLog-icon-setting",
 		["dbtab"] = self:GetCDMMinimapDB(),
-		["vTT"] = {{self:Trans("LID_COOLDOWNMANAGER"), format("|T%d:16:16:0:0|t Cooldown Manager Utils", ICON)}, {self:Trans("LID_LEFTCLICK"), self:Trans("LID_OPENCOOLDOWNMANAGER")}, {self:Trans("LID_RIGHTCLICK"), self:Trans("LID_HIDEMINIMAPBUTTON")}},
-		["funcR"] = function() CooldownManagerUtils:SetCDMMinimapButtonShown(false) end,
+		["vTT"] = {{self:Trans("LID_COOLDOWNMANAGER"), format("|T%d:16:16:0:0|t Cooldown Manager Utils", ICON)}, {self:Trans("LID_LEFTCLICK"), self:Trans("LID_OPENCOOLDOWNMANAGER")}, {self:Trans("LID_RIGHTCLICK"), self:Trans("LID_OPENSETTINGS")}, {self:Trans("LID_SHIFTRIGHTCLICK"), self:Trans("LID_HIDEMINIMAPBUTTON")}},
+		["funcR"] = function() CooldownManagerUtils:ToggleOptions() end,
+		["funcSR"] = function() CooldownManagerUtils:SetCDMMinimapButtonShown(false) end,
 		["addoncomp"] = false,
 		["border"] = false,
 		["dbkey"] = "MMBTNCDM"
