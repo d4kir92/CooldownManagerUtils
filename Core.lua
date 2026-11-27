@@ -3713,7 +3713,7 @@ local function TrackAuraExpiration(entry, aura)
 	SetAuraExpiration(entry.spellID, expirationTime)
 end
 
-local function GetMinimapTrackingState()
+local function GetMinimapTrackingState(spellID)
 	if not C_Minimap or type(C_Minimap.GetNumTrackingTypes) ~= "function" or type(C_Minimap.GetTrackingFilter) ~= "function" or type(C_Minimap.GetTrackingInfo) ~= "function" then return nil end
 	local countOK, count = pcall(C_Minimap.GetNumTrackingTypes)
 	if not countOK or IsSecret(count) or type(count) ~= "number" then return nil end
@@ -3723,8 +3723,8 @@ local function GetMinimapTrackingState()
 		local filterOK, filter = pcall(C_Minimap.GetTrackingFilter, index)
 		local infoOK, info = pcall(C_Minimap.GetTrackingInfo, index)
 		if filterOK and infoOK and not IsSecret(filter) and not IsSecret(info) and type(filter) == "table" and type(info) == "table" then
-			local spellID = filter.spellID or info.spellID
-			if not IsSecret(spellID) and type(spellID) == "number" then
+			local trackedSpellID = filter.spellID or info.spellID
+			if not IsSecret(trackedSpellID) and type(trackedSpellID) == "number" and spellID == trackedSpellID then
 				found = true
 				if IsSecret(info.active) then
 					unknown = true
@@ -3873,7 +3873,7 @@ end
 local function GetReadableAuraState(entry)
 	if entry.reactiveAbility then return CooldownManagerUtils.GetReactiveAbilityState(entry) end
 	if entry.ammo then return CooldownManagerUtils.GetAmmoState(entry) end
-	if entry.minimapTracking then return GetMinimapTrackingState() end
+	if entry.minimapTracking then return GetMinimapTrackingState(nil) end
 	if entry.weaponEnchant then return GetWeaponEnchantState(entry) end
 	if entry.soulstone then return CooldownManagerUtils.GetSoulstoneState(entry) end
 	if not entry.activeBuff and entry.spellID == CooldownManagerUtils.FOREVER_BOOSTED_REST and CooldownManagerUtils.IsBoostedRestUnavailable() then return true end
@@ -4835,12 +4835,7 @@ function CooldownManagerUtils:UpdateReminderBarType(reminderType)
 				end
 
 				if entry.minimapTracking then
-					if not sharedMinimapTrackingState.resolved then
-						sharedMinimapTrackingState.present = GetMinimapTrackingState()
-						sharedMinimapTrackingState.resolved = true
-					end
-
-					if sharedMinimapTrackingState.present ~= nil then show = not sharedMinimapTrackingState.present end
+					show = not GetMinimapTrackingState(entry.spellID)
 				end
 
 				if not show and warningTime and not entry.reactiveAbility then
